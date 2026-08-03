@@ -33,9 +33,9 @@ export interface Turn {
  */
 export type Variant = 'standard' | 'cutthroat' | 'nopoints';
 
-export interface CricketState {
+export type CricketState = {
   players: Player[];
   turns: Turn[];
   currentIndex: number;
   variant: Variant;
-}
+};

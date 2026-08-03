@@ -13,7 +13,7 @@ export interface Round {
   penalties: Record<string, number>;
 }
 
-export interface RummikubState {
+export type RummikubState = {
   players: Player[];
   rounds: Round[];
-}
+};
