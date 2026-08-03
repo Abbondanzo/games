@@ -88,8 +88,10 @@ export class Room extends DurableObject {
       } else if (effect.to === 'member') {
         const payload = encode(effect.message);
         for (const ws of byMember.get(effect.memberId) ?? []) trySend(ws, payload);
-      } else {
+      } else if (effect.to === 'close') {
         for (const ws of byMember.get(effect.memberId) ?? []) ws.close(4003, 'removed');
+      } else {
+        for (const ws of sockets) ws.close(4002, 'room closed');
       }
     }
   }
@@ -207,6 +209,13 @@ export class Room extends DurableObject {
 
     // Kicking removes the member, so their token must stop working too.
     if (message.t === 'kick') await this.forgetTokens(outcome.state);
+
+    // Say it is over before the room goes away, then free the code.
+    if (outcome.effects.some((e) => e.to === 'shutdown')) {
+      this.dispatch(outcome.effects);
+      await this.ctx.storage.deleteAll();
+      return;
+    }
 
     await this.save(outcome.state);
     this.dispatch(outcome.effects);

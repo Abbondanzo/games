@@ -5,7 +5,7 @@
  * protocol against a real RoomCore. This is the test that would actually catch
  * a rooms regression, and it needs no network at all.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -168,6 +168,48 @@ describe('a host and a guest in one room', () => {
     await waitFor(() => expect(room.state().members[guestSession.memberId]).toBeUndefined());
     // Kicking closes the room, or they would simply rejoin.
     expect(room.state().locked).toBe(true);
+  });
+
+  // A host leaving would strand the game on the server, so the only way out
+  // ends the room and brings the game back to this device.
+  it('lets the host close the room, keeping the game locally', async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+
+    const host = mount(room, room.hostSession, 'host');
+    mount(room, guestSession, 'guest');
+
+    await addPlayers(user, host, 'Ada, Grace');
+    await waitFor(() => expect(players(host)).toEqual(['Ada', 'Grace']));
+
+    await user.click(within(host).getByRole('button', { name: 'Who is here' }));
+    await user.click(within(host).getByRole('button', { name: 'Close room' }));
+
+    // Back to playing alone, with the roster still there.
+    await waitFor(() =>
+      expect(within(host).queryByRole('button', { name: 'Who is here' })).not.toBeInTheDocument());
+    expect(localStorage.getItem('games.cricket.v1')).toContain('Ada');
+    confirm.mockRestore();
+  });
+
+  it('offers the host no way to leave without closing', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, guestSession, 'guest');
+
+    await user.click(within(host).getByRole('button', { name: 'Who is here' }));
+    await user.click(within(guest).getByRole('button', { name: 'Who is here' }));
+
+    expect(within(host).queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument();
+    expect(within(host).getByRole('button', { name: 'Close room' })).toBeInTheDocument();
+    // A guest leaving affects nobody else, so they still can.
+    expect(within(guest).getByRole('button', { name: 'Leave' })).toBeInTheDocument();
+    expect(within(guest).queryByRole('button', { name: 'Close room' })).not.toBeInTheDocument();
   });
 
   it('keeps the room code on screen for both of them', async () => {

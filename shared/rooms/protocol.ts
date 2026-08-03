@@ -107,6 +107,7 @@ export const ClientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('roundOpen'), reqId: Id, winnerId: Id }),
   z.object({ t: z.literal('rackSubmit'), reqId: Id, seatId: Id, total: z.int().min(0).max(1000) }),
   z.object({ t: z.literal('roundCancel'), reqId: Id }),
+  z.object({ t: z.literal('closeRoom'), reqId: Id }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
@@ -137,6 +138,8 @@ export const ServerMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('room'), room: RoomViewSchema }),
   z.object({ t: z.literal('error'), reqId: z.string().nullable(), code: ErrorCodeSchema }),
   z.object({ t: z.literal('kicked') }),
+  /** The host ended the room. Distinct from being removed, and said differently. */
+  z.object({ t: z.literal('closed') }),
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;
 

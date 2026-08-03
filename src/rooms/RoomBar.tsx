@@ -1,4 +1,4 @@
-import { Copy, DoorOpen, Lock, LockOpen, UserX, Users } from 'lucide-react';
+import { Copy, DoorOpen, Lock, LockOpen, PowerOff, UserX, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { RoomHandle } from './session';
 
@@ -12,6 +12,14 @@ export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => vo
 
   const online = room.members.filter((m) => m.online).length;
   const isHost = room.role === 'host';
+
+  function endRoom() {
+    const others = room.members.length - 1;
+    const warning = others > 0
+      ? `Close the room? The ${others} other ${others === 1 ? 'person' : 'people'} here will stop seeing the score. The game stays on this device.`
+      : 'Close the room? The game stays on this device.';
+    if (window.confirm(warning)) room.close();
+  }
 
   async function copyLink() {
     const link = `${window.location.origin}/#/join/${room.code}`;
@@ -73,15 +81,22 @@ export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => vo
                   : <><Lock size={15} aria-hidden="true" /> Close the room</>}
               </button>
             )}
-            <button type="button" className="ghost danger" onClick={onLeave}>
-              <DoorOpen size={15} aria-hidden="true" /> Leave
-            </button>
+            {isHost ? (
+              <button type="button" className="ghost danger" onClick={endRoom}>
+                <PowerOff size={15} aria-hidden="true" /> Close room
+              </button>
+            ) : (
+              <button type="button" className="ghost danger" onClick={onLeave}>
+                <DoorOpen size={15} aria-hidden="true" /> Leave
+              </button>
+            )}
           </div>
 
           {isHost && (
             <p className="hint">
               Share the code or the link. Anyone who joins can pick their name and enter their
-              own scores; only you can change the players or the rules.
+              own scores; only you can change the players or the rules. Closing the room ends it
+              for everyone and keeps the game on this device.
             </p>
           )}
         </div>

@@ -68,8 +68,8 @@ export function ScrabbleTracker() {
         <h1>Scrabble</h1>
         <div className="topbar-actions">
           {!room && <HostRoomButton game="scrabble" />}
-          <button type="button" className="ghost" onClick={() => setDictOpen(true)}>
-            <BookOpen size={15} aria-hidden="true" /> Dictionary
+          <button type="button" className="ghost" title="Look up a word" onClick={() => setDictOpen(true)}>
+            <BookOpen size={15} aria-hidden="true" /> <span className="btn-label">Dictionary</span>
           </button>
           {isHost && (
             <>
@@ -79,7 +79,7 @@ export function ScrabbleTracker() {
                 onClick={newGame}
                 title="Clear the scores and keep the players"
               >
-                <RotateCcw size={15} aria-hidden="true" /> New game
+                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
               </button>
               <button
                 type="button"
@@ -87,7 +87,7 @@ export function ScrabbleTracker() {
                 onClick={resetAll}
                 title="Clear the scores and the players"
               >
-                <Trash2 size={15} aria-hidden="true" /> Reset all
+                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
               </button>
             </>
           )}

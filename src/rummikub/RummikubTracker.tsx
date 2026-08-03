@@ -62,7 +62,7 @@ export function RummikubTracker() {
                 onClick={newGame}
                 title="Clear the rounds and keep the players"
               >
-                <RotateCcw size={15} aria-hidden="true" /> New game
+                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
               </button>
               <button
                 type="button"
@@ -70,7 +70,7 @@ export function RummikubTracker() {
                 onClick={resetAll}
                 title="Clear the rounds and the players"
               >
-                <Trash2 size={15} aria-hidden="true" /> Reset all
+                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
               </button>
             </>
           )}

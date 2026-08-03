@@ -511,3 +511,27 @@ button.ghost, button.primary, button.link {
   background: var(--card-2); border: 1px solid var(--line); color: var(--muted);
 }
 .rack-progress li.in { border-color: var(--good); color: var(--text); }
+
+/* ─────────────────────────── narrow top bar ─────────────────────────── */
+
+/*
+ * The top bar gained a Share button on top of New game and Reset all, and on
+ * Scrabble the dictionary as well, which is more than fits on a phone. Below
+ * this width the labels are hidden but kept in the accessibility tree, so the
+ * buttons still announce themselves properly and are still found by name.
+ */
+@media (max-width: 620px) {
+  .topbar { gap: .5rem; padding-left: calc(.7rem + env(safe-area-inset-left)); padding-right: calc(.7rem + env(safe-area-inset-right)); }
+  .topbar h1 { font-size: 1rem; }
+  .topbar-actions { gap: .3rem; }
+  .topbar-actions button.ghost { padding: .5rem; gap: 0; }
+  .topbar-actions .btn-label {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
+
+/* Nothing should ever push the bar wider than the screen. */
+.topbar { min-width: 0; }
+.topbar h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-actions { flex-shrink: 0; }

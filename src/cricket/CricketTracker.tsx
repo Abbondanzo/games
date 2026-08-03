@@ -148,7 +148,7 @@ export function CricketTracker() {
                 onClick={newGame}
                 title="Clear the board and keep the players"
               >
-                <RotateCcw size={15} aria-hidden="true" /> New game
+                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
               </button>
               <button
                 type="button"
@@ -156,7 +156,7 @@ export function CricketTracker() {
                 onClick={resetAll}
                 title="Clear the board and the players"
               >
-                <Trash2 size={15} aria-hidden="true" /> Reset all
+                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
               </button>
             </>
           )}

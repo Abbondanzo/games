@@ -72,7 +72,9 @@ export type ApplyAction<S> = (state: S, action: GameAction) => S | null;
 export type Effect =
   | { to: 'all'; message: ServerMessage }
   | { to: 'member'; memberId: string; message: ServerMessage }
-  | { to: 'close'; memberId: string };
+  | { to: 'close'; memberId: string }
+  /** The room is over: drop every socket and delete it. */
+  | { to: 'shutdown' };
 
 export interface Outcome<S extends Snapshot = Snapshot> {
   state: RoomState<S>;
@@ -285,6 +287,19 @@ export function handle<S extends Snapshot>(
         },
       };
       return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+    }
+
+    /**
+     * Ending the room, which only the host can do. There is deliberately no way
+     * for a host to leave one: the game lives on the server, so a host walking
+     * out would strand it with nobody able to add a player or change the rules.
+     */
+    case 'closeRoom': {
+      if (member.role !== 'host') return fail(touched, memberId, message.reqId, 'host-only');
+      return {
+        state: touched,
+        effects: [{ to: 'all', message: { t: 'closed' } }, { to: 'shutdown' }],
+      };
     }
 
     case 'roundCancel': {

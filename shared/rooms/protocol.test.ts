@@ -15,6 +15,7 @@ const CLIENT: ClientMessage[] = [
   { t: 'roundOpen', reqId: 'r4', winnerId: 'p1' },
   { t: 'rackSubmit', reqId: 'r5', seatId: 'p2', total: 24 },
   { t: 'roundCancel', reqId: 'r6' },
+  { t: 'closeRoom', reqId: 'r7' },
 ];
 
 const SERVER: ServerMessage[] = [
@@ -41,6 +42,7 @@ const SERVER: ServerMessage[] = [
   { t: 'error', reqId: 'r1', code: 'not-your-turn' },
   { t: 'error', reqId: null, code: 'rate-limited' },
   { t: 'kicked' },
+  { t: 'closed' },
 ];
 
 describe('round trips', () => {

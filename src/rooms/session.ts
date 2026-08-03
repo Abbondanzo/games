@@ -44,7 +44,14 @@ export interface RoomHandle {
   claimSeat: (seatId: string | null) => void;
   setLocked: (locked: boolean) => void;
   kick: (memberId: string) => void;
+  /**
+   * Stop following the room. Guests only: a host cannot leave, because the game
+   * lives in the room and walking out would strand it with nobody able to
+   * administer it. This does nothing when called by the host.
+   */
   leave: () => void;
+  /** Ends the room for everyone. Host only. */
+  close: () => void;
 }
 
 export interface GameSessionOptions<S extends Snapshot, A> {
@@ -102,8 +109,22 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
 
   const transport = useRef<Transport | null>(null);
   const rev = useRef(0);
+  const roleRef = useRef<Role>('player');
+  const stateRef = useRef<S>(initialState);
   const inFlight = useRef(new Map<string, A>());
   const rejectHandler = useRef<(action: A, code: ErrorCode) => void>(() => {});
+
+  // Read in the close handler, which cannot see the render's state.
+  stateRef.current = state;
+
+  /** Writes what the room last sent into this device's own save. */
+  const keepLocally = useCallback(() => {
+    try {
+      localStorage.setItem(storeKey, JSON.stringify(stateRef.current));
+    } catch {
+      // Storage can be unavailable; nothing more to do.
+    }
+  }, [storeKey]);
 
   /* ── solo: persist exactly as before ── */
   useEffect(() => {
@@ -130,6 +151,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
           switch (message.t) {
             case 'welcome':
               rev.current = message.rev;
+              roleRef.current = message.you.role;
               setRole(message.you.role);
               setSeatId(message.you.seatId);
               setMembers(message.room.members);
@@ -151,6 +173,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
               const me = message.room.members.find((m) => m.memberId === session.memberId);
               if (me) {
                 setSeatId(me.seatId);
+                roleRef.current = me.role;
                 setRole(me.role);
               }
               break;
@@ -167,6 +190,14 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
             }
 
             case 'kicked':
+              clearSession(game);
+              setSession(null);
+              break;
+
+            case 'closed':
+              // The host started this game and has just stopped sharing it, so
+              // it carries on here rather than disappearing with the room.
+              if (roleRef.current === 'host') keepLocally();
               clearSession(game);
               setSession(null);
               break;
@@ -226,9 +257,12 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       setLocked: (value) => transport.current?.send({ t: 'lock', locked: value }),
       kick: (memberId) => transport.current?.send({ t: 'kick', memberId }),
       leave: () => {
+        // A host has no way out that is not closing the room.
+        if (role === 'host') return;
         clearSession(game);
         setSession(null);
       },
+      close: () => transport.current?.send({ t: 'closeRoom', reqId: nextRequestId() }),
     };
   }, [session, game, state, role, seatId, members, locked, status, pending, lastError]);
 

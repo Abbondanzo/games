@@ -67,6 +67,10 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
 
   function deliver(effects: Effect[]): void {
     for (const effect of effects) {
+      if (effect.to === 'shutdown') {
+        sockets.clear();
+        continue;
+      }
       if (effect.to === 'close') {
         sockets.delete(effect.memberId);
         continue;

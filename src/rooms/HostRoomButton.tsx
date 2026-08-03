@@ -31,7 +31,8 @@ export function HostRoomButton({ game }: { game: Game }) {
   return (
     <>
       <button type="button" className="ghost" onClick={() => void host()} disabled={busy}>
-        <Users size={15} aria-hidden="true" /> {busy ? 'Starting' : 'Share'}
+        <Users size={15} aria-hidden="true" />{' '}
+        <span className="btn-label">{busy ? 'Starting' : 'Share'}</span>
       </button>
       {error && <span className="room-error">{ROOM_ERRORS[error]}</span>}
     </>

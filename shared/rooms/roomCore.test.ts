@@ -439,6 +439,29 @@ describe('collecting Rummikub racks', () => {
   });
 });
 
+/**
+ * A host has no way to leave. The game lives in the room, so a host walking out
+ * would strand it with nobody able to add a player or change the rules. Ending
+ * it is the only exit, and it ends it for everyone.
+ */
+describe('closing a room', () => {
+  it('tells everyone and shuts the room down', () => {
+    const room = withGuest(newRoom(), 'm1', 'Grace');
+    const { effects } = act(room, HOST.memberId, { t: 'closeRoom', reqId: 'x1' });
+
+    expect(sentTo(effects, 'all')).toContainEqual({ t: 'closed' });
+    expect(effects).toContainEqual({ to: 'shutdown' });
+  });
+
+  it('is refused to a guest', () => {
+    const room = withGuest(newRoom(), 'm1', 'Grace');
+    const { effects } = act(room, 'm1', { t: 'closeRoom', reqId: 'x1' });
+
+    expect(firstError(effects)?.code).toBe('host-only');
+    expect(effects.some((e) => e.to === 'shutdown')).toBe(false);
+  });
+});
+
 describe('activity', () => {
   it('records the time of the last message, for idle expiry', () => {
     const room = newRoom();
