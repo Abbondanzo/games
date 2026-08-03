@@ -9,7 +9,9 @@
  */
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
+  compareProtocol,
   type ErrorCode, type Game, type GameAction, type Member, type Role, type Snapshot,
+  type VersionGap,
 } from '@shared/rooms/protocol';
 import { can as canDo, seatView } from '@shared/rooms/permissions';
 import {
@@ -39,6 +41,11 @@ export interface RoomHandle {
   /** True while a request is in flight, so entry controls can wait. */
   sending: boolean;
   lastError: ErrorCode | null;
+  /**
+   * Set when this app and the room are different versions. Worth surfacing:
+   * otherwise a button the room has never heard of just appears to be broken.
+   */
+  outdated: VersionGap | null;
   /** Would the room accept this kind of action from me right now? */
   can: (actionType: string) => boolean;
   setLocked: (locked: boolean) => void;
@@ -105,6 +112,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
   const [role, setRole] = useState<Role>('player');
   const [lastError, setLastError] = useState<ErrorCode | null>(null);
   const [pending, setPending] = useState(0);
+  const [outdated, setOutdated] = useState<VersionGap | null>(null);
 
   const transport = useRef<Transport | null>(null);
   const rev = useRef(0);
@@ -150,6 +158,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
           switch (message.t) {
             case 'welcome':
               rev.current = message.rev;
+              setOutdated(compareProtocol(message.protocol));
               roleRef.current = message.you.role;
               setRole(message.you.role);
               setSeatId(message.you.seatId);
@@ -250,6 +259,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       status,
       sending: pending > 0,
       lastError,
+      outdated,
       can: (actionType: string) => canDo(game, view, actor, actionType),
       setLocked: (value) => transport.current?.send({ t: 'lock', locked: value }),
       kick: (memberId) => transport.current?.send({ t: 'kick', memberId }),
@@ -261,7 +271,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       },
       close: () => transport.current?.send({ t: 'closeRoom', reqId: nextRequestId() }),
     };
-  }, [session, game, state, role, seatId, members, locked, status, pending, lastError]);
+  }, [session, game, state, role, seatId, members, locked, status, pending, lastError, outdated]);
 
   return { state, dispatch, room, onReject };
 }

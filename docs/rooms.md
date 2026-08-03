@@ -107,10 +107,20 @@ VITE_ROOMS_URL=http://localhost:8787 pnpm dev
 Deploy the Worker by hand with `pnpm worker:deploy`. CI deliberately holds no
 secrets and does not deploy.
 
-**Deploy the Worker before the client** when a protocol field is added. The two
-deploy independently and the app is precached by a service worker, so a client
-can be weeks old. Protocol changes must stay additive; `PROTOCOL_VERSION` is for
-breaking ones.
+**Deploy the Worker before the client.** The two deploy independently and the
+app is precached by a service worker, so a client can be weeks old.
+
+Only *server-to-client* additions are safe, because an old client ignores a
+frame it cannot read. Adding a *client-to-server* message is not: an old room
+rejects a frame it has never heard of, and the player just sees a button that
+does nothing useful. Bump `PROTOCOL_VERSION` whenever one side gains something
+the other cannot understand, including that case - the client compares it
+against the version in the welcome and says which side is behind, rather than
+leaving a generic failure to be puzzled over.
+
+This has already happened once: `closeRoom` shipped to the client while the
+deployed Worker predated it, and closing a room reported "Something went wrong"
+with nothing to indicate why.
 
 ## Testing
 

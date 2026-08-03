@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ERROR_CODES, ERROR_MESSAGES, MAX_FRAME_BYTES, PROTOCOL_VERSION,
+  ERROR_CODES, ERROR_MESSAGES, MAX_FRAME_BYTES, PROTOCOL_VERSION, VERSION_MESSAGES,
+  compareProtocol,
   type ClientMessage, type ServerMessage,
   decodeClientMessage, decodeServerMessage, encode,
 } from './protocol';
@@ -105,6 +106,33 @@ describe('malformed input is dropped, not thrown on', () => {
     ['an unknown error code', '{"t":"error","reqId":null,"code":"teapot"}'],
   ])('drops server frames with %s', (_label, raw) => {
     expect(decodeServerMessage(raw)).toBeNull();
+  });
+});
+
+/**
+ * The two sides deploy separately, so being out of step is routine rather than
+ * exceptional. A room that has never heard of a frame just rejects it, which
+ * looks to the player like a broken button unless we say otherwise.
+ */
+describe('version mismatch', () => {
+  it('says nothing when both sides agree', () => {
+    expect(compareProtocol(PROTOCOL_VERSION)).toBeNull();
+  });
+
+  it('blames the room when the room is behind', () => {
+    expect(compareProtocol(PROTOCOL_VERSION - 1)).toBe('room');
+  });
+
+  it('blames the app when the app is behind', () => {
+    expect(compareProtocol(PROTOCOL_VERSION + 1)).toBe('app');
+  });
+
+  it('explains both without mentioning versions or servers', () => {
+    const JARGON = /\b(version|protocol|server|deploy|websocket|\d{3})\b/i;
+    for (const [gap, message] of Object.entries(VERSION_MESSAGES)) {
+      expect(message, gap).not.toMatch(JARGON);
+      expect(message, gap).toMatch(/^[A-Z].*[.!]$/);
+    }
   });
 });
 

@@ -1,5 +1,6 @@
 import { Copy, DoorOpen, Lock, LockOpen, PowerOff, UserX, Users } from 'lucide-react';
 import { useState } from 'react';
+import { VERSION_MESSAGES } from '@shared/rooms/protocol';
 import type { RoomHandle } from './session';
 
 /**
@@ -49,6 +50,10 @@ export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => vo
           {open ? 'Hide' : 'Who is here'}
         </button>
       </div>
+
+      {room.outdated && (
+        <p className="room-error" role="status">{VERSION_MESSAGES[room.outdated]}</p>
+      )}
 
       {open && (
         <div className="room-detail">

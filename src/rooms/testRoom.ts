@@ -41,7 +41,8 @@ export interface TestRoom {
   hostSession: StoredSession;
   /** Hands a session to this tab, as create or join would. */
   signIn: (session: StoredSession) => void;
-  transport: TransportFactory;
+  /** Optionally pretends to be a room of a different protocol version. */
+  transport: (options?: { protocol?: number }) => TransportFactory;
   /** The room's own view, for asserting on the server rather than the UI. */
   state: () => RoomState;
 }
@@ -105,7 +106,7 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
 
     signIn: writeSession,
 
-    transport: ({ token, handlers }) => {
+    transport: (options) => ({ token, handlers }) => {
       const memberId = tokens.get(token);
       if (!memberId) throw new Error('unknown token');
 
@@ -114,7 +115,11 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
 
       const opened = connect(state, memberId, ctx());
       state = opened.state;
-      deliver(opened.effects);
+      deliver(options?.protocol === undefined
+        ? opened.effects
+        : opened.effects.map((e) => (e.to === 'member' && e.message.t === 'welcome'
+          ? { ...e, message: { ...e.message, protocol: options.protocol! } }
+          : e)));
 
       return {
         send(message) {

@@ -13,11 +13,33 @@
 import { z } from 'zod';
 
 /**
- * Bumped only for a breaking change. The client and the Worker deploy
- * independently, and a precached client can be weeks old, so additive changes
- * must stay backward compatible and leave this alone.
+ * The client and the room server deploy separately, and a precached client can
+ * be weeks old, so the two are routinely different versions.
+ *
+ * Bump this whenever one side gains something the other cannot understand. That
+ * includes adding a client-to-server message: an older room will reject a frame
+ * it has never heard of, which looks to the player like the button is broken.
+ * Only server-to-client additions are genuinely safe, because an old client
+ * ignores what it cannot read.
+ *
+ * 2: added closeRoom, roundOpen, rackSubmit, roundCancel.
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
+
+/** Which side is behind, worked out from the version in the welcome. */
+export type VersionGap = 'app' | 'room';
+
+export const compareProtocol = (roomVersion: number): VersionGap | null => {
+  if (roomVersion < PROTOCOL_VERSION) return 'room';
+  if (roomVersion > PROTOCOL_VERSION) return 'app';
+  return null;
+};
+
+/** Said without mentioning versions, servers or deploys. */
+export const VERSION_MESSAGES: Record<VersionGap, string> = {
+  room: 'This room needs updating before everything here will work.',
+  app: 'This app is out of date. Refresh to get the latest.',
+};
 
 export const GameSchema = z.enum(['scrabble', 'cricket', 'rummikub']);
 export type Game = z.infer<typeof GameSchema>;

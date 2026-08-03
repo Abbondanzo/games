@@ -14,17 +14,23 @@ import { CricketTracker } from '../cricket/CricketTracker';
 import { ScrabbleTracker } from '../scrabble/ScrabbleTracker';
 import { RoomProvider } from './RoomProvider';
 import { createTestRoom, type TestRoom } from './testRoom';
+import { PROTOCOL_VERSION } from '@shared/rooms/protocol';
 import type { StoredSession } from './storage';
 
 type User = ReturnType<typeof userEvent.setup>;
 
 /** Renders one client into its own container, so the two never collide. */
-function mount(room: TestRoom, session: StoredSession, label: string): HTMLElement {
+function mount(
+  room: TestRoom,
+  session: StoredSession,
+  label: string,
+  options?: { protocol?: number },
+): HTMLElement {
   const host = document.createElement('div');
   host.dataset.client = label;
   document.body.append(host);
   render(
-    <RoomProvider value={{ transport: room.transport, session }}>
+    <RoomProvider value={{ transport: room.transport(options), session }}>
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <CricketTracker />
       </MemoryRouter>
@@ -222,6 +228,24 @@ describe('a host and a guest in one room', () => {
     expect(within(guest).queryByRole('button', { name: 'Close room' })).not.toBeInTheDocument();
   });
 
+  // The exact failure that made "Close room" look broken: a room deployed
+  // before the frame existed rejects it, with nothing to explain why.
+  it('says so when the room is behind this app', async () => {
+    const room = createTestRoom('cricket');
+    const host = mount(room, room.hostSession, 'host', { protocol: PROTOCOL_VERSION - 1 });
+
+    await waitFor(() =>
+      expect(within(host).getByText(/needs updating/i)).toBeInTheDocument());
+  });
+
+  it('says nothing when both sides match', async () => {
+    const room = createTestRoom('cricket');
+    const host = mount(room, room.hostSession, 'host');
+
+    await waitFor(() => expect(within(host).getByText('AB2D')).toBeInTheDocument());
+    expect(within(host).queryByText(/needs updating/i)).not.toBeInTheDocument();
+  });
+
   it('keeps the room code on screen for both of them', async () => {
     const room = createTestRoom('cricket');
     const guestSession = room.addMember('Grace');
@@ -243,7 +267,7 @@ describe('a Scrabble room', () => {
     container.dataset.client = label;
     document.body.append(container);
     render(
-      <RoomProvider value={{ transport: room.transport, session }}>
+      <RoomProvider value={{ transport: room.transport(), session }}>
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ScrabbleTracker />
         </MemoryRouter>

@@ -108,8 +108,10 @@ it fail first.
   cannot mint the same ids.
 - **Solo play must never touch the network.** There is a test asserting no WebSocket is
   constructed and that storage is still written. Keep it passing.
-- **Deploy the Worker before the client** when adding a protocol field. They deploy separately
-  and the app is precached, so a client can be weeks old. Additive changes only.
+- **Deploy the Worker before the client.** They deploy separately and the app is precached, so a
+  client can be weeks old. Server-to-client additions are safe; a new *client-to-server* message
+  is not, because an old room rejects a frame it has never heard of and the button just appears
+  broken. Bump `PROTOCOL_VERSION` for either, so the mismatch names itself.
 - **Storage keys are `games.<game>.v1`.** Changing one discards saved games, so version them
   rather than renaming.
 
