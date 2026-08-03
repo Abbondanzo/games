@@ -138,12 +138,18 @@ export class Room extends DurableObject {
     const memberId = uid();
     const token = uid();
 
-    const result = join(state, { memberId, name: body.name, now: Date.now() });
+    const result = join(
+      state,
+      { memberId, name: body.name, now: Date.now() },
+      this.applyFor(state.game),
+    );
     if (!result.ok) return json({ error: result.code }, 409);
 
     const tokens = (await this.ctx.storage.get<Record<string, string>>('tokens')) ?? {};
     await this.ctx.storage.put('tokens', { ...tokens, [token]: memberId });
     await this.save(result.state);
+    // Joining adds a player, so whoever is already connected needs to see it.
+    this.dispatch(result.effects);
 
     return json({ code: state.code, token, memberId, game: state.game });
   }

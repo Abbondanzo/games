@@ -8,12 +8,19 @@ sees the score update live and can enter their own turns.
 **To host**, open any game and press **Share**. A code appears in a strip under
 the top bar, along with a copyable invite link.
 
-**To join**, either follow the link, or use **Join a game** on the home page and
-type the code. Pick which player you are, and you can enter your own scores.
+**To join**, either follow the link, or use **Join a game** on the home page.
+Enter the code and the name you want on the scoreboard, and you are in the game
+straight away, entering your own scores. Nobody waits on the host.
 
-The host runs the room: adding and removing players, changing the rules,
-locking it, and removing anyone. Everyone else can enter scores for the player
-they picked, and watch everything else.
+The host runs the room: typing in anyone playing without a phone, removing
+players, changing the rules, stopping new players joining, and removing anyone.
+Everyone else enters their own scores and watches the rest.
+
+**Stop new players** closes the door without ending anything, and is what
+prevents both a join and the player it would have created. **Close room** ends
+it for everyone, and keeps the game on the host's device. A host cannot simply
+leave: the game lives in the room, so walking out would strand it with nobody
+able to administer it.
 
 ## What the code is
 
@@ -51,10 +58,15 @@ re-evaluated against newer state. This matters because "is it your turn?" is a
 question about a particular snapshot: `recordTurn` carries no player id, so the
 room attributes it to whoever is up.
 
-**Seats.** A seat is a player id. First claim wins, which a Durable Object
-serialises naturally. Seats survive a dropped connection, so a sleeping phone
-keeps its place, and they are re-derived from the game after every change, so
-removing a player cannot leave someone holding a seat that no longer exists.
+**Seats.** A seat is a player id, handed out when you join and never chosen.
+Joining runs the game's own `addPlayers` and seats you on the player it creates,
+so the room and the game cannot disagree about who is who. A second Grace
+becomes "Grace 2", since two of them would be indistinguishable on the
+scoreboard.
+
+Seats survive a dropped connection, so a sleeping phone keeps its place, and
+they are re-derived from the game after every change: if the host removes your
+player you become a spectator rather than holding a seat that no longer exists.
 
 **Rummikub** is the exception. A round records every rack at once, so it cannot
 be seat-scoped. The host opens a round, each player submits their own rack, and

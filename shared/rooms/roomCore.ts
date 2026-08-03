@@ -131,32 +131,84 @@ export function createRoom<S extends Snapshot>(input: {
 }
 
 export type JoinResult<S extends Snapshot> =
-  | { ok: true; state: RoomState<S>; member: StoredMember }
+  | { ok: true; state: RoomState<S>; member: StoredMember; effects: Effect[] }
   | { ok: false; code: ErrorCode };
 
+/**
+ * Two people called Grace would be indistinguishable on the scoreboard, so the
+ * second becomes "Grace 2". Only joiners are numbered; a host typing the roster
+ * can call people whatever they like.
+ */
+function distinctName(wanted: string, taken: readonly string[]): string {
+  const trimmed = wanted.trim() || 'Player';
+  if (!taken.includes(trimmed)) return trimmed;
+  for (let n = 2; n < 100; n++) {
+    const candidate = `${trimmed} ${n}`;
+    if (!taken.includes(candidate)) return candidate;
+  }
+  return trimmed;
+}
+
+/**
+ * Joining adds you to the game, not just to the room.
+ *
+ * Someone who types their name is here to play, so the room creates the player
+ * and seats them in one step. Waiting for the host to add you and then picking
+ * yourself off a list is two rounds of coordination for something nobody needs
+ * to decide.
+ *
+ * Locking is therefore what stops both at once: no join, no new player.
+ */
 export function join<S extends Snapshot>(
   state: RoomState<S>,
   input: { memberId: string; name: string; now: number },
+  apply: ApplyAction<S>,
 ): JoinResult<S> {
   if (state.locked) return { ok: false, code: 'room-locked' };
   if (Object.keys(state.members).length >= MAX_MEMBERS) return { ok: false, code: 'room-full' };
 
+  const before = seatView[state.game](state.snapshot);
+  const name = distinctName(input.name, namesIn(state.snapshot));
+
+  const snapshot = apply(state.snapshot, { type: 'addPlayers', names: name });
+  // If the game would not take the player, they still join as a spectator
+  // rather than being turned away at the door.
+  const added = snapshot && snapshot !== state.snapshot ? snapshot : null;
+  const seatId = added
+    ? seatView[state.game](added).playerIds.find((id) => !before.playerIds.includes(id)) ?? null
+    : null;
+
   const member: StoredMember = {
     memberId: input.memberId,
-    name: input.name,
+    name,
     role: 'player',
-    seatId: null,
+    seatId,
     seen: [],
   };
-  return {
-    ok: true,
-    member,
-    state: {
-      ...state,
-      members: { ...state.members, [input.memberId]: member },
-      lastActiveAt: input.now,
-    },
+
+  const next: RoomState<S> = {
+    ...state,
+    snapshot: added ?? state.snapshot,
+    rev: added ? state.rev + 1 : state.rev,
+    members: { ...state.members, [input.memberId]: member },
+    lastActiveAt: input.now,
   };
+
+  // Whoever is already connected needs to see the new player arrive.
+  const effects: Effect[] = added
+    ? [{ to: 'all', message: { t: 'state', rev: next.rev, state: added, cause: null } }]
+    : [];
+
+  return { ok: true, member, state: next, effects };
+}
+
+/** Player names already in the game, so a joiner does not collide with one. */
+function namesIn(snapshot: Snapshot): string[] {
+  const players = snapshot.players;
+  if (!Array.isArray(players)) return [];
+  return players
+    .map((p) => (typeof p === 'object' && p !== null ? (p as { name?: unknown }).name : null))
+    .filter((n): n is string => typeof n === 'string');
 }
 
 /** A socket opened. The joiner gets everything; everyone else gets the presence change. */
@@ -237,9 +289,6 @@ export function handle<S extends Snapshot>(
   switch (message.t) {
     case 'action':
       return handleAction(touched, member, message, ctx, apply);
-
-    case 'claimSeat':
-      return handleClaimSeat(touched, member, message, ctx);
 
     case 'setName': {
       const members = {
@@ -380,32 +429,6 @@ function handleAction<S extends Snapshot>(
     effects.push({ to: 'all', message: { t: 'room', room: roomView(next, ctx) } });
   }
   return { state: next, effects };
-}
-
-function handleClaimSeat<S extends Snapshot>(
-  state: RoomState<S>,
-  member: StoredMember,
-  message: Extract<ClientMessage, { t: 'claimSeat' }>,
-  ctx: Context,
-): Outcome<S> {
-  const { seatId } = message;
-
-  if (seatId !== null) {
-    const seats = seatView[state.game](state.snapshot).playerIds;
-    if (!seats.includes(seatId)) return fail(state, member.memberId, message.reqId, 'not-your-seat');
-
-    // First claim wins. A room handles one message at a time, so this is a
-    // natural serialisation point and needs no locking.
-    const taken = Object.values(state.members)
-      .some((m) => m.memberId !== member.memberId && m.seatId === seatId);
-    if (taken) return fail(state, member.memberId, message.reqId, 'seat-taken');
-  }
-
-  const next: RoomState<S> = {
-    ...state,
-    members: { ...state.members, [member.memberId]: { ...member, seatId } },
-  };
-  return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
 }
 
 function handleKick<S extends Snapshot>(

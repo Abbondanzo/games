@@ -63,13 +63,34 @@ describe('a host and a guest in one room', () => {
     const host = mount(room, room.hostSession, 'host');
     const guest = mount(room, guestSession, 'guest');
 
-    await addPlayers(user, host, 'Ada, Grace');
+    // Grace joined, so she is already a player; the host adds Ada, who has no phone.
+    await waitFor(() => expect(players(host)).toEqual(['Grace']));
+    await addPlayers(user, host, 'Ada');
 
-    // The guest sees the roster appear without doing anything.
-    await waitFor(() => expect(players(guest)).toEqual(['Ada', 'Grace']));
+    await waitFor(() => expect(players(guest)).toEqual(['Grace', 'Ada']));
   });
 
-  it('lets a guest claim a seat and score on their own turn', async () => {
+  // Typing your name is the whole of joining. Nobody waits on the host.
+  it('puts the joiner straight into the game, seated', async () => {
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(players(guest)).toEqual(['Grace']));
+    // Seated at the door: nothing to choose, nothing to wait for.
+    expect(room.state().members[guestSession.memberId]?.seatId).toBeTruthy();
+  });
+
+  it('numbers a second joiner with the same name', async () => {
+    const room = createTestRoom('cricket');
+    room.addMember('Grace');
+    const second = room.addMember('Grace');
+    const client = mount(room, second, 'second');
+
+    await waitFor(() => expect(players(client)).toEqual(['Grace', 'Grace 2']));
+  });
+
+  it('lets a guest score on their own turn', async () => {
     const user = userEvent.setup();
     const room = createTestRoom('cricket');
     const guestSession = room.addMember('Grace');
@@ -77,13 +98,10 @@ describe('a host and a guest in one room', () => {
     const host = mount(room, room.hostSession, 'host');
     const guest = mount(room, guestSession, 'guest');
 
-    await addPlayers(user, host, 'Ada, Grace');
-    await waitFor(() => expect(players(guest)).toEqual(['Ada', 'Grace']));
-
-    // Ada is up first, so the guest takes that seat to be able to throw.
-    await user.click(await within(guest).findByRole('button', { name: 'Play as Ada' }));
-    await waitFor(() =>
-      expect(within(guest).queryByText('Which one are you?')).not.toBeInTheDocument());
+    // Grace joined first, so she is player one and it is her turn.
+    await waitFor(() => expect(players(guest)).toEqual(['Grace']));
+    await addPlayers(user, host, 'Ada');
+    await waitFor(() => expect(players(guest)).toEqual(['Grace', 'Ada']));
 
     await throwDart(user, guest, 'Triple', 'Triple 20');
     await user.click(within(guest).getByRole('button', { name: 'End turn' }));
@@ -101,11 +119,10 @@ describe('a host and a guest in one room', () => {
     const host = mount(room, room.hostSession, 'host');
     const guest = mount(room, guestSession, 'guest');
 
-    await addPlayers(user, host, 'Ada, Grace');
-    await waitFor(() => expect(players(guest)).toEqual(['Ada', 'Grace']));
-
-    // Takes Grace's seat while Ada is the one up.
-    await user.click(await within(guest).findByRole('button', { name: 'Play as Grace' }));
+    // The host adds Ada and hands her the turn, so it is not the guest's.
+    await addPlayers(user, host, 'Ada');
+    await waitFor(() => expect(players(guest)).toEqual(['Grace', 'Ada']));
+    await user.click(within(host).getByTitle("Make it Ada's turn"));
     await waitFor(() => expect(within(guest).getByText(/Now throwing/)).toHaveTextContent('Ada'));
 
     // The controls are closed off rather than failing after the fact.
@@ -121,8 +138,8 @@ describe('a host and a guest in one room', () => {
     const host = mount(room, room.hostSession, 'host');
     const guest = mount(room, guestSession, 'guest');
 
-    await addPlayers(user, host, 'Ada, Grace');
-    await waitFor(() => expect(players(guest)).toEqual(['Ada', 'Grace']));
+    await addPlayers(user, host, 'Ada');
+    await waitFor(() => expect(players(guest)).toEqual(['Grace', 'Ada']));
 
     for (const label of ['New game', 'Reset all']) {
       expect(within(host).getByRole('button', { name: label })).toBeInTheDocument();
@@ -132,26 +149,17 @@ describe('a host and a guest in one room', () => {
     expect(within(guest).queryByRole('button', { name: 'Cut-throat' })).not.toBeInTheDocument();
   });
 
-  it('gives a seat to whoever asks first', async () => {
+  // Locking is what stops a join, and therefore the player it would have made.
+  it('turns away a join once the host stops new players', async () => {
     const user = userEvent.setup();
     const room = createTestRoom('cricket');
-    const first = room.addMember('Grace');
-    const second = room.addMember('Alan');
-
     const host = mount(room, room.hostSession, 'host');
-    const a = mount(room, first, 'a');
-    const b = mount(room, second, 'b');
 
-    await addPlayers(user, host, 'Ada, Grace');
-    await waitFor(() => expect(players(a)).toEqual(['Ada', 'Grace']));
+    await user.click(within(host).getByRole('button', { name: 'Who is here' }));
+    await user.click(within(host).getByRole('button', { name: 'Stop new players' }));
+    await waitFor(() => expect(room.state().locked).toBe(true));
 
-    await user.click(await within(a).findByRole('button', { name: 'Play as Ada' }));
-    await waitFor(() => expect(room.state().members[first.memberId]?.seatId).toBeTruthy());
-
-    // The seat is gone, so it is no longer offered to the second player.
-    await waitFor(() =>
-      expect(within(b).queryByRole('button', { name: 'Play as Ada' })).not.toBeInTheDocument());
-    expect(room.state().members[second.memberId]?.seatId).toBeNull();
+    expect(() => room.addMember('Late')).toThrow(/room-locked/);
   });
 
   it('drops a kicked member out of the room', async () => {
@@ -181,8 +189,9 @@ describe('a host and a guest in one room', () => {
     const host = mount(room, room.hostSession, 'host');
     mount(room, guestSession, 'guest');
 
-    await addPlayers(user, host, 'Ada, Grace');
-    await waitFor(() => expect(players(host)).toEqual(['Ada', 'Grace']));
+    await waitFor(() => expect(players(host)).toEqual(['Grace']));
+    await addPlayers(user, host, 'Ada');
+    await waitFor(() => expect(players(host)).toEqual(['Grace', 'Ada']));
 
     await user.click(within(host).getByRole('button', { name: 'Who is here' }));
     await user.click(within(host).getByRole('button', { name: 'Close room' }));
@@ -190,7 +199,7 @@ describe('a host and a guest in one room', () => {
     // Back to playing alone, with the roster still there.
     await waitFor(() =>
       expect(within(host).queryByRole('button', { name: 'Who is here' })).not.toBeInTheDocument());
-    expect(localStorage.getItem('games.cricket.v1')).toContain('Ada');
+    expect(localStorage.getItem('games.cricket.v1')).toContain('Grace');
     confirm.mockRestore();
   });
 

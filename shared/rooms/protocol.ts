@@ -46,7 +46,6 @@ export const ErrorCodeSchema = z.enum([
   'rate-limited',
   'room-full',
   'room-locked',
-  'seat-taken',
   'stale-rev',
   'too-large',
   'unknown-action',
@@ -100,7 +99,6 @@ export type Cause = z.infer<typeof CauseSchema>;
 
 export const ClientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('action'), reqId: Id, rev: Rev, action: GameActionSchema }),
-  z.object({ t: z.literal('claimSeat'), reqId: Id, seatId: Id.nullable() }),
   z.object({ t: z.literal('setName'), name: Name }),
   z.object({ t: z.literal('lock'), locked: z.boolean() }),
   z.object({ t: z.literal('kick'), memberId: Id }),
@@ -193,7 +191,6 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   'rate-limited': 'Slow down a moment, then try again.',
   'room-full': 'This room is full.',
   'room-locked': 'This room is not taking new players.',
-  'seat-taken': 'Someone else is already playing as them.',
   'stale-rev': 'The game moved on. Have another look.',
   'too-large': 'This game is too big to share.',
   'unknown-action': 'This app is out of date. Refresh to get the latest.',

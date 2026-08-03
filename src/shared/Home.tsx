@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Blocks, Dices, DoorOpen, SpellCheck, Target, type LucideIcon } from 'lucide-react';
+import { Blocks, DoorOpen, SpellCheck, Target, type LucideIcon } from 'lucide-react';
 
 interface Game {
   path?: string;
@@ -27,7 +27,6 @@ const GAMES: Game[] = [
     title: 'Rummikub',
     desc: 'Round-by-round scoring from the tiles left on each rack.',
   },
-  { Icon: Dices, title: 'Yahtzee', desc: 'Scorecard with upper-section bonus.' },
 ];
 
 export function Home() {

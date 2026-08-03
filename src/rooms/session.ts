@@ -41,7 +41,6 @@ export interface RoomHandle {
   lastError: ErrorCode | null;
   /** Would the room accept this kind of action from me right now? */
   can: (actionType: string) => boolean;
-  claimSeat: (seatId: string | null) => void;
   setLocked: (locked: boolean) => void;
   kick: (memberId: string) => void;
   /**
@@ -252,8 +251,6 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       sending: pending > 0,
       lastError,
       can: (actionType: string) => canDo(game, view, actor, actionType),
-      claimSeat: (seat) =>
-        transport.current?.send({ t: 'claimSeat', reqId: nextRequestId(), seatId: seat }),
       setLocked: (value) => transport.current?.send({ t: 'lock', locked: value }),
       kick: (memberId) => transport.current?.send({ t: 'kick', memberId }),
       leave: () => {

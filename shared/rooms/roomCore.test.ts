@@ -33,8 +33,13 @@ function newRoom(): RoomState<Snapshot> {
 }
 
 /** Adds a guest to any room, whatever the game. */
-function withGuestIn(state: RoomState<Snapshot>, memberId: string, name: string): RoomState<Snapshot> {
-  const result = join(state, { memberId, name, now: 1_000 });
+function withGuestIn(
+  state: RoomState<Snapshot>,
+  memberId: string,
+  name: string,
+  apply: ApplyAction<Snapshot> = cricketApply(),
+): RoomState<Snapshot> {
+  const result = join(state, { memberId, name, now: 1_000 }, apply);
   if (!result.ok) throw new Error(`join failed: ${result.code}`);
   return result.state;
 }
@@ -44,8 +49,9 @@ function withGuest(
   state: RoomState<Snapshot>,
   memberId: string,
   name: string,
+  apply: ApplyAction<Snapshot> = cricketApply(),
 ): RoomState<Snapshot> {
-  const result = join(state, { memberId, name, now: 1_000 });
+  const result = join(state, { memberId, name, now: 1_000 }, apply);
   if (!result.ok) throw new Error(`join failed: ${result.code}`);
   return result.state;
 }
@@ -82,21 +88,42 @@ describe('creating and joining', () => {
     expect(Object.keys(room.members)).toHaveLength(1);
   });
 
-  it('admits a guest as a player with no seat', () => {
+  // Someone who types their name is here to play, so joining puts them in the
+  // game rather than in a queue for the host's attention.
+  it('adds the joiner to the game and seats them', () => {
     const room = withGuest(newRoom(), 'm1', 'Grace');
-    expect(room.members.m1).toMatchObject({ role: 'player', seatId: null });
+    const players = asCricket(room.snapshot).players;
+
+    expect(players.map((p) => p.name)).toEqual(['Grace']);
+    expect(room.members.m1?.seatId).toBe(players[0]!.id);
+    expect(room.rev).toBe(1);
+  });
+
+  it('tells everyone already here that a player arrived', () => {
+    const apply = cricketApply();
+    const result = join(newRoom(), { memberId: 'm1', name: 'Grace', now: 1 }, apply);
+    if (!result.ok) throw new Error('join refused');
+    expect(result.effects.map((e) => e.to)).toEqual(['all']);
+  });
+
+  // Two players called Grace would be indistinguishable on the scoreboard.
+  it('numbers a joiner whose name is already taken', () => {
+    const apply = cricketApply();
+    let room = withGuest(newRoom(), 'm1', 'Grace', apply);
+    room = withGuest(room, 'm2', 'Grace', apply);
+    expect(asCricket(room.snapshot).players.map((p) => p.name)).toEqual(['Grace', 'Grace 2']);
   });
 
   it('refuses a locked room', () => {
     const locked = { ...newRoom(), locked: true };
-    expect(join(locked, { memberId: 'm1', name: 'Grace', now: 1 }))
+    expect(join(locked, { memberId: 'm1', name: 'Grace', now: 1 }, cricketApply()))
       .toEqual({ ok: false, code: 'room-locked' });
   });
 
   it('refuses a full room', () => {
     let room = newRoom();
     for (let i = 0; i < MAX_MEMBERS - 1; i++) room = withGuest(room, `m${i}`, `P${i}`);
-    expect(join(room, { memberId: 'over', name: 'One too many', now: 1 }))
+    expect(join(room, { memberId: 'over', name: 'One too many', now: 1 }, cricketApply()))
       .toEqual({ ok: false, code: 'room-full' });
   });
 });
@@ -107,7 +134,7 @@ describe('connecting', () => {
     const { effects } = connect(room, 'm1', ctx(['m-host', 'm1']));
 
     const welcome = sentTo(effects, 'member')[0];
-    expect(welcome).toMatchObject({ t: 'welcome', code: 'AB2D', game: 'cricket', rev: 0 });
+    expect(welcome).toMatchObject({ t: 'welcome', code: 'AB2D', game: 'cricket' });
     expect(sentTo(effects, 'all')[0]).toMatchObject({ t: 'room' });
   });
 
@@ -126,13 +153,11 @@ describe('connecting', () => {
   });
 
   it('keeps a seat when the socket drops', () => {
-    let room = withGuest(newRoom(), 'm1', 'Grace');
-    const seeded = withPlayers(room);
-    room = seeded.state;
-    room = act(room, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: seeded.players[0]! }).state;
+    const room = withGuest(newRoom(), 'm1', 'Grace');
+    const seat = room.members.m1?.seatId;
 
     const after = disconnect(room, 'm1', ctx([])).state;
-    expect(after.members.m1?.seatId).toBe(seeded.players[0]);
+    expect(after.members.m1?.seatId).toBe(seat);
   });
 });
 
@@ -211,85 +236,81 @@ describe('permissions at the boundary', () => {
   it('refuses a guest a host-only action', () => {
     const room = withGuest(newRoom(), 'm1', 'Grace');
     const { state, effects } = act(room, 'm1', {
-      t: 'action', reqId: 'r1', rev: 0, action: { type: 'newGame' },
+      t: 'action', reqId: 'r1', rev: room.rev, action: { type: 'newGame' },
     });
     expect(firstError(effects)?.code).toBe('host-only');
-    expect(state.rev).toBe(0);
+    expect(state.rev).toBe(room.rev);
   });
 
   it('refuses a seated guest a turn that is not theirs', () => {
-    const seeded = withPlayers(withGuest(newRoom(), 'm1', 'Grace'));
-    let room = act(seeded.state, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: seeded.players[1]! }).state;
+    const apply = cricketApply();
+    // Ada is added by the host and is up first; Grace joins and gets her own seat.
+    let room = act(newRoom(), HOST.memberId, {
+      t: 'action', reqId: 'r1', rev: 0, action: { type: 'addPlayers', names: 'Ada' },
+    }, apply).state;
+    room = withGuest(room, 'm1', 'Grace', apply);
 
     const { effects } = act(room, 'm1', {
       t: 'action', reqId: 'r5', rev: room.rev, action: { type: 'recordTurn', darts: [] },
-    }, seeded.apply);
+    }, apply);
     expect(firstError(effects)?.code).toBe('not-your-turn');
   });
 
   it('lets a seated guest act on their own turn', () => {
-    const seeded = withPlayers(withGuest(newRoom(), 'm1', 'Grace'));
-    let room = act(seeded.state, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: seeded.players[0]! }).state;
+    const apply = cricketApply();
+    // Grace is the only player, so it is her turn from the start.
+    const room = withGuest(newRoom(), 'm1', 'Grace', apply);
 
     const { state } = act(room, 'm1', {
       t: 'action',
       reqId: 'r5',
       rev: room.rev,
       action: { type: 'recordTurn', darts: [{ target: 20, multiplier: 3 }] },
-    }, seeded.apply);
+    }, apply);
     expect(state.rev).toBe(room.rev + 1);
   });
 });
 
 describe('seats', () => {
-  it('gives the seat to whoever asks first', () => {
-    const seeded = withPlayers(withGuest(withGuest(newRoom(), 'm1', 'Grace'), 'm2', 'Alan'));
-    const seat = seeded.players[0]!;
-
-    let room = act(seeded.state, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: seat }).state;
-    const second = act(room, 'm2', { t: 'claimSeat', reqId: 'c2', seatId: seat });
-
-    expect(firstError(second.effects)?.code).toBe('seat-taken');
-    expect(second.state.members.m1?.seatId).toBe(seat);
-    expect(second.state.members.m2?.seatId).toBeNull();
-  });
-
-  it('refuses a seat that is not a player in the game', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const { effects } = act(room, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: 'nobody' });
-    expect(firstError(effects)?.code).toBe('not-your-seat');
-  });
-
-  it('lets someone give a seat back', () => {
-    const seeded = withPlayers(withGuest(newRoom(), 'm1', 'Grace'));
-    let room = act(seeded.state, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: seeded.players[0]! }).state;
-    room = act(room, 'm1', { t: 'claimSeat', reqId: 'c2', seatId: null }).state;
-    expect(room.members.m1?.seatId).toBeNull();
-  });
-
-  // Seats are derived from the game after every change, so they cannot drift.
+  // Seats are handed out at the door and never chosen, so the only way one
+  // changes is the host removing the player. Reconciling from the game after
+  // every change means the two cannot drift apart.
   it('unseats whoever held a player the host has removed', () => {
-    const seeded = withPlayers(withGuest(newRoom(), 'm1', 'Grace'));
-    let room = act(seeded.state, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: seeded.players[0]! }).state;
-    expect(room.members.m1?.seatId).toBe(seeded.players[0]);
+    const apply = cricketApply();
+    const room = withGuest(newRoom(), 'm1', 'Grace', apply);
+    const grace = room.members.m1!.seatId!;
 
     const out = act(room, HOST.memberId, {
-      t: 'action',
-      reqId: 'r7',
-      rev: room.rev,
-      action: { type: 'removePlayer', id: seeded.players[0]! },
-    }, seeded.apply);
+      t: 'action', reqId: 'r7', rev: room.rev, action: { type: 'removePlayer', id: grace },
+    }, apply);
 
     expect(out.state.members.m1?.seatId).toBeNull();
     expect(sentTo(out.effects, 'all').some((m) => m.t === 'room')).toBe(true);
   });
+
+  it('leaves them watching rather than dropping them from the room', () => {
+    const apply = cricketApply();
+    const room = withGuest(newRoom(), 'm1', 'Grace', apply);
+    const out = act(room, HOST.memberId, {
+      t: 'action', reqId: 'r7', rev: room.rev,
+      action: { type: 'removePlayer', id: room.members.m1!.seatId! },
+    }, apply);
+
+    expect(out.state.members.m1).toBeDefined();
+  });
 });
 
 describe('host controls', () => {
+  // Locking is what stops both joining and the player it would have created.
   it('locks and unlocks the room', () => {
     const room = act(newRoom(), HOST.memberId, { t: 'lock', locked: true }).state;
     expect(room.locked).toBe(true);
-    expect(join(room, { memberId: 'x', name: 'Late', now: 1 }).ok).toBe(false);
+
+    const refused = join(room, { memberId: 'x', name: 'Late', now: 1 }, cricketApply());
+    expect(refused).toEqual({ ok: false, code: 'room-locked' });
+
+    const open = act(room, HOST.memberId, { t: 'lock', locked: false }).state;
+    expect(join(open, { memberId: 'x', name: 'Late', now: 1 }, cricketApply()).ok).toBe(true);
   });
 
   it('refuses a guest the lock', () => {
@@ -306,7 +327,7 @@ describe('host controls', () => {
     expect(state.members.m1).toBeUndefined();
     expect(state.locked).toBe(true);
     expect(effects).toContainEqual({ to: 'close', memberId: 'm1' });
-    expect(join(state, { memberId: 'm1-again', name: 'Grace', now: 1 }).ok).toBe(false);
+    expect(join(state, { memberId: 'm1-again', name: 'Grace', now: 1 }, cricketApply()).ok).toBe(false);
   });
 
   it('will not let the host kick themselves', () => {
@@ -340,25 +361,28 @@ describe('collecting Rummikub racks', () => {
     return bindRummikub(() => `srv-${n++}`);
   };
 
-  /** Adds Ada and Grace, and seats a guest as Grace. */
+  /**
+   * Grace joins, which seats her, and the host types in Ada, who has no phone.
+   * Note the room's own reducer has to be threaded through the join, or the
+   * player it creates would be built by the wrong game.
+   */
   function setUp() {
     const rules = apply();
-    let room = withGuestIn(rummikubRoom(), 'm1', 'Grace');
+    let room = withGuestIn(rummikubRoom(), 'm1', 'Grace', rules);
     room = handle(room, HOST.memberId, {
-      t: 'action', reqId: 'r1', rev: 0, action: { type: 'addPlayers', names: 'Ada, Grace' },
+      t: 'action', reqId: 'r1', rev: room.rev, action: { type: 'addPlayers', names: 'Ada' },
     }, ctx(), rules).state;
 
     const players = (room.snapshot.players as { id: string }[]).map((p) => p.id);
-    room = handle(room, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: players[1]! }, ctx(), rules).state;
-    return { room, players, rules };
+    return { room, players, rules, grace: players[0]!, ada: players[1]! };
   }
 
   it('opens a round for the player who went out', () => {
-    const { room, players, rules } = setUp();
+    const { room, ada, rules } = setUp();
     const out = handle(room, HOST.memberId, {
-      t: 'roundOpen', reqId: 'o1', winnerId: players[0]!,
+      t: 'roundOpen', reqId: 'o1', winnerId: ada,
     }, ctx(), rules);
-    expect(out.state.pending).toEqual({ winnerId: players[0], racks: {} });
+    expect(out.state.pending).toEqual({ winnerId: ada, racks: {} });
   });
 
   it('refuses to open a round for someone who is not playing', () => {
@@ -370,61 +394,61 @@ describe('collecting Rummikub racks', () => {
   });
 
   it('refuses a guest the right to open one', () => {
-    const { room, players, rules } = setUp();
+    const { room, ada, rules } = setUp();
     const out = handle(room, 'm1', {
-      t: 'roundOpen', reqId: 'o1', winnerId: players[0]!,
+      t: 'roundOpen', reqId: 'o1', winnerId: ada,
     }, ctx(), rules);
     expect(out.state.pending).toBeNull();
   });
 
   it('takes a rack from the player it belongs to', () => {
-    const { room, players, rules } = setUp();
+    const { room, grace, ada, rules } = setUp();
     let next = handle(room, HOST.memberId, {
-      t: 'roundOpen', reqId: 'o1', winnerId: players[0]!,
+      t: 'roundOpen', reqId: 'o1', winnerId: ada,
     }, ctx(), rules).state;
 
     next = handle(next, 'm1', {
-      t: 'rackSubmit', reqId: 's1', seatId: players[1]!, total: 24,
+      t: 'rackSubmit', reqId: 's1', seatId: grace, total: 24,
     }, ctx(), rules).state;
 
-    expect(next.pending?.racks).toEqual({ [players[1]!]: 24 });
+    expect(next.pending?.racks).toEqual({ [grace]: 24 });
   });
 
   it('lets someone correct their own rack before it is committed', () => {
-    const { room, players, rules } = setUp();
-    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: players[0]! }, ctx(), rules).state;
-    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's1', seatId: players[1]!, total: 24 }, ctx(), rules).state;
-    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's2', seatId: players[1]!, total: 42 }, ctx(), rules).state;
-    expect(next.pending?.racks[players[1]!]).toBe(42);
+    const { room, grace, ada, rules } = setUp();
+    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: ada }, ctx(), rules).state;
+    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's1', seatId: grace, total: 24 }, ctx(), rules).state;
+    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's2', seatId: grace, total: 42 }, ctx(), rules).state;
+    expect(next.pending?.racks[grace]).toBe(42);
   });
 
   it('refuses a rack submitted for somebody else', () => {
-    const { room, players, rules } = setUp();
-    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: players[0]! }, ctx(), rules).state;
+    const { room, grace, ada, rules } = setUp();
+    const next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: grace }, ctx(), rules).state;
     const out = handle(next, 'm1', {
-      t: 'rackSubmit', reqId: 's1', seatId: players[0]!, total: 5,
+      t: 'rackSubmit', reqId: 's1', seatId: ada, total: 5,
     }, ctx(), rules);
     expect(firstError(out.effects)?.code).toBe('not-your-seat');
   });
 
   it('refuses a rack when no round is being collected', () => {
-    const { room, players, rules } = setUp();
+    const { room, grace, rules } = setUp();
     const out = handle(room, 'm1', {
-      t: 'rackSubmit', reqId: 's1', seatId: players[1]!, total: 24,
+      t: 'rackSubmit', reqId: 's1', seatId: grace, total: 24,
     }, ctx(), rules);
     expect(firstError(out.effects)?.code).toBe('unknown-action');
   });
 
   it('clears the collection when the host records the round', () => {
-    const { room, players, rules } = setUp();
-    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: players[0]! }, ctx(), rules).state;
-    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's1', seatId: players[1]!, total: 24 }, ctx(), rules).state;
+    const { room, grace, ada, rules } = setUp();
+    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: ada }, ctx(), rules).state;
+    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's1', seatId: grace, total: 24 }, ctx(), rules).state;
 
     const out = handle(next, HOST.memberId, {
       t: 'action',
       reqId: 'r9',
       rev: next.rev,
-      action: { type: 'recordRound', winnerId: players[0]!, penalties: { [players[1]!]: 24 } },
+      action: { type: 'recordRound', winnerId: ada, penalties: { [grace]: 24 } },
     }, ctx(), rules);
 
     expect(out.state.pending).toBeNull();
@@ -432,8 +456,8 @@ describe('collecting Rummikub racks', () => {
   });
 
   it('lets the host abandon a round', () => {
-    const { room, players, rules } = setUp();
-    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: players[0]! }, ctx(), rules).state;
+    const { room, ada, rules } = setUp();
+    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: ada }, ctx(), rules).state;
     next = handle(next, HOST.memberId, { t: 'roundCancel', reqId: 'x1' }, ctx(), rules).state;
     expect(next.pending).toBeNull();
   });

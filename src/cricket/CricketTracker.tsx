@@ -8,7 +8,6 @@ import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from '@s
 import { describeError } from '@shared/rooms/protocol';
 import { useCricket } from './lib/useCricket';
 import { RoomBar } from '../rooms/RoomBar';
-import { SeatPicker } from '../rooms/SeatPicker';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import type { Dart, Variant } from '@shared/games/cricket/types';
 
@@ -168,7 +167,6 @@ export function CricketTracker() {
         {room?.lastError && (
           <div className="banner warn" role="status">{describeError(room.lastError)}</div>
         )}
-        {room && <SeatPicker room={room} players={state.players} />}
 
         {winner && (
           <div className="banner win" role="status">

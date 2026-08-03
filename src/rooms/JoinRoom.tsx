@@ -18,7 +18,7 @@ export function JoinRoom() {
   const [code, setCode] = useState(linkCode?.toUpperCase() ?? '');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<RoomError | 'bad-code' | null>(null);
+  const [error, setError] = useState<RoomError | 'bad-code' | 'no-name' | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -33,6 +33,11 @@ export function JoinRoom() {
       return;
     }
 
+    if (!name.trim()) {
+      setError('no-name');
+      return;
+    }
+
     setBusy(true);
     setError(null);
 
@@ -43,7 +48,7 @@ export function JoinRoom() {
       return;
     }
 
-    const joined = await joinRoom(clean, name.trim() || 'Player');
+    const joined = await joinRoom(clean, name.trim());
     setBusy(false);
     if (!joined.ok) {
       setError(joined.error);
@@ -60,7 +65,7 @@ export function JoinRoom() {
   return (
     <main className="home">
       <h1>Join a game</h1>
-      <p className="sub">Enter the code the host gave you.</p>
+      <p className="sub">Enter the code the host gave you, and the name you want on the scoreboard.</p>
 
       <form className="card join-form" onSubmit={submit}>
         <label className="field">
@@ -89,13 +94,16 @@ export function JoinRoom() {
           />
         </label>
 
-        <button type="submit" className="primary" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy || !name.trim()}>
           <DoorOpen size={15} aria-hidden="true" /> {busy ? 'Joining' : 'Join'}
         </button>
+        <p className="hint">You will be added to the game straight away.</p>
 
         {error && (
           <p className="room-error" role="status">
-            {error === 'bad-code' ? 'That is not a valid code. Check and try again.' : ROOM_ERRORS[error]}
+            {error === 'bad-code' ? 'That is not a valid code. Check and try again.'
+              : error === 'no-name' ? 'Enter the name you want on the scoreboard.'
+              : ROOM_ERRORS[error]}
           </p>
         )}
       </form>

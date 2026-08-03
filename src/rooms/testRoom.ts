@@ -95,9 +95,10 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
     addMember(name) {
       const memberId = nextId();
       const token = `token-${memberId}`;
-      const result = join(state, { memberId, name, now: 1_000 });
+      const result = join(state, { memberId, name, now: 1_000 }, apply);
       if (!result.ok) throw new Error(`join refused: ${result.code}`);
       state = result.state;
+      deliver(result.effects);
       tokens.set(token, memberId);
       return { game, code: 'AB2D', token, memberId };
     },

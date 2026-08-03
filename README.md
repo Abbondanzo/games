@@ -51,7 +51,7 @@ is the React app and `worker/` is the room server.
 Scores are derived by replaying the raw events - words played, darts thrown, rounds won - rather
 than being stored, which is what lets cricket switch scoring modes mid-game without restarting.
 
-Around 450 tests cover the rule engines, the reducers, the room protocol and every tracker end
+Around 480 tests cover the rule engines, the reducers, the room protocol and every tracker end
 to end.
 
 [CLAUDE.md](CLAUDE.md) has the detail: architecture, conventions, testing approach and the

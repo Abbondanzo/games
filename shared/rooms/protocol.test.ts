@@ -7,8 +7,6 @@ import {
 
 const CLIENT: ClientMessage[] = [
   { t: 'action', reqId: 'r1', rev: 7, action: { type: 'recordTurn', darts: [] } },
-  { t: 'claimSeat', reqId: 'r2', seatId: 'p1' },
-  { t: 'claimSeat', reqId: 'r3', seatId: null },
   { t: 'setName', name: 'Ada' },
   { t: 'lock', locked: true },
   { t: 'kick', memberId: 'm1' },

@@ -5,7 +5,6 @@ import { RoundEntry } from './components/RoundEntry';
 import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
 import { RoomBar } from '../rooms/RoomBar';
-import { SeatPicker } from '../rooms/SeatPicker';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import { describeError } from '@shared/rooms/protocol';
 
@@ -82,7 +81,6 @@ export function RummikubTracker() {
         {room?.lastError && (
           <div className="banner warn" role="status">{describeError(room.lastError)}</div>
         )}
-        {room && <SeatPicker room={room} players={state.players} />}
 
         <PlayersCard
           players={state.players}

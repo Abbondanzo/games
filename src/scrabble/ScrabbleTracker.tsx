@@ -7,7 +7,6 @@ import { HistoryCard } from './components/HistoryCard';
 import { DictionaryDrawer } from './components/DictionaryDrawer';
 import { useGame } from './lib/useGame';
 import { RoomBar } from '../rooms/RoomBar';
-import { SeatPicker } from '../rooms/SeatPicker';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import { describeError } from '@shared/rooms/protocol';
 import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/scoring';
@@ -99,7 +98,6 @@ export function ScrabbleTracker() {
         {room?.lastError && (
           <div className="banner warn" role="status">{describeError(room.lastError)}</div>
         )}
-        {room && <SeatPicker room={room} players={state.players} />}
 
         <PlayersCard
           players={state.players}

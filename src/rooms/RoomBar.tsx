@@ -77,8 +77,8 @@ export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => vo
             {isHost && (
               <button type="button" className="ghost" onClick={() => room.setLocked(!room.locked)}>
                 {room.locked
-                  ? <><LockOpen size={15} aria-hidden="true" /> Let people in</>
-                  : <><Lock size={15} aria-hidden="true" /> Close the room</>}
+                  ? <><LockOpen size={15} aria-hidden="true" /> Allow new players</>
+                  : <><Lock size={15} aria-hidden="true" /> Stop new players</>}
               </button>
             )}
             {isHost ? (
@@ -95,8 +95,9 @@ export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => vo
           {isHost && (
             <p className="hint">
               Share the code or the link. Anyone who joins can pick their name and enter their
-              own scores; only you can change the players or the rules. Closing the room ends it
-              for everyone and keeps the game on this device.
+              own scores; only you can change the rules. Stopping new players closes the door
+              without ending anything. Closing the room ends it for everyone and keeps the game
+              on this device.
             </p>
           )}
         </div>
