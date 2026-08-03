@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cricketApply, cricketInitialState, decodeCricketAction } from './cricket';
+import { CricketStateSchema } from '../../games/cricket/schema';
 import type { GameAction } from '../protocol';
 
 const decode = (action: GameAction) => decodeCricketAction(action);
@@ -64,10 +65,11 @@ describe('applying', () => {
     return () => `id-${n++}`;
   };
 
-  it('runs the real reducer with the room own id source', () => {
+  it('runs the real reducer with the room\'s own id source', () => {
     const apply = cricketApply(uid());
     const state = apply(cricketInitialState(), { type: 'addPlayers', names: 'Ada' });
-    expect(state?.players).toEqual([{ id: 'id-0', name: 'Ada', joinedAtTurn: 0 }]);
+    expect(CricketStateSchema.parse(state).players)
+      .toEqual([{ id: 'id-0', name: 'Ada', joinedAtTurn: 0 }]);
   });
 
   it('returns null rather than throwing on a bad payload', () => {
@@ -76,10 +78,28 @@ describe('applying', () => {
     expect(apply(cricketInitialState(), { type: 'addPlayers', names: 42 })).toBeNull();
   });
 
+  // The room tells a declined action apart from an applied one by identity, and
+  // validating the state on the way in would otherwise always produce a new object.
+  it('hands back the very same snapshot when the reducer declines', () => {
+    const apply = cricketApply(uid());
+    const start = cricketInitialState();
+    expect(apply(start, { type: 'undo' })).toBe(start);
+  });
+
+  it('returns a different object when something actually changed', () => {
+    const apply = cricketApply(uid());
+    const start = cricketInitialState();
+    expect(apply(start, { type: 'addPlayers', names: 'Ada' })).not.toBe(start);
+  });
+
+  // Written by an older deploy, or hand-edited in storage.
+  it('refuses a snapshot that is not a cricket game', () => {
+    const apply = cricketApply(uid());
+    expect(apply({ nonsense: true }, { type: 'undo' })).toBeNull();
+  });
+
   // Without the decoder this exact payload reaches names.split(',') and throws.
   it('protects the reducer from the payload that would crash it', () => {
-    const reducerWouldThrow = () => cricketInitialState().players.length;
-    expect(reducerWouldThrow()).toBe(0);
     const apply = cricketApply(uid());
     expect(apply(cricketInitialState(), { type: 'addPlayers', names: { toString: 1 } })).toBeNull();
   });

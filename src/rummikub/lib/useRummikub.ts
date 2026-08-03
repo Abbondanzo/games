@@ -1,20 +1,13 @@
 import { useEffect, useReducer } from 'react';
 import { z } from 'zod';
 import { initialState, reducer } from '@shared/games/rummikub/reducer';
+import { PlayerSchema, RoundSchema } from '@shared/games/rummikub/schema';
 import type { RummikubState } from '@shared/games/rummikub/types';
 
 export { initialState, reducer, createReducer } from '@shared/games/rummikub/reducer';
 export type { Action } from '@shared/games/rummikub/reducer';
 
 export const STORE_KEY = 'games.rummikub.v1';
-
-const PlayerSchema = z.object({ id: z.string(), name: z.string() });
-
-const RoundSchema = z.object({
-  id: z.string(),
-  winnerId: z.string(),
-  penalties: z.record(z.string(), z.number().finite()),
-});
 
 /**
  * A stored game is untrusted: it may predate a change to the shape, or have

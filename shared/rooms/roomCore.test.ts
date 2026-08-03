@@ -4,45 +4,49 @@ import {
   type ApplyAction, type Context, type Effect, type RoomState,
 } from './roomCore';
 import type { ClientMessage, ServerMessage } from './protocol';
-import { cricketApply as bindCricket } from './games/cricket';
-import type { CricketState } from '../games/cricket/types';
+import { cricketApply as bindCricket, cricketInitialState } from './games/cricket';
+import { CricketStateSchema } from '../games/cricket/schema';
+import type { Snapshot } from './protocol';
 
 /** The room runs the real cricket reducer, with ids it mints itself. */
-const cricketApply = (): ApplyAction<CricketState> => {
+const cricketApply = (): ApplyAction<Snapshot> => {
   let n = 0;
   return bindCricket(() => `srv-${n++}`);
 };
+
+/** Reads the opaque snapshot back as a real cricket state. */
+const asCricket = (snapshot: Snapshot) => CricketStateSchema.parse(snapshot);
 
 const ctx = (online: string[] = [], now = 1_000): Context => ({ online, now });
 
 const HOST = { memberId: 'm-host', name: 'Ada' };
 
-function newRoom(): RoomState<CricketState> {
+function newRoom(): RoomState<Snapshot> {
   return createRoom({
     code: 'AB2D',
     game: 'cricket',
     host: HOST,
-    snapshot: { players: [], turns: [], currentIndex: 0, variant: 'standard' },
+    snapshot: cricketInitialState(),
     now: 1_000,
   });
 }
 
 /** Adds a guest and returns the room plus their id. */
 function withGuest(
-  state: RoomState<CricketState>,
+  state: RoomState<Snapshot>,
   memberId: string,
   name: string,
-): RoomState<CricketState> {
+): RoomState<Snapshot> {
   const result = join(state, { memberId, name, now: 1_000 });
   if (!result.ok) throw new Error(`join failed: ${result.code}`);
   return result.state;
 }
 
 const act = (
-  state: RoomState<CricketState>,
+  state: RoomState<Snapshot>,
   memberId: string,
   message: ClientMessage,
-  apply: ApplyAction<CricketState> = cricketApply(),
+  apply: ApplyAction<Snapshot> = cricketApply(),
   online: string[] = [],
 ) => handle(state, memberId, message, ctx(online), apply);
 
@@ -53,12 +57,12 @@ const firstError = (effects: Effect[]) =>
   sentTo(effects, 'member').find((m): m is Extract<ServerMessage, { t: 'error' }> => m.t === 'error');
 
 /** Drives a room through adding two players, returning the room and their ids. */
-function withPlayers(state: RoomState<CricketState>) {
+function withPlayers(state: RoomState<Snapshot>) {
   const apply = cricketApply();
   const out = act(state, HOST.memberId, {
     t: 'action', reqId: 'r1', rev: 0, action: { type: 'addPlayers', names: 'Ada, Grace' },
   }, apply);
-  const players = out.state.snapshot.players.map((p) => p.id);
+  const players = asCricket(out.state.snapshot).players.map((p) => p.id);
   return { state: out.state, players, apply };
 }
 
@@ -138,7 +142,7 @@ describe('applying an action', () => {
 
   it('mints ids itself, so every client agrees on them', () => {
     const { state } = withPlayers(newRoom());
-    expect(state.snapshot.players.map((p) => p.id)).toEqual(['srv-0', 'srv-1']);
+    expect(asCricket(state.snapshot).players.map((p) => p.id)).toEqual(['srv-0', 'srv-1']);
   });
 
   // Requests are judged against the snapshot the sender saw, never re-evaluated
@@ -177,7 +181,7 @@ describe('applying an action', () => {
   });
 
   it('refuses a state too large to store', () => {
-    const bloat: ApplyAction<CricketState> = (state) => ({
+    const bloat: ApplyAction<Snapshot> = (state) => ({
       ...state,
       players: [{ id: 'x'.repeat(70_000), name: 'Big', joinedAtTurn: 0 }],
     });

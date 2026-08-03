@@ -16,17 +16,13 @@ export type Action =
   | { type: 'adjust'; playerId: string; points: number }
   | { type: 'undo' }
   | { type: 'newGame' }
-  | { type: 'resetAll' }
-  | { type: 'hydrate'; state: GameState };
+  | { type: 'resetAll' };
 
 const nextIndex = (state: GameState): number =>
   state.players.length ? (state.currentIndex + 1) % state.players.length : 0;
 
 function apply(state: GameState, action: Action, uid: IdSource): GameState {
   switch (action.type) {
-    case 'hydrate':
-      return action.state;
-
     case 'addPlayers': {
       // "Ada, Grace" adds both - pasting a list is the fastest way to set up.
       const names = action.names.split(',').map((n) => n.trim()).filter(Boolean);

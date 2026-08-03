@@ -50,3 +50,11 @@ export const CricketActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('newGame') }),
   z.object({ type: z.literal('resetAll') }),
 ]);
+
+/** The whole game state. Validated when the room reads it back from storage. */
+export const CricketStateSchema = z.object({
+  players: z.array(PlayerSchema),
+  turns: z.array(TurnSchema),
+  currentIndex: z.int().nonnegative(),
+  variant: VariantSchema,
+});

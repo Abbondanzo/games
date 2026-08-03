@@ -1,23 +1,13 @@
 import { useEffect, useReducer } from 'react';
 import { z } from 'zod';
 import { initialState, reducer } from '@shared/games/scrabble/reducer';
+import { PlayerSchema, TurnSchema } from '@shared/games/scrabble/schema';
 import type { GameState } from '@shared/games/scrabble/types';
 
 export { initialState, reducer, createReducer } from '@shared/games/scrabble/reducer';
 export type { Action } from '@shared/games/scrabble/reducer';
 
 export const STORE_KEY = 'games.scrabble.v1';
-
-const PlayerSchema = z.object({ id: z.string(), name: z.string() });
-
-const TurnSchema = z.object({
-  id: z.string(),
-  playerId: z.string(),
-  kind: z.enum(['play', 'pass', 'adjust']),
-  words: z.array(z.string()),
-  bingo: z.boolean(),
-  points: z.number().finite(),
-});
 
 /**
  * A stored game is untrusted: it may predate a change to the shape, or have

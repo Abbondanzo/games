@@ -1,0 +1,274 @@
+/**
+ * One Durable Object per room.
+ *
+ * Deliberately thin. Every decision about who may do what, and what a message
+ * means, lives in shared/rooms/roomCore.ts, which is a pure function and is
+ * tested without any of this. What is left here is the part that can only be
+ * done against the platform: sockets, storage, alarms and hibernation.
+ */
+import { DurableObject } from 'cloudflare:workers';
+import {
+  connect, createRoom, disconnect, handle, join,
+  type Effect, type RoomState,
+} from '../shared/rooms/roomCore';
+import { decodeClientMessage, encode, type Game } from '../shared/rooms/protocol';
+import { cricketApply, cricketInitialState } from '../shared/rooms/games/cricket';
+import { scrabbleApply, scrabbleInitialState } from '../shared/rooms/games/scrabble';
+import { rummikubApply, rummikubInitialState } from '../shared/rooms/games/rummikub';
+import type { ApplyAction } from '../shared/rooms/roomCore';
+import type { Snapshot } from '../shared/rooms/protocol';
+import type { IdSource } from '../shared/ids';
+
+/** A room with no traffic at all for this long is deleted, freeing its code. */
+const IDLE_MS = 4 * 60 * 60 * 1000;
+
+/** A socket may send this many messages a second before it is told to slow down. */
+const MESSAGE_BUDGET = 20;
+
+const STORAGE_KEY = 'room';
+
+interface Attachment {
+  memberId: string;
+  /** Timestamps of recent messages, for the per-socket budget. */
+  recent: number[];
+}
+
+const uid = () => crypto.randomUUID();
+
+interface GameSetup {
+  initial: () => Snapshot;
+  apply: (uid: IdSource) => ApplyAction<Snapshot>;
+}
+
+const GAME_SETUP: Record<Game, GameSetup> = {
+  cricket: { initial: cricketInitialState, apply: cricketApply },
+  scrabble: { initial: scrabbleInitialState, apply: scrabbleApply },
+  rummikub: { initial: rummikubInitialState, apply: rummikubApply },
+};
+
+export class Room extends DurableObject {
+  /**
+   * Held only for the life of one request. Hibernation wipes memory, so the
+   * room is always read from storage rather than trusted from a field.
+   */
+  private async load(): Promise<RoomState | null> {
+    return (await this.ctx.storage.get<RoomState>(STORAGE_KEY)) ?? null;
+  }
+
+  private async save(state: RoomState): Promise<void> {
+    await this.ctx.storage.put(STORAGE_KEY, state);
+    await this.ctx.storage.setAlarm(Date.now() + IDLE_MS);
+  }
+
+  /** Live member ids, derived from the sockets rather than stored. */
+  private online(): string[] {
+    return this.ctx.getWebSockets()
+      .map((ws) => (ws.deserializeAttachment() as Attachment | null)?.memberId)
+      .filter((id): id is string => typeof id === 'string');
+  }
+
+  private applyFor(game: Game): ApplyAction<Snapshot> {
+    return GAME_SETUP[game].apply(uid);
+  }
+
+  private dispatch(effects: Effect[]): void {
+    if (!effects.length) return;
+    const sockets = this.ctx.getWebSockets();
+    const byMember = new Map<string, WebSocket[]>();
+    for (const ws of sockets) {
+      const id = (ws.deserializeAttachment() as Attachment | null)?.memberId;
+      if (!id) continue;
+      byMember.set(id, [...(byMember.get(id) ?? []), ws]);
+    }
+
+    for (const effect of effects) {
+      if (effect.to === 'all') {
+        const payload = encode(effect.message);
+        for (const ws of sockets) trySend(ws, payload);
+      } else if (effect.to === 'member') {
+        const payload = encode(effect.message);
+        for (const ws of byMember.get(effect.memberId) ?? []) trySend(ws, payload);
+      } else {
+        for (const ws of byMember.get(effect.memberId) ?? []) ws.close(4003, 'removed');
+      }
+    }
+  }
+
+  /* ─────────────────────────── HTTP ─────────────────────────── */
+
+  override async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const action = url.searchParams.get('do');
+
+    if (action === 'create') return this.handleCreate(request);
+    if (action === 'join') return this.handleJoin(request);
+    if (action === 'peek') return this.handlePeek();
+    if (action === 'socket') return this.handleSocket(url);
+    return json({ error: 'not-found' }, 404);
+  }
+
+  private async handleCreate(request: Request): Promise<Response> {
+    // A room already at this code means the mint collided; the caller retries.
+    if (await this.load()) return json({ error: 'taken' }, 409);
+
+    const body = (await request.json()) as { code: string; game: Game; name: string };
+    const memberId = uid();
+    const token = uid();
+
+    const state = createRoom({
+      code: body.code,
+      game: body.game,
+      host: { memberId, name: body.name },
+      snapshot: GAME_SETUP[body.game].initial(),
+      now: Date.now(),
+    });
+
+    await this.ctx.storage.put('tokens', { [token]: memberId });
+    await this.save(state);
+    return json({ code: body.code, token, memberId, game: body.game });
+  }
+
+  private async handleJoin(request: Request): Promise<Response> {
+    const state = await this.load();
+    if (!state) return json({ error: 'no-room' }, 404);
+
+    const body = (await request.json()) as { name: string };
+    const memberId = uid();
+    const token = uid();
+
+    const result = join(state, { memberId, name: body.name, now: Date.now() });
+    if (!result.ok) return json({ error: result.code }, 409);
+
+    const tokens = (await this.ctx.storage.get<Record<string, string>>('tokens')) ?? {};
+    await this.ctx.storage.put('tokens', { ...tokens, [token]: memberId });
+    await this.save(result.state);
+
+    return json({ code: state.code, token, memberId, game: state.game });
+  }
+
+  private async handlePeek(): Promise<Response> {
+    const state = await this.load();
+    if (!state) return json({ error: 'no-room' }, 404);
+    return json({ game: state.game, open: !state.locked });
+  }
+
+  private async handleSocket(url: URL): Promise<Response> {
+    const state = await this.load();
+    if (!state) return json({ error: 'no-room' }, 404);
+
+    const token = url.searchParams.get('t') ?? '';
+    const tokens = (await this.ctx.storage.get<Record<string, string>>('tokens')) ?? {};
+    const memberId = tokens[token];
+    // A kicked member's entry is gone from the room even though the token remains.
+    if (!memberId || !state.members[memberId]) return json({ error: 'unauthorised' }, 401);
+
+    const pair = new WebSocketPair();
+    const [client, server] = [pair[0], pair[1]];
+
+    // Identity rides on the socket, set during the upgrade, so a hibernated
+    // room still knows who is on the other end without any in-memory map.
+    server.serializeAttachment({ memberId, recent: [] } satisfies Attachment);
+    this.ctx.acceptWebSocket(server);
+
+    const outcome = connect(state, memberId, { online: this.online(), now: Date.now() });
+    await this.save(outcome.state);
+    this.dispatch(outcome.effects);
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  /* ─────────────────────────── sockets ─────────────────────────── */
+
+  override async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
+    if (typeof raw !== 'string') return;
+
+    const attachment = ws.deserializeAttachment() as Attachment | null;
+    if (!attachment) return ws.close(4001, 'unauthorised');
+
+    if (!this.withinBudget(ws, attachment)) {
+      return trySend(ws, encode({ t: 'error', reqId: null, code: 'rate-limited' }));
+    }
+
+    const message = decodeClientMessage(raw);
+    if (!message) {
+      return trySend(ws, encode({ t: 'error', reqId: null, code: 'bad-message' }));
+    }
+
+    const state = await this.load();
+    if (!state) return ws.close(4002, 'room gone');
+
+    const outcome = handle(
+      state,
+      attachment.memberId,
+      message,
+      { online: this.online(), now: Date.now() },
+      this.applyFor(state.game),
+    );
+
+    // Kicking removes the member, so their token must stop working too.
+    if (message.t === 'kick') await this.forgetTokens(outcome.state);
+
+    await this.save(outcome.state);
+    this.dispatch(outcome.effects);
+  }
+
+  override async webSocketClose(ws: WebSocket): Promise<void> {
+    const attachment = ws.deserializeAttachment() as Attachment | null;
+    const state = await this.load();
+    if (!state || !attachment) return;
+
+    // The socket is still listed until this handler returns, so exclude it.
+    const online = this.online().filter((id, i, all) =>
+      id !== attachment.memberId || all.indexOf(id) !== i);
+    this.dispatch(disconnect(state, attachment.memberId, { online, now: Date.now() }).effects);
+  }
+
+  override async webSocketError(ws: WebSocket): Promise<void> {
+    await this.webSocketClose(ws);
+  }
+
+  /** Drops any token whose member is no longer in the room. */
+  private async forgetTokens(state: RoomState): Promise<void> {
+    const tokens = (await this.ctx.storage.get<Record<string, string>>('tokens')) ?? {};
+    const kept = Object.fromEntries(
+      Object.entries(tokens).filter(([, memberId]) => state.members[memberId]),
+    );
+    await this.ctx.storage.put('tokens', kept);
+  }
+
+  private withinBudget(ws: WebSocket, attachment: Attachment): boolean {
+    const now = Date.now();
+    const recent = [...attachment.recent.filter((t) => now - t < 1000), now];
+    ws.serializeAttachment({ ...attachment, recent } satisfies Attachment);
+    return recent.length <= MESSAGE_BUDGET;
+  }
+
+  /**
+   * Nothing has happened for hours. Wiping storage also frees the code for
+   * reuse, so expiry and the code registry are the same mechanism.
+   */
+  override async alarm(): Promise<void> {
+    const state = await this.load();
+    if (state && Date.now() - state.lastActiveAt < IDLE_MS) {
+      await this.ctx.storage.setAlarm(state.lastActiveAt + IDLE_MS);
+      return;
+    }
+    for (const ws of this.ctx.getWebSockets()) ws.close(4002, 'room expired');
+    await this.ctx.storage.deleteAll();
+  }
+}
+
+/** A closing socket throws on send; that is not worth failing the whole broadcast for. */
+function trySend(ws: WebSocket, payload: string): void {
+  try {
+    ws.send(payload);
+  } catch {
+    // The socket is going away; the close handler will tidy up.
+  }
+}
+
+const json = (body: unknown, status = 200): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
