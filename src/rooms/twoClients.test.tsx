@@ -385,6 +385,79 @@ describe('a Scrabble room', () => {
   });
 });
 
+/** Sharing starts a fresh game, so it must say what it is about to clear. */
+describe('starting to share', () => {
+  const solo = (children: React.ReactNode) => (
+    <RoomProvider value={{ session: null }}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        {children}
+      </MemoryRouter>
+    </RoomProvider>
+  );
+
+  it('warns, and names what is on screen, before clearing it', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('games.cricket.v1', JSON.stringify({
+      players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }, { id: 'b', name: 'Bo', joinedAtTurn: 0 }],
+      turns: [{ id: 't', playerId: 'a', darts: [{ target: 20, multiplier: 3 }] }],
+      currentIndex: 0,
+      variant: 'standard',
+    }));
+
+    render(solo(<CricketTracker />));
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('2 players and 1 turn');
+    // The button says what it does, rather than hiding it in the small print.
+    expect(screen.getByRole('button', { name: /Clear and start sharing/ })).toBeInTheDocument();
+  });
+
+  it('says nothing when there is nothing to lose', async () => {
+    const user = userEvent.setup();
+    render(solo(<CricketTracker />));
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(screen.queryByText(/will be cleared/)).not.toBeInTheDocument();
+    // No warning styling either, so an empty game is a plain first step.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Start sharing$/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Clear and/ })).not.toBeInTheDocument();
+  });
+
+  // A roster somebody typed out is worth warning about even before anyone has
+  // thrown, because retyping it is the annoying part.
+  it('warns about players alone, with no turns yet', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('games.cricket.v1', JSON.stringify({
+      players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }],
+      turns: [], currentIndex: 0, variant: 'standard',
+    }));
+
+    render(solo(<CricketTracker />));
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('1 player');
+    expect(screen.getByRole('status')).not.toHaveTextContent('turn');
+  });
+
+  it('does nothing until the button is pressed', async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    localStorage.setItem('games.cricket.v1', JSON.stringify({
+      players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }], turns: [], currentIndex: 0, variant: 'standard',
+    }));
+
+    render(solo(<CricketTracker />));
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(localStorage.getItem('games.cricket.v1')).toContain('Ada');
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('playing alone', () => {
   const Solo = ({ children }: { children: ReactNode }) => (
     <RoomProvider value={{ session: null }}>

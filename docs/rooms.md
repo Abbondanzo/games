@@ -6,8 +6,13 @@ sees the score update live and can enter their own turns.
 ## Using it
 
 **To host**, open any game and press **Share**, then enter your name. You are a
-player like anyone else, and the room starts a fresh game. A code appears in a
-strip under the top bar, along with a copyable invite link.
+player like anyone else. A code appears in a strip under the top bar, along with
+a copyable invite link.
+
+Sharing starts a fresh game. If anything is already on screen it says what will
+be cleared - "2 players and 1 turn" - and the button reads **Clear and start
+sharing** rather than hiding it in the small print. With nothing to lose there
+is no warning and no extra step.
 
 **To join**, either follow the link, or use **Join a game** on the home page.
 Enter the code and the name you want on the scoreboard, and you are in the game

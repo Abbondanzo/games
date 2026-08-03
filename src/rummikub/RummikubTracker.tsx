@@ -5,8 +5,12 @@ import { RoundEntry } from './components/RoundEntry';
 import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
 import { RoomBar } from '../rooms/RoomBar';
+import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import { describeError } from '@shared/rooms/protocol';
+
+const describeGame = (s: { players: unknown[]; rounds: unknown[] }) =>
+  summarise([[s.players.length, 'player'], [s.rounds.length, 'round']]);
 
 export function RummikubTracker() {
   const { state, dispatch, room } = useRummikub();
@@ -52,7 +56,7 @@ export function RummikubTracker() {
         </Link>
         <h1>Rummikub</h1>
         <div className="topbar-actions">
-          {!room && <HostRoomButton game="rummikub" />}
+          {!room && <HostRoomButton game="rummikub" existing={describeGame(state)} />}
           {isHost && (
             <>
               <button

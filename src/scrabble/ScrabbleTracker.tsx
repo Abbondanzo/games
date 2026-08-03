@@ -7,10 +7,14 @@ import { HistoryCard } from './components/HistoryCard';
 import { DictionaryDrawer } from './components/DictionaryDrawer';
 import { useGame } from './lib/useGame';
 import { RoomBar } from '../rooms/RoomBar';
+import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import { describeError } from '@shared/rooms/protocol';
 import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/scoring';
 import type { Draft } from '@shared/games/scrabble/types';
+
+const describeGame = (s: { players: unknown[]; turns: unknown[] }) =>
+  summarise([[s.players.length, 'player'], [s.turns.length, 'turn']]);
 
 export function ScrabbleTracker() {
   const { state, dispatch, room, onReject } = useGame();
@@ -66,7 +70,7 @@ export function ScrabbleTracker() {
         </Link>
         <h1>Scrabble</h1>
         <div className="topbar-actions">
-          {!room && <HostRoomButton game="scrabble" />}
+          {!room && <HostRoomButton game="scrabble" existing={describeGame(state)} />}
           {isHost && (
             <>
               <button

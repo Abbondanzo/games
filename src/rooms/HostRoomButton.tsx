@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Users } from 'lucide-react';
+import { TriangleAlert, Users } from 'lucide-react';
 import type { Game } from '@shared/rooms/protocol';
 import { ROOM_ERRORS, createRoom, type RoomError } from './api';
 import { readName, writeName, writeSession } from './storage';
@@ -11,7 +11,17 @@ import { readName, writeName, writeSession } from './storage';
  * exactly as a joiner's does. From the moment the room exists it is the source
  * of truth, so this is a one-way door until the room is closed.
  */
-export function HostRoomButton({ game }: { game: Game }) {
+interface Props {
+  game: Game;
+  /**
+   * What is on screen right now, in the game's own words, or null if there is
+   * nothing to lose. Sharing starts a fresh game, so this is what the warning
+   * names before anyone presses the button.
+   */
+  existing?: string | null;
+}
+
+export function HostRoomButton({ game, existing }: Props) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(readName);
   const [busy, setBusy] = useState(false);
@@ -65,15 +75,29 @@ export function HostRoomButton({ game }: { game: Game }) {
                 />
               </label>
 
-              <button type="submit" className="primary" disabled={busy || !name.trim()}>
-                <Users size={15} aria-hidden="true" /> {busy ? 'Starting' : 'Start sharing'}
+              {existing && (
+                <div className="banner warn" role="status">
+                  <TriangleAlert size={18} aria-hidden="true" className="mark" />
+                  <span>
+                    Sharing starts a fresh game. The {existing} on screen will be cleared.
+                  </span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className={existing ? 'primary danger' : 'primary'}
+                disabled={busy || !name.trim()}
+              >
+                <Users size={15} aria-hidden="true" />{' '}
+                {busy ? 'Starting' : existing ? 'Clear and start sharing' : 'Start sharing'}
               </button>
 
               {error && <p className="room-error" role="status">{ROOM_ERRORS[error]}</p>}
 
               <p className="hint">
                 You get a code to share. Everyone who joins is added to the game and enters their
-                own scores. This starts a fresh game.
+                own scores.
               </p>
             </form>
           </div>

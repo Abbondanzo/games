@@ -8,6 +8,7 @@ import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from '@s
 import { describeError } from '@shared/rooms/protocol';
 import { useCricket } from './lib/useCricket';
 import { RoomBar } from '../rooms/RoomBar';
+import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import type { Dart, Variant } from '@shared/games/cricket/types';
 
@@ -22,6 +23,9 @@ const WIN_REASON: Record<Variant, string> = {
   cutthroat: 'Closed every target with the lowest score.',
   nopoints: 'First to close every target.',
 };
+
+const describeGame = (s: { players: unknown[]; turns: unknown[] }) =>
+  summarise([[s.players.length, 'player'], [s.turns.length, 'turn']]);
 
 export function CricketTracker() {
   const { state, dispatch, room, onReject } = useCricket();
@@ -138,7 +142,7 @@ export function CricketTracker() {
         </Link>
         <h1>Cricket</h1>
         <div className="topbar-actions">
-          {!room && <HostRoomButton game="cricket" />}
+          {!room && <HostRoomButton game="cricket" existing={describeGame(state)} />}
           {isHost && (
             <>
               <button
