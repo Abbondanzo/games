@@ -1,10 +1,5 @@
-import { createIdSource, type IdSource } from '../../shared/ids';
-import {
-  isArrayOf, isInteger, isOneOf, isRecord, isString, parseJson,
-} from '../../shared/parse';
-import type { CricketState, Dart, Player, Turn, Variant } from './types';
-
-export const STORE_KEY = 'games.cricket.v1';
+import { createIdSource, type IdSource } from '../../ids';
+import type { CricketState, Dart, Turn, Variant } from './types';
 
 /** Ids are minted per module, so each game numbers its own. */
 const defaultUid = createIdSource();
@@ -124,69 +119,3 @@ export const createReducer = (uid: IdSource = defaultUid) =>
  * alone.
  */
 export const reducer = createReducer();
-
-const MULTIPLIERS = [1, 2, 3] as const;
-
-const isDart = (v: unknown): v is Dart =>
-  isRecord(v) && isInteger(v.target) && isOneOf(v.multiplier, MULTIPLIERS);
-
-const isTurn = (v: unknown): v is Turn =>
-  isRecord(v) && isString(v.id) && isString(v.playerId) && isArrayOf(v.darts, isDart);
-
-const VARIANTS = ['standard', 'cutthroat', 'nopoints'] as const;
-
-/**
- * Built rather than asserted, because a stored player may predate join points.
- * A guard claiming `v is Player` would be lying about a field it never checked.
- */
-const toPlayer = (v: unknown): Player | null => {
-  if (!isRecord(v) || !isString(v.id) || !isString(v.name)) return null;
-  const joined = v.joinedAtTurn;
-  return {
-    id: v.id,
-    name: v.name,
-    // Games stored before join points existed began with everyone at the board.
-    joinedAtTurn: isInteger(joined) && joined >= 0 ? joined : 0,
-  };
-};
-
-/**
- * A stored game is untrusted input: it may predate a change to the shape, or
- * have been hand-edited. A turn missing its darts would throw during the
- * replay, and because that happens while rendering, the bad payload would
- * never be overwritten - so anything malformed is dropped here instead.
- */
-export function readStored(): CricketState | null {
-  // getItem itself can throw in private browsing, so the read stays guarded.
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(STORE_KEY);
-  } catch {
-    return null;
-  }
-  if (!raw) return null;
-
-  const parsed = parseJson(raw);
-  if (!isRecord(parsed)) return null;
-  if (!Array.isArray(parsed.players) || !Array.isArray(parsed.turns)) return null;
-
-  const players: Player[] = [];
-  for (const candidate of parsed.players) {
-    const player = toPlayer(candidate);
-    if (!player) return null;
-    players.push(player);
-  }
-
-  const ids = new Set(players.map((p) => p.id));
-  const turns = parsed.turns.filter((t): t is Turn => isTurn(t) && ids.has(t.playerId));
-
-  const index = parsed.currentIndex;
-  const currentIndex = isInteger(index) && index >= 0 && index < players.length ? index : 0;
-
-  return {
-    players,
-    turns,
-    currentIndex,
-    variant: isOneOf(parsed.variant, VARIANTS) ? parsed.variant : 'standard',
-  };
-}

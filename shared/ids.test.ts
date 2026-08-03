@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createIdSource } from './ids';
-import { createReducer as createScrabble } from '../scrabble/lib/reducer';
-import { createReducer as createCricket } from '../cricket/lib/reducer';
-import { createReducer as createRummikub } from '../rummikub/lib/reducer';
-import { initialState as scrabbleInit } from '../scrabble/lib/reducer';
-import { initialState as cricketInit } from '../cricket/lib/reducer';
-import { initialState as rummikubInit } from '../rummikub/lib/reducer';
+import { createReducer as createScrabble } from './games/scrabble/reducer';
+import { createReducer as createCricket } from './games/cricket/reducer';
+import { createReducer as createRummikub } from './games/rummikub/reducer';
+import { initialState as scrabbleInit } from './games/scrabble/reducer';
+import { initialState as cricketInit } from './games/cricket/reducer';
+import { initialState as rummikubInit } from './games/rummikub/reducer';
 
 describe('createIdSource', () => {
   it('counts independently per source', () => {
@@ -63,7 +63,7 @@ describe('the default reducer export', () => {
   // Array.reduce passes an index as the third argument, so a third positional
   // parameter on the reducer would be filled with a number.
   it('takes exactly two arguments', async () => {
-    const { reducer } = await import('../scrabble/lib/reducer');
+    const { reducer } = await import('./games/scrabble/reducer');
     expect(reducer.length).toBe(2);
   });
 });

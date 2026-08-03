@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Undo2 } from 'lucide-react';
-import type { BoardState } from '../lib/cricket';
-import { DARTS_PER_TURN, TARGETS, dartShorthand, targetLabel } from '../lib/cricket';
-import type { CricketTarget, Dart, Player } from '../lib/types';
+import type { BoardState } from '@shared/games/cricket/rules';
+import { DARTS_PER_TURN, TARGETS, dartShorthand, targetLabel } from '@shared/games/cricket/rules';
+import type { CricketTarget, Dart, Player } from '@shared/games/cricket/types';
 import { MarkGlyph } from './MarkGlyph';
 
 interface Props {

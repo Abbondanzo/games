@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { BookOpen, Plus, X } from 'lucide-react';
-import type { Draft, Player, Tile, WordMult } from '../lib/types';
+import type { Draft, Player, Tile, WordMult } from '@shared/games/scrabble/types';
 import {
   WORD_MULTS,
   cycleTile,
@@ -9,7 +9,7 @@ import {
   emptyDraft,
   tilesFromWord,
   turnTotal,
-} from '../lib/scoring';
+} from '@shared/games/scrabble/scoring';
 import { runLookup, type LookupView } from '../lib/lookupView';
 import { TileRow } from './TileRow';
 import { ValidityBar } from './ValidityBar';

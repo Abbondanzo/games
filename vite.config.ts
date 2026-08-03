@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -20,6 +21,11 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  // One shared library, imported the same way by the app, the tests and the
+  // Worker, so no type or rule exists in two places.
+  resolve: {
+    alias: { '@shared': fileURLToPath(new URL('./shared', import.meta.url)) },
+  },
   // Absolute base: the service worker and manifest are scoped to the site root,
   // which rules out serving the app from a subpath.
   base: '/',

@@ -4,9 +4,9 @@ import { ArrowLeft, RotateCcw, Trash2, Trophy } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { CricketBoard } from './components/CricketBoard';
 import { DartEntry } from './components/DartEntry';
-import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from './lib/cricket';
+import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from '@shared/games/cricket/rules';
 import { useCricket } from './lib/useCricket';
-import type { Dart, Variant } from './lib/types';
+import type { Dart, Variant } from '@shared/games/cricket/types';
 
 const VARIANTS: { value: Variant; label: string; blurb: string }[] = [
   { value: 'standard', label: 'Standard', blurb: 'Points are yours. Highest score wins.' },

@@ -1,6 +1,6 @@
-import type { BoardState } from '../lib/cricket';
-import { TARGETS, targetLabel } from '../lib/cricket';
-import type { Player, Variant } from '../lib/types';
+import type { BoardState } from '@shared/games/cricket/rules';
+import { TARGETS, targetLabel } from '@shared/games/cricket/rules';
+import type { Player, Variant } from '@shared/games/cricket/types';
 import { MarkGlyph } from './MarkGlyph';
 
 interface Props {

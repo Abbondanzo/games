@@ -6,7 +6,7 @@
  * Because the UI and the enforcement ask the same question, a button cannot
  * end up enabled for something the room will refuse.
  */
-import { isArrayOf, isInteger, isRecord, isString } from '../shared/parse';
+import { z } from 'zod';
 import type { ErrorCode, Game, GameAction, Role, Snapshot } from './protocol';
 
 export interface Actor {
@@ -34,21 +34,25 @@ export interface SeatView {
   lastTurnPlayerId: string | null;
 }
 
-const idsOf = (value: unknown): string[] =>
-  isArrayOf(value, isRecord) ? value.map((p) => p.id).filter(isString) : [];
+/**
+ * The room reads a snapshot it holds but does not own the type of, so these
+ * pick out just the fields the seating rules need and shrug at anything else.
+ */
+const PlayerListSchema = z.array(z.object({ id: z.string() })).catch([]);
+const EntryListSchema = z.array(z.object({ playerId: z.string() })).catch([]);
 
-const lastEntryPlayer = (value: unknown): string | null => {
-  if (!isArrayOf(value, isRecord)) return null;
-  const last = value[value.length - 1];
-  return last && isString(last.playerId) ? last.playerId : null;
-};
+const idsOf = (value: unknown): string[] =>
+  PlayerListSchema.parse(value).map((p) => p.id);
+
+const lastEntryPlayer = (value: unknown): string | null =>
+  EntryListSchema.parse(value).at(-1)?.playerId ?? null;
 
 const withTurnPointer = (state: Snapshot): SeatView => {
   const playerIds = idsOf(state.players);
-  const index = state.currentIndex;
+  const index = z.int().nonnegative().catch(-1).parse(state.currentIndex);
   return {
     playerIds,
-    currentPlayerId: isInteger(index) ? playerIds[index] ?? null : null,
+    currentPlayerId: playerIds[index] ?? null,
     lastTurnPlayerId: lastEntryPlayer(state.turns),
   };
 };

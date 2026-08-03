@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Crown, RotateCcw, Trash2 } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { RoundEntry } from './components/RoundEntry';
-import { roundScores, standings } from './lib/rummikub';
+import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
 
 export function RummikubTracker() {

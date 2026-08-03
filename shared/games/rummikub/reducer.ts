@@ -1,10 +1,5 @@
-import { createIdSource, type IdSource } from '../../shared/ids';
-import {
-  isArrayOf, isFiniteNumber, isRecord, isRecordOf, isString, parseJson,
-} from '../../shared/parse';
-import type { Player, Round, RummikubState } from './types';
-
-export const STORE_KEY = 'games.rummikub.v1';
+import { createIdSource, type IdSource } from '../../ids';
+import type { Round, RummikubState } from './types';
 
 /** Ids are minted per module, so each game numbers its own. */
 const defaultUid = createIdSource();
@@ -73,39 +68,3 @@ export const createReducer = (uid: IdSource = defaultUid) =>
  * alone.
  */
 export const reducer = createReducer();
-
-const isPlayer = (v: unknown): v is Player =>
-  isRecord(v) && isString(v.id) && isString(v.name);
-
-const isRound = (v: unknown): v is Round =>
-  isRecord(v)
-  && isString(v.id)
-  && isString(v.winnerId)
-  && isRecordOf(v.penalties, isFiniteNumber);
-
-/**
- * A stored game is untrusted input: it may predate a change to the shape, or
- * have been hand-edited. Anything malformed is dropped rather than allowed to
- * crash the render, which would leave the bad payload stuck in storage.
- */
-export function readStored(): RummikubState | null {
-  // getItem itself can throw in private browsing, so the read stays guarded.
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(STORE_KEY);
-  } catch {
-    return null;
-  }
-  if (!raw) return null;
-
-  const parsed = parseJson(raw);
-  if (!isRecord(parsed)) return null;
-  if (!isArrayOf(parsed.players, isPlayer)) return null;
-  if (!Array.isArray(parsed.rounds)) return null;
-
-  const players = parsed.players;
-  const ids = new Set(players.map((p) => p.id));
-  const rounds = parsed.rounds.filter((r): r is Round => isRound(r) && ids.has(r.winnerId));
-
-  return { players, rounds };
-}

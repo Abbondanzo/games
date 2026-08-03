@@ -6,8 +6,8 @@ import { TurnEntry } from './components/TurnEntry';
 import { HistoryCard } from './components/HistoryCard';
 import { DictionaryDrawer } from './components/DictionaryDrawer';
 import { useGame } from './lib/useGame';
-import { draftWord, draftWordScore, emptyDraft } from './lib/scoring';
-import type { Draft } from './lib/types';
+import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/scoring';
+import type { Draft } from '@shared/games/scrabble/types';
 
 export function ScrabbleTracker() {
   const { state, dispatch } = useGame();

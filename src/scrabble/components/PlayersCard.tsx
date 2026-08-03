@@ -1,6 +1,6 @@
 import { Crown } from 'lucide-react';
-import type { Player, Turn } from '../lib/types';
-import { standings } from '../lib/scoring';
+import type { Player, Turn } from '@shared/games/scrabble/types';
+import { standings } from '@shared/games/scrabble/scoring';
 import { PlayersCard as SharedPlayersCard } from '../../shared/PlayersCard';
 
 interface Props {

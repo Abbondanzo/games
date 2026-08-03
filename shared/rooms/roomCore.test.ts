@@ -5,7 +5,7 @@ import {
 } from './roomCore';
 import type { ClientMessage, ServerMessage } from './protocol';
 import { cricketApply as bindCricket } from './games/cricket';
-import type { CricketState } from '../cricket/lib/types';
+import type { CricketState } from '../games/cricket/types';
 
 /** The room runs the real cricket reducer, with ids it mints itself. */
 const cricketApply = (): ApplyAction<CricketState> => {

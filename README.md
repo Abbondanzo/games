@@ -38,12 +38,15 @@ Needs Node 20+ and pnpm; `corepack enable` picks up the pinned version.
 
 ## How it fits together
 
-Each game is a self-contained module under `src/<game>/`, with its rules in plain functions that
-have no React in them. Scores are derived by replaying the raw events - words played, darts
-thrown, rounds won - rather than being stored, which is what lets cricket switch scoring modes
-mid-game without restarting.
+Pure domain code - game rules, reducers and the room protocol - lives in `shared/`, with no
+React and no browser APIs, so the room server can run exactly the same code the app does. `src/`
+is the React app and `worker/` is the room server.
 
-Around 260 tests cover the rule engines, the reducers and every tracker end to end.
+Scores are derived by replaying the raw events - words played, darts thrown, rounds won - rather
+than being stored, which is what lets cricket switch scoring modes mid-game without restarting.
+
+Around 430 tests cover the rule engines, the reducers, the room protocol and every tracker end
+to end.
 
 [CLAUDE.md](CLAUDE.md) has the detail: architecture, conventions, testing approach and the
 gotchas worth knowing before changing anything.

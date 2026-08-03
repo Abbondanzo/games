@@ -1,11 +1,6 @@
-import { createIdSource, type IdSource } from '../../shared/ids';
-import {
-  isArrayOf, isBoolean, isFiniteNumber, isInteger, isOneOf, isRecord, isString, parseJson,
-} from '../../shared/parse';
-import type { GameState, Player, ScoredWord, Turn } from './types';
+import { createIdSource, type IdSource } from '../../ids';
+import type { GameState, ScoredWord, Turn } from './types';
 import { BINGO_BONUS } from './scoring';
-
-export const STORE_KEY = 'games.scrabble.v1';
 
 /** Ids are minted per module, so each game numbers its own. */
 const defaultUid = createIdSource();
@@ -142,47 +137,3 @@ export const createReducer = (uid: IdSource = defaultUid) =>
  * alone.
  */
 export const reducer = createReducer();
-
-const isPlayer = (v: unknown): v is Player =>
-  isRecord(v) && isString(v.id) && isString(v.name);
-
-const TURN_KINDS = ['play', 'pass', 'adjust'] as const;
-
-const isTurn = (v: unknown): v is Turn =>
-  isRecord(v)
-  && isString(v.id)
-  && isString(v.playerId)
-  && isOneOf(v.kind, TURN_KINDS)
-  && isArrayOf(v.words, isString)
-  && isBoolean(v.bingo)
-  && isFiniteNumber(v.points);
-
-/**
- * A stored game is untrusted input: it may predate a change to the shape, or
- * have been hand-edited. Anything malformed is dropped rather than allowed to
- * crash the render, which would leave the bad payload stuck in storage.
- */
-export function readStored(): GameState | null {
-  // getItem itself can throw in private browsing, so the read stays guarded.
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(STORE_KEY);
-  } catch {
-    return null;
-  }
-  if (!raw) return null;
-
-  const parsed = parseJson(raw);
-  if (!isRecord(parsed)) return null;
-  if (!isArrayOf(parsed.players, isPlayer)) return null;
-  if (!Array.isArray(parsed.turns)) return null;
-
-  const players = parsed.players;
-  const ids = new Set(players.map((p) => p.id));
-  const turns = parsed.turns.filter((t): t is Turn => isTurn(t) && ids.has(t.playerId));
-
-  const index = parsed.currentIndex;
-  const currentIndex = isInteger(index) && index >= 0 && index < players.length ? index : 0;
-
-  return { players, turns, currentIndex };
-}
