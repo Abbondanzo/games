@@ -12,6 +12,9 @@ const CLIENT: ClientMessage[] = [
   { t: 'setName', name: 'Ada' },
   { t: 'lock', locked: true },
   { t: 'kick', memberId: 'm1' },
+  { t: 'roundOpen', reqId: 'r4', winnerId: 'p1' },
+  { t: 'rackSubmit', reqId: 'r5', seatId: 'p2', total: 24 },
+  { t: 'roundCancel', reqId: 'r6' },
 ];
 
 const SERVER: ServerMessage[] = [
@@ -23,7 +26,7 @@ const SERVER: ServerMessage[] = [
     you: { memberId: 'm1', role: 'host', seatId: null, name: 'Ada' },
     rev: 0,
     state: { players: [], turns: [] },
-    room: { members: [], locked: false },
+    room: { members: [], locked: false, pending: null },
   },
   { t: 'state', rev: 3, state: { players: [] }, cause: { memberId: 'm1', actionType: 'pass' } },
   { t: 'state', rev: 4, state: {}, cause: null },
@@ -32,6 +35,7 @@ const SERVER: ServerMessage[] = [
     room: {
       members: [{ memberId: 'm1', name: 'Ada', role: 'host', seatId: 'p1', online: true }],
       locked: true,
+      pending: { winnerId: 'p1', racks: { p2: 24 } },
     },
   },
   { t: 'error', reqId: 'r1', code: 'not-your-turn' },

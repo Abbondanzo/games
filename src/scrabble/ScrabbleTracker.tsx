@@ -6,11 +6,24 @@ import { TurnEntry } from './components/TurnEntry';
 import { HistoryCard } from './components/HistoryCard';
 import { DictionaryDrawer } from './components/DictionaryDrawer';
 import { useGame } from './lib/useGame';
+import { RoomBar } from '../rooms/RoomBar';
+import { SeatPicker } from '../rooms/SeatPicker';
+import { HostRoomButton } from '../rooms/HostRoomButton';
+import { describeError } from '@shared/rooms/protocol';
 import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/scoring';
 import type { Draft } from '@shared/games/scrabble/types';
 
 export function ScrabbleTracker() {
-  const { state, dispatch } = useGame();
+  const { state, dispatch, room, onReject } = useGame();
+
+  // A refused play would otherwise take the typed word with it.
+  onReject((action) => {
+    if (action.type === 'recordPlay') {
+      setDraft((d) => ({ ...d, words: action.words, bingo: action.bingo }));
+    }
+  });
+
+  const isHost = !room || room.role === 'host';
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [dictOpen, setDictOpen] = useState(false);
 
@@ -54,33 +67,45 @@ export function ScrabbleTracker() {
         </Link>
         <h1>Scrabble</h1>
         <div className="topbar-actions">
+          {!room && <HostRoomButton game="scrabble" />}
           <button type="button" className="ghost" onClick={() => setDictOpen(true)}>
             <BookOpen size={15} aria-hidden="true" /> Dictionary
           </button>
-          <button
-            type="button"
-            className="ghost"
-            onClick={newGame}
-            title="Clear the scores and keep the players"
-          >
-            <RotateCcw size={15} aria-hidden="true" /> New game
-          </button>
-          <button
-            type="button"
-            className="ghost danger"
-            onClick={resetAll}
-            title="Clear the scores and the players"
-          >
-            <Trash2 size={15} aria-hidden="true" /> Reset all
-          </button>
+          {isHost && (
+            <>
+              <button
+                type="button"
+                className="ghost"
+                onClick={newGame}
+                title="Clear the scores and keep the players"
+              >
+                <RotateCcw size={15} aria-hidden="true" /> New game
+              </button>
+              <button
+                type="button"
+                className="ghost danger"
+                onClick={resetAll}
+                title="Clear the scores and the players"
+              >
+                <Trash2 size={15} aria-hidden="true" /> Reset all
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       <main>
+        {room && <RoomBar room={room} onLeave={room.leave} />}
+        {room?.lastError && (
+          <div className="banner warn" role="status">{describeError(room.lastError)}</div>
+        )}
+        {room && <SeatPicker room={room} players={state.players} />}
+
         <PlayersCard
           players={state.players}
           turns={state.turns}
           currentPlayerId={currentPlayer?.id ?? null}
+          editable={isHost}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={(id) => dispatch({ type: 'removePlayer', id })}
           onSelect={(id) => dispatch({ type: 'setCurrent', id })}

@@ -1,5 +1,6 @@
-import { useEffect, useReducer } from 'react';
 import { z } from 'zod';
+import { useGameSession } from '../../rooms/session';
+import type { TransportFactory } from '../../rooms/transport';
 import { initialState, reducer } from '@shared/games/rummikub/reducer';
 import { PlayerSchema, RoundSchema } from '@shared/games/rummikub/schema';
 import type { RummikubState } from '@shared/games/rummikub/types';
@@ -49,16 +50,13 @@ export function readStored(): RummikubState | null {
   return { players, rounds };
 }
 
-export function useRummikub() {
-  const [state, dispatch] = useReducer(reducer, initialState, (init) => readStored() ?? init);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    } catch {
-      // Storage can be unavailable; the session still works.
-    }
-  }, [state]);
-
-  return { state, dispatch };
+export function useRummikub(transport?: TransportFactory) {
+  return useGameSession({
+    game: 'rummikub',
+    reducer,
+    initialState,
+    readStored,
+    storeKey: STORE_KEY,
+    transport,
+  });
 }

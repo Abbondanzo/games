@@ -70,9 +70,22 @@ export const MemberSchema = z.object({
 });
 export type Member = z.infer<typeof MemberSchema>;
 
+/**
+ * A Rummikub round being collected. Every player enters their own rack and the
+ * host commits when they are in, so this is room state rather than a game
+ * action: it is session scratch that dies with the room, and keeping it out of
+ * the game state means RummikubState and its storage never had to change.
+ */
+export const PendingRoundSchema = z.object({
+  winnerId: z.string(),
+  racks: z.record(z.string(), z.number().int().min(0)),
+});
+export type PendingRound = z.infer<typeof PendingRoundSchema>;
+
 export const RoomViewSchema = z.object({
   members: z.array(MemberSchema),
   locked: z.boolean(),
+  pending: PendingRoundSchema.nullable(),
 });
 export type RoomView = z.infer<typeof RoomViewSchema>;
 
@@ -91,6 +104,9 @@ export const ClientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('setName'), name: Name }),
   z.object({ t: z.literal('lock'), locked: z.boolean() }),
   z.object({ t: z.literal('kick'), memberId: Id }),
+  z.object({ t: z.literal('roundOpen'), reqId: Id, winnerId: Id }),
+  z.object({ t: z.literal('rackSubmit'), reqId: Id, seatId: Id, total: z.int().min(0).max(1000) }),
+  z.object({ t: z.literal('roundCancel'), reqId: Id }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 

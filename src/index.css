@@ -461,3 +461,53 @@ button.ghost, button.primary, button.link {
 .tile-pad button.undo:hover:not(:disabled) { color: var(--bad); border-color: var(--bad); }
 
 .history .got { font-variant-numeric: tabular-nums; font-weight: 500; font-size: .82rem; }
+
+/* ─────────────────────────── rooms ─────────────────────────── */
+
+.room-bar {
+  background: var(--card); border: 1px solid var(--line);
+  border-left: 4px solid var(--good); border-radius: var(--radius); padding: .6rem .9rem;
+}
+.room-bar.waiting { border-left-color: var(--warn); }
+
+.room-summary { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; font-size: .85rem; }
+.room-summary .link { margin-left: auto; }
+
+.room-code {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--card-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: .25rem .55rem; color: inherit; font: inherit;
+}
+.room-code .code { font-weight: 700; letter-spacing: .12em; font-variant-numeric: tabular-nums; }
+.locked-tag { display: inline-flex; align-items: center; gap: .25rem; }
+
+.room-detail { margin-top: .75rem; }
+.room-detail .chips li.away { opacity: .5; }
+.room-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
+
+.room-error { color: var(--bad); font-size: .82rem; }
+.banner.warn {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, var(--card));
+}
+
+/* ── join ── */
+.join-row { margin-top: 1.25rem; }
+.join-form { display: flex; flex-direction: column; gap: .9rem; margin-top: 1rem; }
+.field { display: flex; flex-direction: column; gap: .3rem; font-size: .82rem; color: var(--muted); }
+.field input {
+  font: inherit; color: var(--text); background: var(--card-2);
+  border: 1px solid var(--line); border-radius: 9px; padding: .55rem .7rem;
+}
+.code-input {
+  font-size: 1.5rem; font-weight: 700; letter-spacing: .35em; text-align: center;
+  text-transform: uppercase;
+}
+
+/* ── rummikub rack collection ── */
+.rack-progress { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+.rack-progress li {
+  list-style: none; font-size: .78rem; padding: .2rem .55rem; border-radius: 999px;
+  background: var(--card-2); border: 1px solid var(--line); color: var(--muted);
+}
+.rack-progress li.in { border-color: var(--good); color: var(--text); }

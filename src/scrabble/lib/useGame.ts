@@ -1,5 +1,6 @@
-import { useEffect, useReducer } from 'react';
 import { z } from 'zod';
+import { useGameSession } from '../../rooms/session';
+import type { TransportFactory } from '../../rooms/transport';
 import { initialState, reducer } from '@shared/games/scrabble/reducer';
 import { PlayerSchema, TurnSchema } from '@shared/games/scrabble/schema';
 import type { GameState } from '@shared/games/scrabble/types';
@@ -56,16 +57,13 @@ export function readStored(): GameState | null {
   };
 }
 
-export function useGame() {
-  const [state, dispatch] = useReducer(reducer, initialState, (init) => readStored() ?? init);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    } catch {
-      // Storage can be unavailable (private browsing); the session still works.
-    }
-  }, [state]);
-
-  return { state, dispatch };
+export function useGame(transport?: TransportFactory) {
+  return useGameSession({
+    game: 'scrabble',
+    reducer,
+    initialState,
+    readStored,
+    storeKey: STORE_KEY,
+    transport,
+  });
 }

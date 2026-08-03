@@ -10,7 +10,7 @@
  * level up: protocol lives in plain functions.
  */
 import type {
-  Cause, ErrorCode, Game, GameAction, Member, Role, RoomView, ServerMessage, Snapshot,
+  Cause, ErrorCode, Game, GameAction, Member, PendingRound, Role, RoomView, ServerMessage, Snapshot,
 } from './protocol';
 import { PROTOCOL_VERSION } from './protocol';
 import type { ClientMessage } from './protocol';
@@ -46,6 +46,8 @@ export interface RoomState<S extends Snapshot = Snapshot> {
   snapshot: S;
   members: Record<string, StoredMember>;
   locked: boolean;
+  /** A Rummikub round being collected, if one is open. */
+  pending: PendingRound | null;
   lastActiveAt: number;
 }
 
@@ -88,7 +90,7 @@ export function roomView<S extends Snapshot>(state: RoomState<S>, ctx: Context):
     seatId: m.seatId,
     online: online.has(m.memberId),
   }));
-  return { members, locked: state.locked };
+  return { members, locked: state.locked, pending: state.pending };
 }
 
 const actorOf = (member: StoredMember): Actor => ({
@@ -121,6 +123,7 @@ export function createRoom<S extends Snapshot>(input: {
       },
     },
     locked: false,
+    pending: null,
     lastActiveAt: input.now,
   };
 }
@@ -254,6 +257,42 @@ export function handle<S extends Snapshot>(
     case 'kick':
       return handleKick(touched, member, message.memberId, ctx);
 
+    case 'roundOpen': {
+      if (member.role !== 'host') return fail(touched, memberId, message.reqId, 'host-only');
+      const seats = seatView[touched.game](touched.snapshot).playerIds;
+      if (!seats.includes(message.winnerId)) {
+        return fail(touched, memberId, message.reqId, 'not-your-seat');
+      }
+      const next = { ...touched, pending: { winnerId: message.winnerId, racks: {} } };
+      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+    }
+
+    case 'rackSubmit': {
+      if (!touched.pending) return fail(touched, memberId, message.reqId, 'unknown-action');
+      // Your own rack only, unless you are the host filling in for someone.
+      if (member.role !== 'host' && member.seatId !== message.seatId) {
+        return fail(touched, memberId, message.reqId, 'not-your-seat');
+      }
+      if (message.seatId === touched.pending.winnerId) {
+        // They went out, so by definition they hold nothing.
+        return fail(touched, memberId, message.reqId, 'unknown-action');
+      }
+      const next = {
+        ...touched,
+        pending: {
+          ...touched.pending,
+          racks: { ...touched.pending.racks, [message.seatId]: message.total },
+        },
+      };
+      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+    }
+
+    case 'roundCancel': {
+      if (member.role !== 'host') return fail(touched, memberId, message.reqId, 'host-only');
+      const next = { ...touched, pending: null };
+      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+    }
+
     default:
       return fail(touched, memberId, null, 'bad-message');
   }
@@ -309,6 +348,8 @@ function handleAction<S extends Snapshot>(
     ...state,
     rev: state.rev + 1,
     snapshot,
+    // Recording the round is what ends the collection.
+    pending: message.action.type === 'recordRound' ? null : state.pending,
     members: reconcileSeats(
       { ...state.members, [member.memberId]: remember(member, message.reqId) },
       snapshot,

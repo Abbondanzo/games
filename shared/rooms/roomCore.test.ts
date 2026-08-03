@@ -5,6 +5,7 @@ import {
 } from './roomCore';
 import type { ClientMessage, ServerMessage } from './protocol';
 import { cricketApply as bindCricket, cricketInitialState } from './games/cricket';
+import { rummikubApply as bindRummikub, rummikubInitialState } from './games/rummikub';
 import { CricketStateSchema } from '../games/cricket/schema';
 import type { Snapshot } from './protocol';
 
@@ -29,6 +30,13 @@ function newRoom(): RoomState<Snapshot> {
     snapshot: cricketInitialState(),
     now: 1_000,
   });
+}
+
+/** Adds a guest to any room, whatever the game. */
+function withGuestIn(state: RoomState<Snapshot>, memberId: string, name: string): RoomState<Snapshot> {
+  const result = join(state, { memberId, name, now: 1_000 });
+  if (!result.ok) throw new Error(`join failed: ${result.code}`);
+  return result.state;
 }
 
 /** Adds a guest and returns the room plus their id. */
@@ -310,6 +318,124 @@ describe('host controls', () => {
     const room = withGuest(newRoom(), 'm1', 'Grace');
     const { state } = act(room, 'm1', { t: 'setName', name: 'Grace H' });
     expect(state.members.m1?.name).toBe('Grace H');
+  });
+});
+
+/**
+ * A Rummikub round records everyone's rack at once, so it cannot be seat-scoped
+ * like a dart or a word. Guests instead submit their own rack into room state,
+ * and the host commits the round when they are in. RummikubState never changes.
+ */
+describe('collecting Rummikub racks', () => {
+  const rummikubRoom = () => createRoom({
+    code: 'CD3F',
+    game: 'rummikub' as const,
+    host: HOST,
+    snapshot: rummikubInitialState(),
+    now: 1_000,
+  });
+
+  const apply = () => {
+    let n = 0;
+    return bindRummikub(() => `srv-${n++}`);
+  };
+
+  /** Adds Ada and Grace, and seats a guest as Grace. */
+  function setUp() {
+    const rules = apply();
+    let room = withGuestIn(rummikubRoom(), 'm1', 'Grace');
+    room = handle(room, HOST.memberId, {
+      t: 'action', reqId: 'r1', rev: 0, action: { type: 'addPlayers', names: 'Ada, Grace' },
+    }, ctx(), rules).state;
+
+    const players = (room.snapshot.players as { id: string }[]).map((p) => p.id);
+    room = handle(room, 'm1', { t: 'claimSeat', reqId: 'c1', seatId: players[1]! }, ctx(), rules).state;
+    return { room, players, rules };
+  }
+
+  it('opens a round for the player who went out', () => {
+    const { room, players, rules } = setUp();
+    const out = handle(room, HOST.memberId, {
+      t: 'roundOpen', reqId: 'o1', winnerId: players[0]!,
+    }, ctx(), rules);
+    expect(out.state.pending).toEqual({ winnerId: players[0], racks: {} });
+  });
+
+  it('refuses to open a round for someone who is not playing', () => {
+    const { room, rules } = setUp();
+    const out = handle(room, HOST.memberId, {
+      t: 'roundOpen', reqId: 'o1', winnerId: 'ghost',
+    }, ctx(), rules);
+    expect(out.state.pending).toBeNull();
+  });
+
+  it('refuses a guest the right to open one', () => {
+    const { room, players, rules } = setUp();
+    const out = handle(room, 'm1', {
+      t: 'roundOpen', reqId: 'o1', winnerId: players[0]!,
+    }, ctx(), rules);
+    expect(out.state.pending).toBeNull();
+  });
+
+  it('takes a rack from the player it belongs to', () => {
+    const { room, players, rules } = setUp();
+    let next = handle(room, HOST.memberId, {
+      t: 'roundOpen', reqId: 'o1', winnerId: players[0]!,
+    }, ctx(), rules).state;
+
+    next = handle(next, 'm1', {
+      t: 'rackSubmit', reqId: 's1', seatId: players[1]!, total: 24,
+    }, ctx(), rules).state;
+
+    expect(next.pending?.racks).toEqual({ [players[1]!]: 24 });
+  });
+
+  it('lets someone correct their own rack before it is committed', () => {
+    const { room, players, rules } = setUp();
+    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: players[0]! }, ctx(), rules).state;
+    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's1', seatId: players[1]!, total: 24 }, ctx(), rules).state;
+    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's2', seatId: players[1]!, total: 42 }, ctx(), rules).state;
+    expect(next.pending?.racks[players[1]!]).toBe(42);
+  });
+
+  it('refuses a rack submitted for somebody else', () => {
+    const { room, players, rules } = setUp();
+    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: players[0]! }, ctx(), rules).state;
+    const out = handle(next, 'm1', {
+      t: 'rackSubmit', reqId: 's1', seatId: players[0]!, total: 5,
+    }, ctx(), rules);
+    expect(firstError(out.effects)?.code).toBe('not-your-seat');
+  });
+
+  it('refuses a rack when no round is being collected', () => {
+    const { room, players, rules } = setUp();
+    const out = handle(room, 'm1', {
+      t: 'rackSubmit', reqId: 's1', seatId: players[1]!, total: 24,
+    }, ctx(), rules);
+    expect(firstError(out.effects)?.code).toBe('unknown-action');
+  });
+
+  it('clears the collection when the host records the round', () => {
+    const { room, players, rules } = setUp();
+    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: players[0]! }, ctx(), rules).state;
+    next = handle(next, 'm1', { t: 'rackSubmit', reqId: 's1', seatId: players[1]!, total: 24 }, ctx(), rules).state;
+
+    const out = handle(next, HOST.memberId, {
+      t: 'action',
+      reqId: 'r9',
+      rev: next.rev,
+      action: { type: 'recordRound', winnerId: players[0]!, penalties: { [players[1]!]: 24 } },
+    }, ctx(), rules);
+
+    expect(out.state.pending).toBeNull();
+    expect((out.state.snapshot.rounds as unknown[]).length).toBe(1);
+  });
+
+  it('lets the host abandon a round', () => {
+    const { room, players, rules } = setUp();
+    let next = handle(room, HOST.memberId, { t: 'roundOpen', reqId: 'o1', winnerId: players[0]! }, ctx(), rules).state;
+    next = handle(next, HOST.memberId, { t: 'roundCancel', reqId: 'x1' }, ctx(), rules).state;
+    expect(next.pending).toBeNull();
   });
 });
 
