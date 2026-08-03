@@ -19,7 +19,7 @@ const renderAt = (path: string) =>
 describe('routing', () => {
   it('lists the games on the home page', () => {
     renderAt('/');
-    expect(screen.getByRole('heading', { name: 'Board Games' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Games' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Scrabble/ })).toBeInTheDocument();
   });
 
@@ -49,7 +49,7 @@ describe('routing', () => {
 
   it('sends an unknown route home', () => {
     renderAt('/not-a-game');
-    expect(screen.getByRole('heading', { name: 'Board Games' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Games' })).toBeInTheDocument();
   });
 
   it('links back to the game list from the tracker', () => {

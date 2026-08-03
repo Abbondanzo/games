@@ -230,7 +230,7 @@ describe('correcting a throw', () => {
 
 describe('a stored game that is malformed', () => {
   const seed = (value: unknown) =>
-    localStorage.setItem('board-games.cricket.v1', JSON.stringify(value));
+    localStorage.setItem('games.cricket.v1', JSON.stringify(value));
 
   it('recovers from a turn with no darts instead of crashing on every load', () => {
     seed({

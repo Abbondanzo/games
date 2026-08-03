@@ -33,7 +33,7 @@ const GAMES: Game[] = [
 export function Home() {
   return (
     <main className="home">
-      <h1>Board Games</h1>
+      <h1>Games</h1>
       <p className="sub">Score trackers that run entirely in your browser.</p>
       <ul className="game-list">
         {GAMES.map((game) => (

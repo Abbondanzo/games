@@ -231,7 +231,7 @@ describe('game management', () => {
     await addPlayers(user, 'Ada');
     await user.type(wordBox(), 'cat{Enter}');
 
-    expect(localStorage.getItem('board-games.scrabble.v1')).toContain('Ada');
+    expect(localStorage.getItem('games.scrabble.v1')).toContain('Ada');
 
     cleanup();
     render(<Router><ScrabbleTracker /></Router>);
@@ -241,7 +241,7 @@ describe('game management', () => {
 
 describe('a stored game that is malformed', () => {
   const seed = (value: unknown) =>
-    localStorage.setItem('board-games.scrabble.v1', JSON.stringify(value));
+    localStorage.setItem('games.scrabble.v1', JSON.stringify(value));
 
   it('recovers from a current player index that is out of range', () => {
     seed({

@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import type { CricketState, Dart, Player, Turn, Variant } from './types';
 
-const STORE_KEY = 'board-games.cricket.v1';
+const STORE_KEY = 'games.cricket.v1';
 
 let counter = 0;
 const uid = (): string => `${Date.now().toString(36)}-${counter++}`;

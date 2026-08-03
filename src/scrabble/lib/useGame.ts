@@ -2,7 +2,7 @@ import { useEffect, useReducer } from 'react';
 import type { GameState, Player, ScoredWord, Turn } from './types';
 import { BINGO_BONUS } from './scoring';
 
-const STORE_KEY = 'board-games.scrabble.v1';
+const STORE_KEY = 'games.scrabble.v1';
 
 let counter = 0;
 const uid = (): string => `${Date.now().toString(36)}-${counter++}`;

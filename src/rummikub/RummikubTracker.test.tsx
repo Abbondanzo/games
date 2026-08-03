@@ -244,13 +244,13 @@ describe('persistence', () => {
   });
 
   it('starts clean when the stored game is malformed', () => {
-    localStorage.setItem('board-games.rummikub.v1', JSON.stringify({ players: [null], rounds: [] }));
+    localStorage.setItem('games.rummikub.v1', JSON.stringify({ players: [null], rounds: [] }));
     expect(() => render(<Router><RummikubTracker /></Router>)).not.toThrow();
     expect(board()).toEqual([]);
   });
 
   it('drops a stored round whose winner is gone', () => {
-    localStorage.setItem('board-games.rummikub.v1', JSON.stringify({
+    localStorage.setItem('games.rummikub.v1', JSON.stringify({
       players: [{ id: 'a', name: 'Ada' }],
       rounds: [{ id: 'r', winnerId: 'ghost', penalties: { a: 10 } }],
     }));

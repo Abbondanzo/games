@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import type { Player, Round, RummikubState } from './types';
 
-const STORE_KEY = 'board-games.rummikub.v1';
+const STORE_KEY = 'games.rummikub.v1';
 
 let counter = 0;
 const uid = (): string => `${Date.now().toString(36)}-${counter++}`;
