@@ -3,6 +3,10 @@
 Browser-based score trackers. React + TypeScript, built with Vite, installable as an app and
 fully usable offline.
 
+**Live at [games.abbondanzo.com](https://games.abbondanzo.com/).** The Cloudflare Pages
+subdomain also serves the same build, so games saved on one host will not appear on the other -
+`localStorage` is per-origin.
+
 ```
 pnpm install
 pnpm dev
