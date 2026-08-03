@@ -181,6 +181,31 @@ src/
       types.ts
 ```
 
+## Deployment
+
+Pushes and pull requests to `main` run `.github/workflows/deploy.yml`: install, type check,
+test, build, then upload `dist/` as an artifact. A push to `main` deploys that artifact to
+Cloudflare Pages; a pull request deploys a preview and comments the URL on the PR, updating the
+same comment rather than adding a new one each run.
+
+The deploy jobs reuse the artifact from the CI job, so the thing that ships is the exact output
+that was tested, and they skip the pnpm install entirely since `wrangler-action` brings its own
+wrangler.
+
+**Setup required before the first deploy**
+
+1. Create a Cloudflare Pages project named `games` (direct upload, not a Git integration -
+   the workflow pushes the build itself). To use a different name, change
+   `CLOUDFLARE_PROJECT_NAME` at the top of the workflow.
+2. Add two repository secrets under Settings > Secrets and variables > Actions:
+   - `CLOUDFLARE_API_TOKEN` - an API token with the **Cloudflare Pages: Edit** permission
+   - `CLOUDFLARE_ACCOUNT_ID` - from the Cloudflare dashboard URL or the account home page
+3. The `deploy` job targets a `production` environment. Either create it under
+   Settings > Environments or drop the `environment: production` line.
+
+No SPA fallback or `_redirects` file is needed: routing is hash-based, so every URL is served
+by `index.html` already.
+
 ## House style
 
 Plain hyphens only, no em or en dashes, and no emoji. Both are enforced by tests in
