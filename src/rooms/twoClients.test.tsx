@@ -70,11 +70,12 @@ describe('a host and a guest in one room', () => {
     const host = mount(room, room.hostSession, 'host');
     const guest = mount(room, guestSession, 'guest');
 
-    // Grace joined, so she is already a player; the host adds Ada, who has no phone.
-    await waitFor(() => expect(players(host)).toEqual(['Grace']));
+    // The host named themselves when starting, and Grace joined; the host adds
+    // Ada, who is playing without a phone.
+    await waitFor(() => expect(players(host)).toEqual(['Host', 'Grace']));
     await addPlayers(user, host, 'Ada');
 
-    await waitFor(() => expect(players(guest)).toEqual(['Grace', 'Ada']));
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace', 'Ada']));
   });
 
   // Typing your name is the whole of joining. Nobody waits on the host.
@@ -83,7 +84,7 @@ describe('a host and a guest in one room', () => {
     const guestSession = room.addMember('Grace');
     const guest = mount(room, guestSession, 'guest');
 
-    await waitFor(() => expect(players(guest)).toEqual(['Grace']));
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
     // Seated at the door: nothing to choose, nothing to wait for.
     expect(room.state().members[guestSession.memberId]?.seatId).toBeTruthy();
   });
@@ -94,7 +95,7 @@ describe('a host and a guest in one room', () => {
     const second = room.addMember('Grace');
     const client = mount(room, second, 'second');
 
-    await waitFor(() => expect(players(client)).toEqual(['Grace', 'Grace 2']));
+    await waitFor(() => expect(players(client)).toEqual(['Host', 'Grace', 'Grace 2']));
   });
 
   it('lets a guest score on their own turn', async () => {
@@ -105,17 +106,17 @@ describe('a host and a guest in one room', () => {
     const host = mount(room, room.hostSession, 'host');
     const guest = mount(room, guestSession, 'guest');
 
-    // Grace joined first, so she is player one and it is her turn.
-    await waitFor(() => expect(players(guest)).toEqual(['Grace']));
-    await addPlayers(user, host, 'Ada');
-    await waitFor(() => expect(players(guest)).toEqual(['Grace', 'Ada']));
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
+    // The host is up first, so they hand the turn to Grace.
+    await user.click(within(host).getByTitle("Make it Grace's turn"));
+    await waitFor(() => expect(within(guest).getByText(/Now throwing/)).toHaveTextContent('Grace'));
 
     await throwDart(user, guest, 'Triple', 'Triple 20');
     await user.click(within(guest).getByRole('button', { name: 'End turn' }));
 
     // Both sides agree, because both are rendering the room's own snapshot.
-    await waitFor(() => expect(marksOn(host, '20', 0)).toContain('closed'));
-    expect(marksOn(guest, '20', 0)).toContain('closed');
+    await waitFor(() => expect(marksOn(host, '20', 1)).toContain('closed'));
+    expect(marksOn(guest, '20', 1)).toContain('closed');
   });
 
   it('refuses a guest a turn that is not theirs, and says whose it is', async () => {
@@ -128,13 +129,13 @@ describe('a host and a guest in one room', () => {
 
     // The host adds Ada and hands her the turn, so it is not the guest's.
     await addPlayers(user, host, 'Ada');
-    await waitFor(() => expect(players(guest)).toEqual(['Grace', 'Ada']));
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace', 'Ada']));
     await user.click(within(host).getByTitle("Make it Ada's turn"));
     await waitFor(() => expect(within(guest).getByText(/Now throwing/)).toHaveTextContent('Ada'));
 
     // The controls are closed off rather than failing after the fact.
     expect(within(guest).getByRole('button', { name: 'Miss' })).toBeDisabled();
-    expect(marksOn(host, '20', 1)).toContain('no marks');
+    expect(marksOn(host, '20', 2)).toContain('no marks');
   });
 
   it('hides the host controls from a guest', async () => {
@@ -146,7 +147,7 @@ describe('a host and a guest in one room', () => {
     const guest = mount(room, guestSession, 'guest');
 
     await addPlayers(user, host, 'Ada');
-    await waitFor(() => expect(players(guest)).toEqual(['Grace', 'Ada']));
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace', 'Ada']));
 
     for (const label of ['New game', 'Reset all']) {
       expect(within(host).getByRole('button', { name: label })).toBeInTheDocument();
@@ -196,9 +197,9 @@ describe('a host and a guest in one room', () => {
     const host = mount(room, room.hostSession, 'host');
     mount(room, guestSession, 'guest');
 
-    await waitFor(() => expect(players(host)).toEqual(['Grace']));
+    await waitFor(() => expect(players(host)).toEqual(['Host', 'Grace']));
     await addPlayers(user, host, 'Ada');
-    await waitFor(() => expect(players(host)).toEqual(['Grace', 'Ada']));
+    await waitFor(() => expect(players(host)).toEqual(['Host', 'Grace', 'Ada']));
 
     await user.click(within(host).getByRole('button', { name: 'Who is here' }));
     await user.click(within(host).getByRole('button', { name: 'Close room' }));
@@ -208,6 +209,45 @@ describe('a host and a guest in one room', () => {
       expect(within(host).queryByRole('button', { name: 'Who is here' })).not.toBeInTheDocument());
     expect(localStorage.getItem('games.cricket.v1')).toContain('Grace');
     confirm.mockRestore();
+  });
+
+  // Leaving used to only clear the local session: the room never heard about
+  // it, and the room's game was then written over this device's own save.
+  it('lets a guest leave without disturbing the room or their own game', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+
+    // A game this person was already keeping on their own device.
+    localStorage.setItem(
+      'games.cricket.v1',
+      JSON.stringify({ players: [{ id: 'x', name: 'Solo', joinedAtTurn: 0 }], turns: [], currentIndex: 0, variant: 'standard' }),
+    );
+
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, guestSession, 'guest');
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
+
+    await user.click(within(guest).getByRole('button', { name: 'Leave' }));
+
+    // Out of the room, with their own game back and untouched.
+    await waitFor(() =>
+      expect(within(guest).queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument());
+    expect(localStorage.getItem('games.cricket.v1')).toContain('Solo');
+    // The room dropped them, so they are no longer taking up a place.
+    expect(room.state().members[guestSession.memberId]).toBeUndefined();
+    // Their player stays, so a score does not vanish from everyone else's board.
+    await waitFor(() => expect(players(host)).toEqual(['Host', 'Grace']));
+  });
+
+  it('puts leaving one tap away rather than behind the detail panel', async () => {
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+    const guest = mount(room, guestSession, 'guest');
+
+    // Without opening "Who is here" first.
+    await waitFor(() =>
+      expect(within(guest).getByRole('button', { name: 'Leave' })).toBeInTheDocument());
   });
 
   it('offers the host no way to leave without closing', async () => {
@@ -224,7 +264,7 @@ describe('a host and a guest in one room', () => {
     expect(within(host).queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument();
     expect(within(host).getByRole('button', { name: 'Close room' })).toBeInTheDocument();
     // A guest leaving affects nobody else, so they still can.
-    expect(within(guest).getByRole('button', { name: 'Leave' })).toBeInTheDocument();
+    expect(within(guest).getByRole('button', { name: 'Leave the room' })).toBeInTheDocument();
     expect(within(guest).queryByRole('button', { name: 'Close room' })).not.toBeInTheDocument();
   });
 
@@ -290,14 +330,15 @@ describe('a Scrabble room', () => {
     const host = mountScrabble(room, room.hostSession, 'host');
     const guest = mountScrabble(room, guestSession, 'guest');
 
-    // Grace joined, so she is the only player and it is her turn.
-    await waitFor(() => expect(scores(guest)).toEqual(['Grace:0']));
+    await waitFor(() => expect(scores(guest)).toEqual(['Host:0', 'Grace:0']));
+    // The host is up first, so they hand the turn to Grace.
+    await user.click(within(host).getByTitle("Make it Grace's turn"));
 
     await user.type(within(guest).getByLabelText('Word played'), 'quiz');
     await user.click(within(guest).getByRole('button', { name: 'Score turn' }));
 
-    await waitFor(() => expect(scores(host)).toEqual(['Grace:22']));
-    expect(scores(guest)).toEqual(['Grace:22']);
+    await waitFor(() => expect(scores(host)).toEqual(['Grace:22', 'Host:0']));
+    expect(scores(guest)).toEqual(['Grace:22', 'Host:0']);
   });
 
   it('keeps the host controls to the host', async () => {
@@ -307,7 +348,7 @@ describe('a Scrabble room', () => {
     const host = mountScrabble(room, room.hostSession, 'host');
     const guest = mountScrabble(room, guestSession, 'guest');
 
-    await waitFor(() => expect(scores(guest)).toEqual(['Grace:0']));
+    await waitFor(() => expect(scores(guest)).toEqual(['Host:0', 'Grace:0']));
 
     for (const label of ['New game', 'Reset all']) {
       expect(within(host).getByRole('button', { name: label })).toBeInTheDocument();
@@ -327,12 +368,12 @@ describe('a Scrabble room', () => {
     const host = mountScrabble(room, room.hostSession, 'host');
     const guest = mountScrabble(room, guestSession, 'guest');
 
-    await waitFor(() => expect(scores(guest)).toEqual(['Grace:0']));
+    await waitFor(() => expect(scores(guest)).toEqual(['Host:0', 'Grace:0']));
 
     // The host adds Ada and hands her the turn, so Grace's play is refused.
     await user.type(within(host).getByLabelText('Player name'), 'Ada');
     await user.click(within(host).getByRole('button', { name: 'Add' }));
-    await waitFor(() => expect(scores(guest)).toHaveLength(2));
+    await waitFor(() => expect(scores(guest)).toHaveLength(3));
     await user.click(within(host).getByTitle("Make it Ada's turn"));
 
     await user.type(within(guest).getByLabelText('Word played'), 'quiz');

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { DoorOpen } from 'lucide-react';
 import { CODE_LENGTH, normaliseCode } from '@shared/rooms/codes';
 import { ROOM_ERRORS, joinRoom, peekRoom, type RoomError } from './api';
-import { writeSession } from './storage';
+import { readName, writeName, writeSession } from './storage';
 
 /**
  * Joining, whether the code was typed on the home page or arrived as a link.
@@ -16,7 +16,7 @@ export function JoinRoom() {
   const navigate = useNavigate();
 
   const [code, setCode] = useState(linkCode?.toUpperCase() ?? '');
-  const [name, setName] = useState('');
+  const [name, setName] = useState(readName);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<RoomError | 'bad-code' | 'no-name' | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -55,6 +55,7 @@ export function JoinRoom() {
       return;
     }
 
+    writeName(name.trim());
     writeSession(joined.value);
     // Replace, so Back does not try to join a second time.
     navigate(`/${found.value.game}`, { replace: true });

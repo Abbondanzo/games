@@ -535,3 +535,7 @@ button.ghost, button.primary, button.link {
 .topbar { min-width: 0; }
 .topbar h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-actions { flex-shrink: 0; }
+
+/* Leaving is one tap from the room strip, not buried in the detail panel. */
+.room-summary .leave-link { color: var(--muted); }
+.room-summary .leave-link:hover { color: var(--bad); }

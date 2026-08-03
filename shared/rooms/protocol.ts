@@ -23,8 +23,9 @@ import { z } from 'zod';
  * ignores what it cannot read.
  *
  * 2: added closeRoom, roundOpen, rackSubmit, roundCancel.
+ * 3: added leave.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** Which side is behind, worked out from the version in the welcome. */
 export type VersionGap = 'app' | 'room';
@@ -128,6 +129,7 @@ export const ClientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('rackSubmit'), reqId: Id, seatId: Id, total: z.int().min(0).max(1000) }),
   z.object({ t: z.literal('roundCancel'), reqId: Id }),
   z.object({ t: z.literal('closeRoom'), reqId: Id }),
+  z.object({ t: z.literal('leave'), reqId: Id }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 

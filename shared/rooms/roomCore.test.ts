@@ -9,26 +9,30 @@ import { rummikubApply as bindRummikub, rummikubInitialState } from './games/rum
 import { CricketStateSchema } from '../games/cricket/schema';
 import type { Snapshot } from './protocol';
 
-/** The room runs the real cricket reducer, with ids it mints itself. */
-const cricketApply = (): ApplyAction<Snapshot> => {
-  let n = 0;
-  return bindCricket(() => `srv-${n++}`);
-};
+/**
+ * The room runs the real cricket reducer, with ids it mints itself. The counter
+ * is shared across instances: a per-instance one restarts at zero, so two
+ * reducers in the same room could mint the same id.
+ */
+let serverIds = 0;
+const cricketApply = (): ApplyAction<Snapshot> => bindCricket(() => `srv-${serverIds++}`);
 
 /** Reads the opaque snapshot back as a real cricket state. */
 const asCricket = (snapshot: Snapshot) => CricketStateSchema.parse(snapshot);
 
 const ctx = (online: string[] = [], now = 1_000): Context => ({ online, now });
 
-const HOST = { memberId: 'm-host', name: 'Ada' };
+const HOST = { memberId: 'm-host', name: 'Host' };
 
-function newRoom(): RoomState<Snapshot> {
+/** The host is seated on creation, so a room starts with them in the game. */
+function newRoom(apply: ApplyAction<Snapshot> = cricketApply()): RoomState<Snapshot> {
   return createRoom({
     code: 'AB2D',
     game: 'cricket',
     host: HOST,
     snapshot: cricketInitialState(),
     now: 1_000,
+    apply,
   });
 }
 
@@ -71,32 +75,49 @@ const firstError = (effects: Effect[]) =>
   sentTo(effects, 'member').find((m): m is Extract<ServerMessage, { t: 'error' }> => m.t === 'error');
 
 /** Drives a room through adding two players, returning the room and their ids. */
-function withPlayers(state: RoomState<Snapshot>) {
-  const apply = cricketApply();
+function withPlayers(state: RoomState<Snapshot>, apply: ApplyAction<Snapshot> = cricketApply()) {
   const out = act(state, HOST.memberId, {
-    t: 'action', reqId: 'r1', rev: 0, action: { type: 'addPlayers', names: 'Ada, Grace' },
+    t: 'action', reqId: 'r1', rev: state.rev, action: { type: 'addPlayers', names: 'Ada, Grace' },
   }, apply);
   const players = asCricket(out.state.snapshot).players.map((p) => p.id);
   return { state: out.state, players, apply };
 }
 
 describe('creating and joining', () => {
-  it('starts at revision zero with the host as the only member', () => {
+  // The host names themselves when they start the room, so they are a player
+  // from the outset rather than a spectator who has to be added.
+  it('seats the host as a player when the room is made', () => {
     const room = newRoom();
-    expect(room.rev).toBe(0);
-    expect(room.members[HOST.memberId]?.role).toBe('host');
-    expect(Object.keys(room.members)).toHaveLength(1);
+    const players = asCricket(room.snapshot).players;
+
+    expect(players.map((p) => p.name)).toEqual(['Host']);
+    expect(room.members[HOST.memberId]).toMatchObject({ role: 'host', seatId: players[0]!.id });
+    expect(room.rev).toBe(1);
   });
 
   // Someone who types their name is here to play, so joining puts them in the
   // game rather than in a queue for the host's attention.
   it('adds the joiner to the game and seats them', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
+    const apply = cricketApply();
+    const room = withGuest(newRoom(apply), 'm1', 'Grace', apply);
     const players = asCricket(room.snapshot).players;
 
-    expect(players.map((p) => p.name)).toEqual(['Grace']);
-    expect(room.members.m1?.seatId).toBe(players[0]!.id);
-    expect(room.rev).toBe(1);
+    expect(players.map((p) => p.name)).toEqual(['Host', 'Grace']);
+    expect(room.members.m1?.seatId).toBe(players[1]!.id);
+    expect(room.rev).toBe(2);
+  });
+
+  // Leaving and coming back, or a host who typed the roster out in advance.
+  it('gives a returning name its old player back rather than a second one', () => {
+    const apply = cricketApply();
+    let room = withGuest(newRoom(apply), 'm1', 'Grace', apply);
+    const seat = room.members.m1!.seatId;
+
+    room = act(room, 'm1', { t: 'leave', reqId: 'l1' }, apply).state;
+    room = withGuest(room, 'm2', 'Grace', apply);
+
+    expect(asCricket(room.snapshot).players.map((p) => p.name)).toEqual(['Host', 'Grace']);
+    expect(room.members.m2?.seatId).toBe(seat);
   });
 
   it('tells everyone already here that a player arrived', () => {
@@ -107,11 +128,12 @@ describe('creating and joining', () => {
   });
 
   // Two players called Grace would be indistinguishable on the scoreboard.
-  it('numbers a joiner whose name is already taken', () => {
+  it('numbers a second joiner whose name is already in use', () => {
     const apply = cricketApply();
-    let room = withGuest(newRoom(), 'm1', 'Grace', apply);
+    let room = withGuest(newRoom(apply), 'm1', 'Grace', apply);
     room = withGuest(room, 'm2', 'Grace', apply);
-    expect(asCricket(room.snapshot).players.map((p) => p.name)).toEqual(['Grace', 'Grace 2']);
+    expect(asCricket(room.snapshot).players.map((p) => p.name))
+      .toEqual(['Host', 'Grace', 'Grace 2']);
   });
 
   it('refuses a locked room', () => {
@@ -163,19 +185,23 @@ describe('connecting', () => {
 
 describe('applying an action', () => {
   it('runs the reducer, bumps the revision and tells everyone who did it', () => {
-    const { state, effects } = act(newRoom(), HOST.memberId, {
-      t: 'action', reqId: 'r1', rev: 0, action: { type: 'addPlayers', names: 'Ada' },
-    });
+    const apply = cricketApply();
+    const room = newRoom(apply);
+    const { state, effects } = act(room, HOST.memberId, {
+      t: 'action', reqId: 'r1', rev: room.rev, action: { type: 'addPlayers', names: 'Ada' },
+    }, apply);
 
-    expect(state.rev).toBe(1);
+    expect(state.rev).toBe(room.rev + 1);
     expect(sentTo(effects, 'all')[0]).toMatchObject({
-      t: 'state', rev: 1, cause: { memberId: HOST.memberId, actionType: 'addPlayers' },
+      t: 'state', rev: state.rev, cause: { memberId: HOST.memberId, actionType: 'addPlayers' },
     });
   });
 
   it('mints ids itself, so every client agrees on them', () => {
     const { state } = withPlayers(newRoom());
-    expect(asCricket(state.snapshot).players.map((p) => p.id)).toEqual(['srv-0', 'srv-1']);
+    const ids = asCricket(state.snapshot).players.map((p) => p.id);
+    expect(ids.every((id) => id.startsWith('srv-'))).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   // Requests are judged against the snapshot the sender saw, never re-evaluated
@@ -192,14 +218,15 @@ describe('applying an action', () => {
 
   it('ignores a repeated request id rather than applying it twice', () => {
     const apply = cricketApply();
-    const first = act(newRoom(), HOST.memberId, {
-      t: 'action', reqId: 'same', rev: 0, action: { type: 'addPlayers', names: 'Ada' },
+    const room = newRoom(apply);
+    const first = act(room, HOST.memberId, {
+      t: 'action', reqId: 'same', rev: room.rev, action: { type: 'addPlayers', names: 'Ada' },
     }, apply);
     const second = act(first.state, HOST.memberId, {
-      t: 'action', reqId: 'same', rev: 1, action: { type: 'addPlayers', names: 'Ada' },
+      t: 'action', reqId: 'same', rev: first.state.rev, action: { type: 'addPlayers', names: 'Ada' },
     }, apply);
 
-    expect(second.state.rev).toBe(1);
+    expect(second.state.rev).toBe(first.state.rev);
     expect(second.effects).toEqual([]);
   });
 
@@ -218,15 +245,16 @@ describe('applying an action', () => {
       ...state,
       players: [{ id: 'x'.repeat(70_000), name: 'Big', joinedAtTurn: 0 }],
     });
-    const { effects } = act(newRoom(), HOST.memberId, {
-      t: 'action', reqId: 'r1', rev: 0, action: { type: 'addPlayers', names: 'Ada' },
+    const room = newRoom();
+    const { effects } = act(room, HOST.memberId, {
+      t: 'action', reqId: 'r1', rev: room.rev, action: { type: 'addPlayers', names: 'Ada' },
     }, bloat);
     expect(firstError(effects)?.code).toBe('too-large');
   });
 
   it('closes the socket of a stranger', () => {
     const { effects } = act(newRoom(), 'ghost', {
-      t: 'action', reqId: 'r1', rev: 0, action: { type: 'newGame' },
+      t: 'action', reqId: 'r1', rev: 1, action: { type: 'newGame' },
     });
     expect(effects).toEqual([{ to: 'close', memberId: 'ghost' }]);
   });
@@ -258,8 +286,14 @@ describe('permissions at the boundary', () => {
 
   it('lets a seated guest act on their own turn', () => {
     const apply = cricketApply();
-    // Grace is the only player, so it is her turn from the start.
-    const room = withGuest(newRoom(), 'm1', 'Grace', apply);
+    let room = withGuest(newRoom(apply), 'm1', 'Grace', apply);
+    // The host is player one, so hand the turn to Grace before she throws.
+    room = act(room, HOST.memberId, {
+      t: 'action',
+      reqId: 'sc',
+      rev: room.rev,
+      action: { type: 'setCurrent', id: room.members.m1!.seatId! },
+    }, apply).state;
 
     const { state } = act(room, 'm1', {
       t: 'action',
@@ -348,12 +382,13 @@ describe('host controls', () => {
  * and the host commits the round when they are in. RummikubState never changes.
  */
 describe('collecting Rummikub racks', () => {
-  const rummikubRoom = () => createRoom({
+  const rummikubRoom = (rules: ApplyAction<Snapshot>) => createRoom({
     code: 'CD3F',
     game: 'rummikub' as const,
     host: HOST,
     snapshot: rummikubInitialState(),
     now: 1_000,
+    apply: rules,
   });
 
   const apply = () => {
@@ -368,13 +403,15 @@ describe('collecting Rummikub racks', () => {
    */
   function setUp() {
     const rules = apply();
-    let room = withGuestIn(rummikubRoom(), 'm1', 'Grace', rules);
+    let room = withGuestIn(rummikubRoom(rules), 'm1', 'Grace', rules);
     room = handle(room, HOST.memberId, {
       t: 'action', reqId: 'r1', rev: room.rev, action: { type: 'addPlayers', names: 'Ada' },
     }, ctx(), rules).state;
 
-    const players = (room.snapshot.players as { id: string }[]).map((p) => p.id);
-    return { room, players, rules, grace: players[0]!, ada: players[1]! };
+    // The host is a player as well, so pick these out by name rather than order.
+    const roster = room.snapshot.players as { id: string; name: string }[];
+    const byName = (name: string) => roster.find((p) => p.name === name)!.id;
+    return { room, players: roster.map((p) => p.id), rules, grace: byName('Grace'), ada: byName('Ada') };
   }
 
   it('opens a round for the player who went out', () => {

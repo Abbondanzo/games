@@ -266,12 +266,17 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       leave: () => {
         // A host has no way out that is not closing the room.
         if (role === 'host') return;
+        transport.current?.send({ t: 'leave', reqId: nextRequestId() });
+        // Put this device's own game back before the solo save is written, or
+        // the room's game would be written straight over the top of it.
+        rawDispatch({ type: '__snapshot', state: readStored() ?? initialState });
         clearSession(game);
         setSession(null);
       },
       close: () => transport.current?.send({ t: 'closeRoom', reqId: nextRequestId() }),
     };
-  }, [session, game, state, role, seatId, members, locked, status, pending, lastError, outdated]);
+  }, [session, game, state, role, seatId, members, locked, status, pending, lastError, outdated,
+      readStored, initialState]);
 
   return { state, dispatch, room, onReject };
 }

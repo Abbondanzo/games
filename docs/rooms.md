@@ -5,12 +5,18 @@ sees the score update live and can enter their own turns.
 
 ## Using it
 
-**To host**, open any game and press **Share**. A code appears in a strip under
-the top bar, along with a copyable invite link.
+**To host**, open any game and press **Share**, then enter your name. You are a
+player like anyone else, and the room starts a fresh game. A code appears in a
+strip under the top bar, along with a copyable invite link.
 
 **To join**, either follow the link, or use **Join a game** on the home page.
 Enter the code and the name you want on the scoreboard, and you are in the game
 straight away, entering your own scores. Nobody waits on the host.
+
+**Leave** at any time. It gives up your place in the room but leaves your player
+and their score on the board, so nothing vanishes from everyone else's view.
+Rejoining with the same name takes that player back rather than making a second
+one. Your own games on the device are untouched either way.
 
 The host runs the room: typing in anyone playing without a phone, removing
 players, changing the rules, stopping new players joining, and removing anyone.
@@ -58,11 +64,13 @@ re-evaluated against newer state. This matters because "is it your turn?" is a
 question about a particular snapshot: `recordTurn` carries no player id, so the
 room attributes it to whoever is up.
 
-**Seats.** A seat is a player id, handed out when you join and never chosen.
-Joining runs the game's own `addPlayers` and seats you on the player it creates,
-so the room and the game cannot disagree about who is who. A second Grace
-becomes "Grace 2", since two of them would be indistinguishable on the
-scoreboard.
+**Seats.** A seat is a player id, handed out when you arrive and never chosen.
+The host and every joiner go through the same step: it runs the game's own
+`addPlayers` and seats them on the player it creates, so the room and the game
+cannot disagree about who is who. An unclaimed player of the same name is taken
+back rather than duplicated, which covers rejoining and a host who typed the
+roster out in advance. Otherwise a second Grace becomes "Grace 2", since two of
+them would be indistinguishable on the scoreboard.
 
 Seats survive a dropped connection, so a sleeping phone keeps its place, and
 they are re-derived from the game after every change: if the host removes your

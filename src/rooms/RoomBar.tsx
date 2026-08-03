@@ -49,6 +49,12 @@ export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => vo
         <button type="button" className="link" onClick={() => setOpen((v) => !v)}>
           {open ? 'Hide' : 'Who is here'}
         </button>
+        {/* Getting out should not be hidden behind a disclosure. */}
+        {!isHost && (
+          <button type="button" className="link leave-link" onClick={onLeave}>
+            Leave
+          </button>
+        )}
       </div>
 
       {room.outdated && (
@@ -92,10 +98,17 @@ export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => vo
               </button>
             ) : (
               <button type="button" className="ghost danger" onClick={onLeave}>
-                <DoorOpen size={15} aria-hidden="true" /> Leave
+                <DoorOpen size={15} aria-hidden="true" /> Leave the room
               </button>
             )}
           </div>
+
+          {!isHost && (
+            <p className="hint">
+              Leaving stops you following the score. Your own games on this device are untouched,
+              and the players here keep theirs.
+            </p>
+          )}
 
           {isHost && (
             <p className="hint">

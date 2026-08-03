@@ -103,24 +103,60 @@ const actorOf = (member: StoredMember): Actor => ({
 
 /* ─────────────────────────── lifecycle ─────────────────────────── */
 
+/**
+ * Puts somebody into the game and hands back their seat.
+ *
+ * Shared by the host at creation and by everyone who joins after, so there is
+ * one answer to "how does a person become a player" rather than two that can
+ * drift. A player of that name already sitting unclaimed is almost always this
+ * person - back after leaving, or typed in by the host in advance - so they
+ * take it rather than appearing twice.
+ */
+function seatNewcomer<S extends Snapshot>(
+  game: Game,
+  snapshot: S,
+  claimed: ReadonlySet<string | null>,
+  wanted: string,
+  apply: ApplyAction<S>,
+): { snapshot: S; seatId: string | null; name: string } {
+  const existing = playersIn(snapshot).find((p) => p.name === wanted.trim() && !claimed.has(p.id));
+  if (existing) return { snapshot, seatId: existing.id, name: existing.name };
+
+  const name = distinctName(wanted, namesIn(snapshot));
+  const before = seatView[game](snapshot).playerIds;
+  const next = apply(snapshot, { type: 'addPlayers', names: name });
+
+  // If the game will not take the player they are still here, just watching.
+  if (!next || next === snapshot) return { snapshot, seatId: null, name };
+
+  const seatId = seatView[game](next).playerIds.find((id) => !before.includes(id)) ?? null;
+  return { snapshot: next, seatId, name };
+}
+
 export function createRoom<S extends Snapshot>(input: {
   code: string;
   game: Game;
   host: { memberId: string; name: string };
   snapshot: S;
   now: number;
+  apply: ApplyAction<S>;
 }): RoomState<S> {
+  // The host is a player like anyone else, unless they chose not to be named.
+  const seated = seatNewcomer(
+    input.game, input.snapshot, new Set(), input.host.name, input.apply,
+  );
+
   return {
     code: input.code,
     game: input.game,
-    rev: 0,
-    snapshot: input.snapshot,
+    rev: seated.snapshot === input.snapshot ? 0 : 1,
+    snapshot: seated.snapshot,
     members: {
       [input.host.memberId]: {
         memberId: input.host.memberId,
-        name: input.host.name,
+        name: seated.name,
         role: 'host',
-        seatId: null,
+        seatId: seated.seatId,
         seen: [],
       },
     },
@@ -167,28 +203,21 @@ export function join<S extends Snapshot>(
   if (state.locked) return { ok: false, code: 'room-locked' };
   if (Object.keys(state.members).length >= MAX_MEMBERS) return { ok: false, code: 'room-full' };
 
-  const before = seatView[state.game](state.snapshot);
-  const name = distinctName(input.name, namesIn(state.snapshot));
-
-  const snapshot = apply(state.snapshot, { type: 'addPlayers', names: name });
-  // If the game would not take the player, they still join as a spectator
-  // rather than being turned away at the door.
-  const added = snapshot && snapshot !== state.snapshot ? snapshot : null;
-  const seatId = added
-    ? seatView[state.game](added).playerIds.find((id) => !before.playerIds.includes(id)) ?? null
-    : null;
+  const claimed = new Set(Object.values(state.members).map((m) => m.seatId));
+  const seated = seatNewcomer(state.game, state.snapshot, claimed, input.name, apply);
+  const added = seated.snapshot !== state.snapshot;
 
   const member: StoredMember = {
     memberId: input.memberId,
-    name,
+    name: seated.name,
     role: 'player',
-    seatId,
+    seatId: seated.seatId,
     seen: [],
   };
 
   const next: RoomState<S> = {
     ...state,
-    snapshot: added ?? state.snapshot,
+    snapshot: seated.snapshot,
     rev: added ? state.rev + 1 : state.rev,
     members: { ...state.members, [input.memberId]: member },
     lastActiveAt: input.now,
@@ -196,20 +225,25 @@ export function join<S extends Snapshot>(
 
   // Whoever is already connected needs to see the new player arrive.
   const effects: Effect[] = added
-    ? [{ to: 'all', message: { t: 'state', rev: next.rev, state: added, cause: null } }]
+    ? [{ to: 'all', message: { t: 'state', rev: next.rev, state: seated.snapshot, cause: null } }]
     : [];
 
   return { ok: true, member, state: next, effects };
 }
 
-/** Player names already in the game, so a joiner does not collide with one. */
-function namesIn(snapshot: Snapshot): string[] {
+/** The players in a snapshot, as far as the room needs to read them. */
+function playersIn(snapshot: Snapshot): { id: string; name: string }[] {
   const players = snapshot.players;
   if (!Array.isArray(players)) return [];
-  return players
-    .map((p) => (typeof p === 'object' && p !== null ? (p as { name?: unknown }).name : null))
-    .filter((n): n is string => typeof n === 'string');
+  return players.flatMap((p) => {
+    if (typeof p !== 'object' || p === null) return [];
+    const { id, name } = p as { id?: unknown; name?: unknown };
+    return typeof id === 'string' && typeof name === 'string' ? [{ id, name }] : [];
+  });
 }
+
+/** Player names already in the game, so a joiner does not collide with one. */
+const namesIn = (snapshot: Snapshot): string[] => playersIn(snapshot).map((p) => p.name);
 
 /** A socket opened. The joiner gets everything; everyone else gets the presence change. */
 export function connect<S extends Snapshot>(
@@ -348,6 +382,25 @@ export function handle<S extends Snapshot>(
       return {
         state: touched,
         effects: [{ to: 'all', message: { t: 'closed' } }, { to: 'shutdown' }],
+      };
+    }
+
+    /**
+     * Leaving gives up the seat but leaves the player in the game, so a score
+     * does not vanish from everyone else's board when someone puts their phone
+     * away. The host can remove the player if they actually left the table.
+     */
+    case 'leave': {
+      if (member.role === 'host') return fail(touched, memberId, message.reqId, 'host-only');
+      const members = { ...touched.members };
+      delete members[memberId];
+      const next = { ...touched, members };
+      return {
+        state: next,
+        effects: [
+          { to: 'close', memberId },
+          { to: 'all', message: { t: 'room', room: roomView(next, ctx) } },
+        ],
       };
     }
 

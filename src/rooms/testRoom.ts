@@ -59,6 +59,7 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
     host: { memberId: hostId, name: hostName },
     snapshot: SETUP[game].initial(),
     now: 1_000,
+    apply,
   });
 
   const tokens = new Map<string, string>([['host-token', hostId]]);

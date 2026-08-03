@@ -123,6 +123,7 @@ export class Room extends DurableObject {
       host: { memberId, name: body.name },
       snapshot: GAME_SETUP[body.game].initial(),
       now: Date.now(),
+      apply: this.applyFor(body.game),
     });
 
     await this.ctx.storage.put('tokens', { [token]: memberId });
@@ -213,8 +214,8 @@ export class Room extends DurableObject {
       this.applyFor(state.game),
     );
 
-    // Kicking removes the member, so their token must stop working too.
-    if (message.t === 'kick') await this.forgetTokens(outcome.state);
+    // Kicking or leaving removes the member, so the token goes with them.
+    if (message.t === 'kick' || message.t === 'leave') await this.forgetTokens(outcome.state);
 
     // Say it is over before the room goes away, then free the code.
     if (outcome.effects.some((e) => e.to === 'shutdown')) {

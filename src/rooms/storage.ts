@@ -56,3 +56,22 @@ export function clearSession(game: Game): void {
     // Nothing to do.
   }
 }
+
+/** The name this device last played under, offered as the default next time. */
+const NAME_KEY = 'games.name.v1';
+
+export function readName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY)?.slice(0, 24) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function writeName(name: string): void {
+  try {
+    localStorage.setItem(NAME_KEY, name.trim().slice(0, 24));
+  } catch {
+    // Storage can be unavailable; they will just type it again.
+  }
+}
