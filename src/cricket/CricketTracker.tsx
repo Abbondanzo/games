@@ -5,7 +5,11 @@ import { PlayersCard } from '../shared/PlayersCard';
 import { CricketBoard } from './components/CricketBoard';
 import { DartEntry } from './components/DartEntry';
 import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from '@shared/games/cricket/rules';
+import { describeError } from '@shared/rooms/protocol';
 import { useCricket } from './lib/useCricket';
+import { RoomBar } from '../rooms/RoomBar';
+import { SeatPicker } from '../rooms/SeatPicker';
+import { HostRoomButton } from '../rooms/HostRoomButton';
 import type { Dart, Variant } from '@shared/games/cricket/types';
 
 const VARIANTS: { value: Variant; label: string; blurb: string }[] = [
@@ -21,8 +25,15 @@ const WIN_REASON: Record<Variant, string> = {
 };
 
 export function CricketTracker() {
-  const { state, dispatch } = useCricket();
+  const { state, dispatch, room, onReject } = useCricket();
   const [darts, setDarts] = useState<Dart[]>([]);
+
+  // A refused throw would otherwise vanish along with what was typed.
+  onReject((action) => {
+    if (action.type === 'recordTurn') setDarts(action.darts);
+  });
+
+  const isHost = !room || room.role === 'host';
 
   const currentPlayer = state.players[state.currentIndex] ?? null;
 
@@ -128,26 +139,37 @@ export function CricketTracker() {
         </Link>
         <h1>Cricket</h1>
         <div className="topbar-actions">
-          <button
-            type="button"
-            className="ghost"
-            onClick={newGame}
-            title="Clear the board and keep the players"
-          >
-            <RotateCcw size={15} aria-hidden="true" /> New game
-          </button>
-          <button
-            type="button"
-            className="ghost danger"
-            onClick={resetAll}
-            title="Clear the board and the players"
-          >
-            <Trash2 size={15} aria-hidden="true" /> Reset all
-          </button>
+          {!room && <HostRoomButton game="cricket" />}
+          {isHost && (
+            <>
+              <button
+                type="button"
+                className="ghost"
+                onClick={newGame}
+                title="Clear the board and keep the players"
+              >
+                <RotateCcw size={15} aria-hidden="true" /> New game
+              </button>
+              <button
+                type="button"
+                className="ghost danger"
+                onClick={resetAll}
+                title="Clear the board and the players"
+              >
+                <Trash2 size={15} aria-hidden="true" /> Reset all
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       <main>
+        {room && <RoomBar room={room} onLeave={room.leave} />}
+        {room?.lastError && (
+          <div className="banner warn" role="status">{describeError(room.lastError)}</div>
+        )}
+        {room && <SeatPicker room={room} players={state.players} />}
+
         {winner && (
           <div className="banner win" role="status">
             <Trophy size={18} aria-hidden="true" className="mark" />
@@ -157,9 +179,10 @@ export function CricketTracker() {
 
         <PlayersCard
           players={state.players}
+          editable={isHost}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={removePlayer}
-          headerExtra={
+          headerExtra={isHost && (
             <div className="seg" role="group" aria-label="Game mode">
               {VARIANTS.map((v) => (
                 <button
@@ -174,14 +197,14 @@ export function CricketTracker() {
                 </button>
               ))}
             </div>
-          }
+          )}
         >
           <CricketBoard
             players={state.players}
             board={board}
             variant={state.variant}
             currentPlayerId={currentPlayer?.id ?? null}
-            onSelect={selectPlayer}
+            onSelect={isHost ? selectPlayer : () => {}}
           />
         </PlayersCard>
 
@@ -194,7 +217,7 @@ export function CricketTracker() {
           onRecord={(thrown) => dispatch({ type: 'recordTurn', darts: thrown })}
           onUndo={undo}
           canUndo={darts.length > 0 || state.turns.length > 0}
-          disabled={Boolean(winner)}
+          disabled={Boolean(winner) || (room ? !room.can('recordTurn') || room.sending : false)}
         />
 
         <section className="card">

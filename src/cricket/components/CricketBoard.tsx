@@ -43,6 +43,7 @@ export function CricketBoard({ players, board, variant, currentPlayerId, onSelec
                   className="player-head"
                   onClick={() => onSelect(p.id)}
                   title={`Make it ${p.name}'s turn`}
+                  aria-label={`Make it ${p.name}'s turn`}
                 >
                   <span className="name">{p.name}</span>
                   {board.hasClosedAll[p.id] && <span className="closed-all">closed out</span>}

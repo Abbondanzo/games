@@ -1,5 +1,6 @@
-import { useEffect, useReducer } from 'react';
 import { z } from 'zod';
+import { useGameSession } from '../../rooms/session';
+import type { TransportFactory } from '../../rooms/transport';
 import { initialState, reducer } from '@shared/games/cricket/reducer';
 import type { CricketState } from '@shared/games/cricket/types';
 import { PlayerSchema, TurnSchema } from '@shared/games/cricket/schema';
@@ -57,16 +58,13 @@ export function readStored(): CricketState | null {
   };
 }
 
-export function useCricket() {
-  const [state, dispatch] = useReducer(reducer, initialState, (init) => readStored() ?? init);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    } catch {
-      // Storage can be unavailable; the session still works.
-    }
-  }, [state]);
-
-  return { state, dispatch };
+export function useCricket(transport?: TransportFactory) {
+  return useGameSession({
+    game: 'cricket',
+    reducer,
+    initialState,
+    readStored,
+    storeKey: STORE_KEY,
+    transport,
+  });
 }
