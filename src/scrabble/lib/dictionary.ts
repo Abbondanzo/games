@@ -41,12 +41,8 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const API = 'https://api.dictionaryapi.dev/api/v2/entries/en';
 
-/**
- * A CORS reverse proxy, tried only if the direct call fails. Override with
- * VITE_CORS_PROXY, or set it empty to disable the fallback entirely.
- */
-const CORS_PROXY = (import.meta.env.VITE_CORS_PROXY ?? 'https://cors.abbondanzo.workers.dev')
-  .replace(/\/+$/, '');
+/** A CORS reverse proxy, tried only if the direct call fails. */
+const CORS_PROXY = 'https://cors.abbondanzo.workers.dev';
 
 /**
  * The API sends `Access-Control-Allow-Origin: *`, so the browser can call it
@@ -55,7 +51,7 @@ const CORS_PROXY = (import.meta.env.VITE_CORS_PROXY ?? 'https://cors.abbondanzo.
  */
 function endpoints(word: string): string[] {
   const direct = `${API}/${encodeURIComponent(word)}`;
-  return CORS_PROXY ? [direct, `${CORS_PROXY}/${direct}`] : [direct];
+  return [direct, `${CORS_PROXY}/${direct}`];
 }
 
 const cache = new Map<string, LookupResult>();

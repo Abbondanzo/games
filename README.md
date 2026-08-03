@@ -142,15 +142,9 @@ Two-letter words are hit hardest by this, and they are exactly the contested one
 it is not a guarantee - see "Known gap" below.
 
 **Endpoints.** The API sends `Access-Control-Allow-Origin: *`, so the browser calls it directly.
-If that call fails, the request is retried once through a CORS reverse proxy, whose default lives
-in `src/scrabble/lib/dictionary.ts`. Override it per machine with `VITE_CORS_PROXY` in a local
-`.env` (untracked), or set it to an empty value to disable the fallback:
-
-```
-VITE_CORS_PROXY=
-```
-
-Note the proxy shares the same upstream, so it does not help when the upstream itself is failing.
+If that call fails, the request is retried once through a CORS reverse proxy, set as a constant
+at the top of `src/scrabble/lib/dictionary.ts`. Note the proxy shares the same upstream, so it
+does not help when the upstream itself is failing.
 
 **Player-facing copy** never contains status codes or networking terms; `dictionary.test.ts`
 enforces that with a jargon guard.
