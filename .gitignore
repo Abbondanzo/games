@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+
+# Local environment overrides
+.env
+*.local
+
+# Editor / tooling
+.vscode
+.idea
+*.tsbuildinfo
