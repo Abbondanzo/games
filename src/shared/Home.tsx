@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Dices, Spade, SpellCheck, Target, type LucideIcon } from 'lucide-react';
+import { Blocks, Dices, SpellCheck, Target, type LucideIcon } from 'lucide-react';
 
 interface Game {
   path?: string;
@@ -21,8 +21,13 @@ const GAMES: Game[] = [
     title: 'Cricket (darts)',
     desc: 'Marks, closing out and points. Standard, cut-throat, or no points at all.',
   },
+  {
+    path: '/rummikub',
+    Icon: Blocks,
+    title: 'Rummikub',
+    desc: 'Round-by-round scoring from the tiles left on each rack.',
+  },
   { Icon: Dices, title: 'Yahtzee', desc: 'Scorecard with upper-section bonus.' },
-  { Icon: Spade, title: 'Rummy', desc: 'Round-by-round scoring to a target.' },
 ];
 
 export function Home() {

@@ -113,6 +113,35 @@ Removing a player who has any marks or points asks first, and says what they hol
 are deleted and the game is rescored, which can move other players' totals - a target they had
 closed may come back to life. Removing a player with nothing on the board is immediate.
 
+## Rummikub
+
+Round-by-round scoring. Rummikub is scored on what is *left* rather than what is played, so a
+round is entered after someone goes out.
+
+**Scoring a round**
+
+1. Add players, then pick who went out.
+2. For everyone else, enter the tiles still on their rack. Tap a player, then tap the tile
+   values they were holding, or just type the total if you have already added it up. A **Joker**
+   left on the rack costs 30.
+3. The winner's score appears live as the racks are entered.
+
+```
+each loser  = -(their remaining tiles)
+the winner  = + the sum of every other rack
+```
+
+Totals therefore net to zero within a round, which makes the running scoreboard
+self-checking - if the column does not sum to zero, a rack was entered wrong.
+
+**Other bits**
+
+- Cumulative totals across rounds, ranked, with rounds won as the tie-break.
+- **Undo last** rolls back a round; history shows the per-player swing for each one.
+- Removing a player rescores every round. Rounds they merely lost are kept and recalculated
+  without their rack; rounds they *won* are deleted, since a round is defined by who went out.
+  You are warned before either happens.
+
 ## Dictionary
 
 **Check** validates the word currently in the entry box. The **Dictionary** button opens a
@@ -172,6 +201,13 @@ src/
       useGame.ts                reducer + localStorage persistence
       dictionary.ts             lookup, caching, proxy fallback
       types.ts
+  rummikub/
+    RummikubTracker.tsx         page
+    components/RoundEntry.tsx   winner picker, racks and tile pad
+    lib/
+      rummikub.ts               pure scoring - round maths and standings
+      useRummikub.ts            reducer + localStorage persistence
+      types.ts
   cricket/
     CricketTracker.tsx          page, owns the throw in progress
     components/                 CricketBoard, DartEntry, MarkGlyph
@@ -222,8 +258,8 @@ and a test in `App.test.tsx` fails the build if one is added.
 
 Each game keeps its rules in plain functions with no React in them, so they are testable on
 their own - cricket's scoring in particular depends on the order darts landed, and `cricket.ts`
-replays them. `pnpm test` covers both rule engines, both reducers, the dictionary fallback chain,
-and both trackers end to end under jsdom.
+replays them. `pnpm test` covers all three rule engines, all three reducers, the dictionary
+fallback chain, and every tracker end to end under jsdom.
 
 ## License
 

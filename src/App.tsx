@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Home } from './shared/Home';
 import { ScrabbleTracker } from './scrabble/ScrabbleTracker';
 import { CricketTracker } from './cricket/CricketTracker';
+import { RummikubTracker } from './rummikub/RummikubTracker';
 
 export function App() {
   return (
@@ -9,6 +10,7 @@ export function App() {
       <Route path="/" element={<Home />} />
       <Route path="/scrabble" element={<ScrabbleTracker />} />
       <Route path="/cricket" element={<CricketTracker />} />
+      <Route path="/rummikub" element={<RummikubTracker />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

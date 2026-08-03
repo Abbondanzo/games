@@ -39,6 +39,14 @@ describe('routing', () => {
     expect(screen.getByRole('group', { name: 'Ring' })).toBeInTheDocument();
   });
 
+  it('opens the rummikub tracker from the home page', async () => {
+    const user = userEvent.setup();
+    renderAt('/');
+    await user.click(screen.getByRole('link', { name: /Rummikub/ }));
+    expect(screen.getByRole('heading', { name: 'Rummikub' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Player name')).toBeInTheDocument();
+  });
+
   it('sends an unknown route home', () => {
     renderAt('/not-a-game');
     expect(screen.getByRole('heading', { name: 'Board Games' })).toBeInTheDocument();
