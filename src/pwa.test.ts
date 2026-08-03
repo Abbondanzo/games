@@ -64,6 +64,12 @@ describe('iOS home screen support', () => {
     expect(html).toMatch(/viewport-fit=cover/);
   });
 
+  // The Pages subdomain serves the same build, so search engines need to be
+  // told which host is the real one.
+  it('names a canonical host', () => {
+    expect(html).toMatch(/<link rel="canonical" href="https:\/\/games\.abbondanzo\.com\/"/);
+  });
+
   it('tints the status bar for both colour schemes', () => {
     expect(html).toMatch(/name="theme-color" media="\(prefers-color-scheme: light\)"/);
     expect(html).toMatch(/name="theme-color" media="\(prefers-color-scheme: dark\)"/);
