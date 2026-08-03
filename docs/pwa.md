@@ -1,8 +1,8 @@
 # Install and offline use
 
 The app is a PWA. A Workbox service worker precaches every built asset, so once loaded it runs
-with no connection. Only the Scrabble dictionary needs the network, and it says so clearly when
-it cannot reach it.
+with no connection. Two things do need the network, and both say so plainly when they cannot
+reach it: the Scrabble dictionary, and [shared rooms](rooms.md). Playing alone never does.
 
 - **iOS**: open in Safari, then Share > Add to Home Screen. It launches without browser chrome.
 - **Android / desktop**: use the browser's install prompt.

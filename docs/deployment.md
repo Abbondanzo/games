@@ -23,6 +23,16 @@ redirect rule from the `pages.dev` subdomain would fix that properly.
 **The app is served from the site root.** `base` is `/` rather than relative, because a service
 worker and manifest are scoped to the origin root. Subpath hosting is not supported.
 
+## The room server
+
+`worker/` is a separate Cloudflare Worker, deployed by hand with
+`pnpm worker:deploy`. It is not built by Pages and not touched by CI, so the site and the room
+server are two independent artefacts.
+
+Deploy the Worker first when a protocol field is added. The app is precached by a service
+worker, so a client can be running weeks-old code; protocol changes have to stay additive. See
+[rooms.md](rooms.md).
+
 ## Toolchain
 
 Node 20+ and pnpm; `corepack enable` picks up the version pinned in `package.json`.

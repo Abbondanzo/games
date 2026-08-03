@@ -81,7 +81,9 @@ throw inside the room.
 2. **Reducers** (`use<Game>.test.ts`) - actions in, state out, no rendering.
 3. **Trackers** (`<Game>Tracker.test.tsx`) - Testing Library, driving the real UI.
 
-Plus `App.test.tsx` (routing, house-style guards) and `pwa.test.ts` (manifest, icons, iOS tags).
+Plus `App.test.tsx` (routing, house-style guards), `pwa.test.ts` (manifest, icons, iOS tags),
+and the rooms tests - of which `twoClients.test.tsx` is the one to keep working: it renders a
+host and a guest side by side against a real room in-process.
 
 Query by role and accessible name, not test ids - the one exception is a couple of live-total
 readouts. When fixing a bug, add the regression test with a comment naming the failure, and make
@@ -101,6 +103,13 @@ it fail first.
   rasterises at build time.
 - **CI does not gate deployment.** Cloudflare Pages builds from the repo independently, so a red
   CI run still ships. See `docs/deployment.md`.
+- **The room is the authority, not the host.** Clients send requests and render
+  what comes back; only the room runs a reducer. A guest gets no optimistic update, because it
+  cannot mint the same ids.
+- **Solo play must never touch the network.** There is a test asserting no WebSocket is
+  constructed and that storage is still written. Keep it passing.
+- **Deploy the Worker before the client** when adding a protocol field. They deploy separately
+  and the app is precached, so a client can be weeks old. Additive changes only.
 - **Storage keys are `games.<game>.v1`.** Changing one discards saved games, so version them
   rather than renaming.
 
@@ -108,4 +117,5 @@ it fail first.
 
 Per-game rules and behaviour live in `docs/`: [scrabble](docs/scrabble.md),
 [cricket](docs/cricket.md), [rummikub](docs/rummikub.md). Also
-[docs/pwa.md](docs/pwa.md) and [docs/deployment.md](docs/deployment.md).
+[docs/rooms.md](docs/rooms.md), [docs/pwa.md](docs/pwa.md) and
+[docs/deployment.md](docs/deployment.md).
