@@ -9,16 +9,23 @@ interface Props {
   headerExtra?: ReactNode;
   /** The game's own scoreboard, shown under the editor. */
   children?: ReactNode;
+  /**
+   * When false the roster is read-only: no add form, no remove buttons, no
+   * edit toggle. Used for players in a room who are not the host.
+   */
+  editable?: boolean;
 }
 
 /**
  * Adding and removing players. Shared by every game so the setup step behaves
  * identically throughout; each game supplies its own scoreboard as children.
  */
-export function PlayersCard({ players, onAdd, onRemove, headerExtra, children }: Props) {
+export function PlayersCard({
+  players, onAdd, onRemove, headerExtra, children, editable = true,
+}: Props) {
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(true);
-  const open = editing || players.length === 0;
+  const open = editable && (editing || players.length === 0);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -32,7 +39,7 @@ export function PlayersCard({ players, onAdd, onRemove, headerExtra, children }:
       <div className="card-head">
         <h2>Players</h2>
         {headerExtra}
-        {players.length > 0 && (
+        {editable && players.length > 0 && (
           <button type="button" className="link" onClick={() => setEditing((v) => !v)}>
             {open ? 'Done' : 'Edit'}
           </button>

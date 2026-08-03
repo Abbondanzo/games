@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Player, Turn } from '../lib/types';
+import type { Player, Turn } from '@shared/games/scrabble/types';
 
 interface Props {
   players: Player[];

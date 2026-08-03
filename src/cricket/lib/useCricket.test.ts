@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { initialState, reducer, type Action } from './useCricket';
-import type { CricketState, Dart } from './types';
+import type { CricketState, Dart } from '@shared/games/cricket/types';
 
 const run = (state: CricketState, ...actions: Action[]): CricketState =>
   actions.reduce(reducer, state);

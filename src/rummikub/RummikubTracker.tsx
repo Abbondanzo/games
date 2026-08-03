@@ -2,11 +2,19 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Crown, RotateCcw, Trash2 } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { RoundEntry } from './components/RoundEntry';
-import { roundScores, standings } from './lib/rummikub';
+import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
+import { RoomBar } from '../rooms/RoomBar';
+import { summarise } from '../rooms/describeGame';
+import { HostRoomButton } from '../rooms/HostRoomButton';
+import { describeError } from '@shared/rooms/protocol';
+
+const describeGame = (s: { players: unknown[]; rounds: unknown[] }) =>
+  summarise([[s.players.length, 'player'], [s.rounds.length, 'round']]);
 
 export function RummikubTracker() {
-  const { state, dispatch } = useRummikub();
+  const { state, dispatch, room } = useRummikub();
+  const isHost = !room || room.role === 'host';
   const rows = standings(state.players, state.rounds);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
   const name = (id: string) => state.players.find((p) => p.id === id)?.name ?? '-';
@@ -48,28 +56,47 @@ export function RummikubTracker() {
         </Link>
         <h1>Rummikub</h1>
         <div className="topbar-actions">
-          <button
-            type="button"
-            className="ghost"
-            onClick={newGame}
-            title="Clear the rounds and keep the players"
-          >
-            <RotateCcw size={15} aria-hidden="true" /> New game
-          </button>
-          <button
-            type="button"
-            className="ghost danger"
-            onClick={resetAll}
-            title="Clear the rounds and the players"
-          >
-            <Trash2 size={15} aria-hidden="true" /> Reset all
-          </button>
+          {!room && <HostRoomButton game="rummikub" existing={describeGame(state)} />}
+          {isHost && (
+            <>
+              <button
+                type="button"
+                className="ghost"
+                onClick={newGame}
+                title="Clear the rounds and keep the players"
+              >
+                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
+              </button>
+              <button
+                type="button"
+                className="ghost danger"
+                onClick={resetAll}
+                title="Clear the rounds and the players"
+              >
+                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       <main>
+        {room && (
+          <RoomBar
+            room={room}
+            onLeave={room.leave}
+            myName={state.players.find((p) => p.id === room.seatId)?.name ?? null}
+            onRename={(name) =>
+              room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
+          />
+        )}
+        {room?.lastError && (
+          <div className="banner warn" role="status">{describeError(room.lastError)}</div>
+        )}
+
         <PlayersCard
           players={state.players}
+          editable={isHost}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={removePlayer}
         >

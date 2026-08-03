@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Delete, Trophy } from 'lucide-react';
-import type { Player } from '../lib/types';
-import { JOKER_PENALTY, TILE_VALUES, potFor } from '../lib/rummikub';
+import type { Player } from '@shared/games/rummikub/types';
+import { JOKER_PENALTY, TILE_VALUES, potFor } from '@shared/games/rummikub/rules';
 
 interface Props {
   players: Player[];

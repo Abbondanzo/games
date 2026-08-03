@@ -1,184 +1,69 @@
-import { useEffect, useReducer } from 'react';
-import type { GameState, Player, ScoredWord, Turn } from './types';
-import { BINGO_BONUS } from './scoring';
+import { z } from 'zod';
+import { useGameSession } from '../../rooms/session';
+import type { TransportFactory } from '../../rooms/transport';
+import { initialState, reducer } from '@shared/games/scrabble/reducer';
+import { PlayerSchema, TurnSchema } from '@shared/games/scrabble/schema';
+import type { GameState } from '@shared/games/scrabble/types';
 
-const STORE_KEY = 'games.scrabble.v1';
+export { initialState, reducer, createReducer } from '@shared/games/scrabble/reducer';
+export type { Action } from '@shared/games/scrabble/reducer';
 
-let counter = 0;
-const uid = (): string => `${Date.now().toString(36)}-${counter++}`;
-
-export const initialState: GameState = { players: [], turns: [], currentIndex: 0 };
-
-export type Action =
-  | { type: 'addPlayers'; names: string }
-  | { type: 'removePlayer'; id: string }
-  | { type: 'setCurrent'; id: string }
-  | { type: 'recordPlay'; words: ScoredWord[]; bingo: boolean }
-  | { type: 'pass' }
-  | { type: 'adjust'; playerId: string; points: number }
-  | { type: 'undo' }
-  | { type: 'newGame' }
-  | { type: 'resetAll' }
-  | { type: 'hydrate'; state: GameState };
-
-const nextIndex = (state: GameState): number =>
-  state.players.length ? (state.currentIndex + 1) % state.players.length : 0;
-
-export function reducer(state: GameState, action: Action): GameState {
-  switch (action.type) {
-    case 'hydrate':
-      return action.state;
-
-    case 'addPlayers': {
-      // "Ada, Grace" adds both - pasting a list is the fastest way to set up.
-      const names = action.names.split(',').map((n) => n.trim()).filter(Boolean);
-      if (!names.length) return state;
-      return { ...state, players: [...state.players, ...names.map((name) => ({ id: uid(), name }))] };
-    }
-
-    case 'removePlayer': {
-      const removedAt = state.players.findIndex((p) => p.id === action.id);
-      if (removedAt === -1) return state;
-
-      const players = state.players.filter((p) => p.id !== action.id);
-      const turns = state.turns.filter((t) => t.playerId !== action.id);
-      if (!players.length) return { players, turns, currentIndex: 0 };
-
-      // Keep the same player up, not the same seat number. If the player who
-      // was up is the one leaving, the next in order takes over - which is the
-      // removed player's own index once everyone after them shifts down.
-      const upNow = state.players[state.currentIndex]?.id;
-      const stillHere = upNow !== undefined && upNow !== action.id
-        ? players.findIndex((p) => p.id === upNow)
-        : -1;
-
-      return {
-        players,
-        turns,
-        currentIndex: stillHere === -1 ? removedAt % players.length : stillHere,
-      };
-    }
-
-    case 'setCurrent': {
-      const idx = state.players.findIndex((p) => p.id === action.id);
-      return idx === -1 ? state : { ...state, currentIndex: idx };
-    }
-
-    case 'recordPlay': {
-      const player = state.players[state.currentIndex];
-      // A bingo is a property of a play, so it cannot stand as a turn on its own.
-      if (!player || !action.words.length) return state;
-      const turn: Turn = {
-        id: uid(),
-        playerId: player.id,
-        kind: 'play',
-        words: action.words.map((w) => w.word),
-        bingo: action.bingo,
-        points: action.words.reduce((s, w) => s + w.points, 0) + (action.bingo ? BINGO_BONUS : 0),
-      };
-      return { ...state, turns: [...state.turns, turn], currentIndex: nextIndex(state) };
-    }
-
-    case 'pass': {
-      const player = state.players[state.currentIndex];
-      if (!player) return state;
-      const turn: Turn = { id: uid(), playerId: player.id, kind: 'pass', words: [], bingo: false, points: 0 };
-      return { ...state, turns: [...state.turns, turn], currentIndex: nextIndex(state) };
-    }
-
-    case 'adjust': {
-      if (!action.points || !state.players.some((p) => p.id === action.playerId)) return state;
-      const turn: Turn = {
-        id: uid(), playerId: action.playerId, kind: 'adjust',
-        words: [], bingo: false, points: Math.trunc(action.points),
-      };
-      // An end-of-game adjustment isn't a turn, so play order doesn't move.
-      return { ...state, turns: [...state.turns, turn] };
-    }
-
-    case 'undo': {
-      const last = state.turns[state.turns.length - 1];
-      if (!last) return state;
-      const turns = state.turns.slice(0, -1);
-      if (last.kind === 'adjust' || !state.players.length) return { ...state, turns };
-
-      // Hand the turn back to whoever played it. Stepping the seat back by one
-      // would land on the wrong player if the order was changed since.
-      const playedBy = state.players.findIndex((p) => p.id === last.playerId);
-      return {
-        ...state,
-        turns,
-        currentIndex: playedBy === -1
-          ? (state.currentIndex - 1 + state.players.length) % state.players.length
-          : playedBy,
-      };
-    }
-
-    case 'newGame':
-      return { ...state, turns: [], currentIndex: 0 };
-
-    // Back to a blank slate, players included.
-    case 'resetAll':
-      return initialState;
-
-    default:
-      return state;
-  }
-}
-
-const isPlayer = (v: unknown): v is Player =>
-  typeof v === 'object' && v !== null
-  && typeof (v as Player).id === 'string' && typeof (v as Player).name === 'string';
-
-const isTurn = (v: unknown): v is Turn => {
-  if (typeof v !== 'object' || v === null) return false;
-  const t = v as Turn;
-  return typeof t.id === 'string'
-    && typeof t.playerId === 'string'
-    && (t.kind === 'play' || t.kind === 'pass' || t.kind === 'adjust')
-    && Array.isArray(t.words) && t.words.every((w) => typeof w === 'string')
-    && typeof t.bingo === 'boolean'
-    && Number.isFinite(t.points);
-};
+export const STORE_KEY = 'games.scrabble.v1';
 
 /**
- * A stored game is untrusted input: it may predate a change to the shape, or
- * have been hand-edited. Anything malformed is dropped rather than allowed to
- * crash the render, which would leave the bad payload stuck in storage.
+ * A stored game is untrusted: it may predate a change to the shape, or have
+ * been hand-edited. Players are all-or-nothing, since a game with a mangled
+ * roster is not recoverable, but a single bad turn is dropped rather than
+ * losing the whole game. An out-of-range current player falls back to the
+ * first, which would otherwise leave the game unable to accept a turn at all.
  */
-function readStored(): GameState | null {
+const StoredSchema = z.object({
+  players: z.array(PlayerSchema),
+  turns: z.array(z.unknown()),
+  currentIndex: z.int().nonnegative().catch(0),
+});
+
+export function readStored(): GameState | null {
+  // getItem itself can throw in private browsing, so the read stays guarded.
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<GameState>;
-    if (!Array.isArray(parsed.players) || !parsed.players.every(isPlayer)) return null;
-    if (!Array.isArray(parsed.turns)) return null;
-
-    const players = parsed.players;
-    const ids = new Set(players.map((p) => p.id));
-    const turns = parsed.turns.filter((t) => isTurn(t) && ids.has(t.playerId));
-
-    const index = parsed.currentIndex;
-    const currentIndex = Number.isInteger(index) && index! >= 0 && index! < players.length
-      ? index!
-      : 0;
-
-    return { players, turns, currentIndex };
+    raw = localStorage.getItem(STORE_KEY);
   } catch {
-    return null; // Corrupt or unreadable payload - start clean rather than crash.
+    return null;
   }
+  if (!raw) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  const result = StoredSchema.safeParse(parsed);
+  if (!result.success) return null;
+
+  const { players, currentIndex } = result.data;
+  const ids = new Set(players.map((p) => p.id));
+  const turns = result.data.turns
+    .map((t) => TurnSchema.safeParse(t))
+    .filter((r) => r.success && ids.has(r.data.playerId))
+    .map((r) => r.data!);
+
+  return {
+    players,
+    turns,
+    currentIndex: currentIndex < players.length ? currentIndex : 0,
+  };
 }
 
-export function useGame() {
-  const [state, dispatch] = useReducer(reducer, initialState, (init) => readStored() ?? init);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    } catch {
-      // Storage can be unavailable (private browsing); the session still works.
-    }
-  }, [state]);
-
-  return { state, dispatch };
+export function useGame(transport?: TransportFactory) {
+  return useGameSession({
+    game: 'scrabble',
+    reducer,
+    initialState,
+    readStored,
+    storeKey: STORE_KEY,
+    transport,
+  });
 }

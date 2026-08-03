@@ -1,4 +1,6 @@
-# esbuild fetches its platform binary in a postinstall script, and pnpm blocks
-# dependency build scripts unless they are allowed explicitly.
+# These packages fetch a platform binary in a postinstall script, and pnpm
+# blocks dependency build scripts unless they are allowed explicitly. esbuild
+# powers the build; workerd is the local Workers runtime wrangler dev uses.
 allowBuilds:
   esbuild: true
+  workerd: true

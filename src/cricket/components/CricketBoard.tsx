@@ -1,6 +1,6 @@
-import type { BoardState } from '../lib/cricket';
-import { TARGETS, targetLabel } from '../lib/cricket';
-import type { Player, Variant } from '../lib/types';
+import type { BoardState } from '@shared/games/cricket/rules';
+import { TARGETS, targetLabel } from '@shared/games/cricket/rules';
+import type { Player, Variant } from '@shared/games/cricket/types';
 import { MarkGlyph } from './MarkGlyph';
 
 interface Props {
@@ -43,6 +43,7 @@ export function CricketBoard({ players, board, variant, currentPlayerId, onSelec
                   className="player-head"
                   onClick={() => onSelect(p.id)}
                   title={`Make it ${p.name}'s turn`}
+                  aria-label={`Make it ${p.name}'s turn`}
                 >
                   <span className="name">{p.name}</span>
                   {board.hasClosedAll[p.id] && <span className="closed-all">closed out</span>}

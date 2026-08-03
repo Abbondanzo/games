@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { JOKER_PENALTY, potFor, roundScores, standings } from './rummikub';
+import { JOKER_PENALTY, potFor, roundScores, standings } from './rules';
 import type { Player, Round } from './types';
 
 const ada: Player = { id: 'a', name: 'Ada' };

@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react';
-import type { LetterMult, Tile } from '../lib/types';
-import { tileValue } from '../lib/scoring';
+import type { LetterMult, Tile } from '@shared/games/scrabble/types';
+import { tileValue } from '@shared/games/scrabble/scoring';
 
 interface Props {
   tiles: Tile[];

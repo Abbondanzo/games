@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Blocks, Dices, SpellCheck, Target, type LucideIcon } from 'lucide-react';
+import { Blocks, DoorOpen, SpellCheck, Target, type LucideIcon } from 'lucide-react';
 
 interface Game {
   path?: string;
@@ -27,7 +27,6 @@ const GAMES: Game[] = [
     title: 'Rummikub',
     desc: 'Round-by-round scoring from the tiles left on each rack.',
   },
-  { Icon: Dices, title: 'Yahtzee', desc: 'Scorecard with upper-section bonus.' },
 ];
 
 export function Home() {
@@ -51,6 +50,14 @@ export function Home() {
           </li>
         ))}
       </ul>
+
+      <Link className="game join-row" to="/join">
+        <DoorOpen className="icon" size={26} strokeWidth={1.75} aria-hidden="true" />
+        <span>
+          <span className="title">Join a game</span>
+          <span className="desc">Someone else is keeping score. Enter their code to follow along.</span>
+        </span>
+      </Link>
     </main>
   );
 }

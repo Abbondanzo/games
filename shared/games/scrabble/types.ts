@@ -33,12 +33,12 @@ export interface Turn {
   points: number;
 }
 
-export interface GameState {
+export type GameState = {
   players: Player[];
   turns: Turn[];
   /** Index into `players` of whoever is up next. */
   currentIndex: number;
-}
+};
 
 /** The turn being entered, held outside the persisted game state. */
 export interface Draft {

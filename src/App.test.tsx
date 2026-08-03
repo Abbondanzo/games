@@ -1,10 +1,13 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from './App';
+
+/** Every directory the house rules apply to. */
+const SOURCE_DIRS = ['src', 'shared', 'worker'];
 
 const renderAt = (path: string) =>
   render(
@@ -69,10 +72,10 @@ describe('icons', () => {
   // icon set. Everything user-visible uses lucide or purpose-drawn SVG.
   it('has no emoji anywhere in the source', () => {
     const emoji = /\p{Extended_Pictographic}/u;
-    const root = resolve(process.cwd(), 'src');
     const offenders: string[] = [];
 
     const walk = (dir: string) => {
+      if (!existsSync(dir)) return;
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = join(dir, entry.name);
         if (entry.isDirectory()) walk(full);
@@ -83,7 +86,7 @@ describe('icons', () => {
         }
       }
     };
-    walk(root);
+    for (const dir of SOURCE_DIRS) walk(resolve(process.cwd(), dir));
 
     expect(offenders).toEqual([]);
   });
@@ -94,6 +97,7 @@ describe('punctuation', () => {
   it('uses single dashes, not em or en dashes', () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {
+      if (!existsSync(dir)) return;
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = join(dir, entry.name);
         if (entry.isDirectory()) walk(full);
@@ -104,7 +108,7 @@ describe('punctuation', () => {
         }
       }
     };
-    walk(resolve(process.cwd(), 'src'));
+    for (const dir of SOURCE_DIRS) walk(resolve(process.cwd(), dir));
 
     expect(offenders).toEqual([]);
   });

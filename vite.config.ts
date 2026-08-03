@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -9,7 +10,10 @@ export default defineConfig({
       // The manifest is a static file in public/ so it can be reviewed and
       // tested directly rather than generated at build time.
       manifest: false,
-      registerType: 'autoUpdate',
+      // 'prompt' rather than 'autoUpdate': the new files land either way, but
+      // the open page keeps running the old ones until it reloads, so it is
+      // better to offer that than to leave someone on stale code unawares.
+      registerType: 'prompt',
       workbox: {
         // Everything the app needs is precached, so a game can be scored with
         // no connection. Only the dictionary lookup needs the network.
@@ -20,6 +24,11 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  // One shared library, imported the same way by the app, the tests and the
+  // Worker, so no type or rule exists in two places.
+  resolve: {
+    alias: { '@shared': fileURLToPath(new URL('./shared', import.meta.url)) },
+  },
   // Absolute base: the service worker and manifest are scoped to the site root,
   // which rules out serving the app from a subpath.
   base: '/',
@@ -32,5 +41,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: false,
+    alias: {
+      // Only exists when Vite builds with the PWA plugin.
+      'virtual:pwa-register/react': fileURLToPath(
+        new URL('./src/test/pwaRegisterStub.ts', import.meta.url),
+      ),
+    },
   },
 });

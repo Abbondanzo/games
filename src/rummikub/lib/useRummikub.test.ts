@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { initialState, reducer, type Action } from './useRummikub';
-import type { RummikubState } from './types';
+import type { RummikubState } from '@shared/games/rummikub/types';
 
 const run = (state: RummikubState, ...actions: Action[]): RummikubState =>
   actions.reduce(reducer, state);

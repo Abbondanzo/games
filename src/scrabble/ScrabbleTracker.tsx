@@ -1,16 +1,32 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react';
 import { PlayersCard } from './components/PlayersCard';
 import { TurnEntry } from './components/TurnEntry';
 import { HistoryCard } from './components/HistoryCard';
 import { DictionaryDrawer } from './components/DictionaryDrawer';
 import { useGame } from './lib/useGame';
-import { draftWord, draftWordScore, emptyDraft } from './lib/scoring';
-import type { Draft } from './lib/types';
+import { RoomBar } from '../rooms/RoomBar';
+import { summarise } from '../rooms/describeGame';
+import { HostRoomButton } from '../rooms/HostRoomButton';
+import { describeError } from '@shared/rooms/protocol';
+import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/scoring';
+import type { Draft } from '@shared/games/scrabble/types';
+
+const describeGame = (s: { players: unknown[]; turns: unknown[] }) =>
+  summarise([[s.players.length, 'player'], [s.turns.length, 'turn']]);
 
 export function ScrabbleTracker() {
-  const { state, dispatch } = useGame();
+  const { state, dispatch, room, onReject } = useGame();
+
+  // A refused play would otherwise take the typed word with it.
+  onReject((action) => {
+    if (action.type === 'recordPlay') {
+      setDraft((d) => ({ ...d, words: action.words, bingo: action.bingo }));
+    }
+  });
+
+  const isHost = !room || room.role === 'host';
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [dictOpen, setDictOpen] = useState(false);
 
@@ -54,33 +70,49 @@ export function ScrabbleTracker() {
         </Link>
         <h1>Scrabble</h1>
         <div className="topbar-actions">
-          <button type="button" className="ghost" onClick={() => setDictOpen(true)}>
-            <BookOpen size={15} aria-hidden="true" /> Dictionary
-          </button>
-          <button
-            type="button"
-            className="ghost"
-            onClick={newGame}
-            title="Clear the scores and keep the players"
-          >
-            <RotateCcw size={15} aria-hidden="true" /> New game
-          </button>
-          <button
-            type="button"
-            className="ghost danger"
-            onClick={resetAll}
-            title="Clear the scores and the players"
-          >
-            <Trash2 size={15} aria-hidden="true" /> Reset all
-          </button>
+          {!room && <HostRoomButton game="scrabble" existing={describeGame(state)} />}
+          {isHost && (
+            <>
+              <button
+                type="button"
+                className="ghost"
+                onClick={newGame}
+                title="Clear the scores and keep the players"
+              >
+                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
+              </button>
+              <button
+                type="button"
+                className="ghost danger"
+                onClick={resetAll}
+                title="Clear the scores and the players"
+              >
+                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       <main>
+        {room && (
+          <RoomBar
+            room={room}
+            onLeave={room.leave}
+            myName={state.players.find((p) => p.id === room.seatId)?.name ?? null}
+            onRename={(name) =>
+              room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
+          />
+        )}
+        {room?.lastError && (
+          <div className="banner warn" role="status">{describeError(room.lastError)}</div>
+        )}
+
         <PlayersCard
           players={state.players}
           turns={state.turns}
           currentPlayerId={currentPlayer?.id ?? null}
+          editable={isHost}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={(id) => dispatch({ type: 'removePlayer', id })}
           onSelect={(id) => dispatch({ type: 'setCurrent', id })}

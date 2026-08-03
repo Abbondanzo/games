@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from './cricket';
+import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from './rules';
 import type { CricketTarget, Dart, Player, Turn, Variant } from './types';
 
 const ada: Player = { id: 'a', name: 'Ada', joinedAtTurn: 0 };

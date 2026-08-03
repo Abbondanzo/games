@@ -1,7 +1,8 @@
 # Games
 
-Score trackers for the games I actually play. React + TypeScript, no backend - everything runs
-in the browser, saves to `localStorage`, and works offline.
+Score trackers for the games I actually play. React + TypeScript. Playing alone needs nothing
+but the browser: it saves to `localStorage` and works offline. Sharing a game with other people
+uses a small room server.
 
 **[games.abbondanzo.com](https://games.abbondanzo.com/)**
 
@@ -10,6 +11,9 @@ in the browser, saves to `localStorage`, and works offline.
 | [Scrabble](docs/scrabble.md) | Words, bonus squares, blanks and bingos, with a dictionary lookup |
 | [Cricket (darts)](docs/cricket.md) | Marks, closing out and points - standard, cut-throat or no points |
 | [Rummikub](docs/rummikub.md) | Round-by-round scoring from the tiles left on each rack |
+
+Any game can be [shared with a four-character code](docs/rooms.md), so everyone at the table
+sees the score and enters their own turns.
 
 Installable as an app on iOS, Android and desktop - see [docs/pwa.md](docs/pwa.md).
 
@@ -33,17 +37,22 @@ breaks the dictionary.
 | `pnpm test:watch` | Re-run tests on change |
 | `pnpm typecheck` | Types only, no build |
 | `pnpm icons` | Regenerate the icon set from the trophy artwork |
+| `pnpm worker:dev` | Run the room server locally on :8787 |
+| `pnpm worker:deploy` | Deploy the room server |
 
 Needs Node 20+ and pnpm; `corepack enable` picks up the pinned version.
 
 ## How it fits together
 
-Each game is a self-contained module under `src/<game>/`, with its rules in plain functions that
-have no React in them. Scores are derived by replaying the raw events - words played, darts
-thrown, rounds won - rather than being stored, which is what lets cricket switch scoring modes
-mid-game without restarting.
+Pure domain code - game rules, reducers and the room protocol - lives in `shared/`, with no
+React and no browser APIs, so the room server can run exactly the same code the app does. `src/`
+is the React app and `worker/` is the room server.
 
-Around 260 tests cover the rule engines, the reducers and every tracker end to end.
+Scores are derived by replaying the raw events - words played, darts thrown, rounds won - rather
+than being stored, which is what lets cricket switch scoring modes mid-game without restarting.
+
+Around 480 tests cover the rule engines, the reducers, the room protocol and every tracker end
+to end.
 
 [CLAUDE.md](CLAUDE.md) has the detail: architecture, conventions, testing approach and the
 gotchas worth knowing before changing anything.
@@ -52,6 +61,7 @@ gotchas worth knowing before changing anything.
 
 - [Scrabble](docs/scrabble.md), [Cricket](docs/cricket.md), [Rummikub](docs/rummikub.md) - rules
   and behaviour for each tracker
+- [Rooms](docs/rooms.md) - sharing a game, and how the room server works
 - [Install and offline use](docs/pwa.md) - PWA setup, icon pipeline, iOS specifics
 - [CI and deployment](docs/deployment.md) - what runs where, and what does not
 

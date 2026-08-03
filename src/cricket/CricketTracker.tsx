@@ -4,9 +4,13 @@ import { ArrowLeft, RotateCcw, Trash2, Trophy } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { CricketBoard } from './components/CricketBoard';
 import { DartEntry } from './components/DartEntry';
-import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from './lib/cricket';
+import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from '@shared/games/cricket/rules';
+import { describeError } from '@shared/rooms/protocol';
 import { useCricket } from './lib/useCricket';
-import type { Dart, Variant } from './lib/types';
+import { RoomBar } from '../rooms/RoomBar';
+import { summarise } from '../rooms/describeGame';
+import { HostRoomButton } from '../rooms/HostRoomButton';
+import type { Dart, Variant } from '@shared/games/cricket/types';
 
 const VARIANTS: { value: Variant; label: string; blurb: string }[] = [
   { value: 'standard', label: 'Standard', blurb: 'Points are yours. Highest score wins.' },
@@ -20,9 +24,19 @@ const WIN_REASON: Record<Variant, string> = {
   nopoints: 'First to close every target.',
 };
 
+const describeGame = (s: { players: unknown[]; turns: unknown[] }) =>
+  summarise([[s.players.length, 'player'], [s.turns.length, 'turn']]);
+
 export function CricketTracker() {
-  const { state, dispatch } = useCricket();
+  const { state, dispatch, room, onReject } = useCricket();
   const [darts, setDarts] = useState<Dart[]>([]);
+
+  // A refused throw would otherwise vanish along with what was typed.
+  onReject((action) => {
+    if (action.type === 'recordTurn') setDarts(action.darts);
+  });
+
+  const isHost = !room || room.role === 'host';
 
   const currentPlayer = state.players[state.currentIndex] ?? null;
 
@@ -128,26 +142,44 @@ export function CricketTracker() {
         </Link>
         <h1>Cricket</h1>
         <div className="topbar-actions">
-          <button
-            type="button"
-            className="ghost"
-            onClick={newGame}
-            title="Clear the board and keep the players"
-          >
-            <RotateCcw size={15} aria-hidden="true" /> New game
-          </button>
-          <button
-            type="button"
-            className="ghost danger"
-            onClick={resetAll}
-            title="Clear the board and the players"
-          >
-            <Trash2 size={15} aria-hidden="true" /> Reset all
-          </button>
+          {!room && <HostRoomButton game="cricket" existing={describeGame(state)} />}
+          {isHost && (
+            <>
+              <button
+                type="button"
+                className="ghost"
+                onClick={newGame}
+                title="Clear the board and keep the players"
+              >
+                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
+              </button>
+              <button
+                type="button"
+                className="ghost danger"
+                onClick={resetAll}
+                title="Clear the board and the players"
+              >
+                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       <main>
+        {room && (
+          <RoomBar
+            room={room}
+            onLeave={room.leave}
+            myName={state.players.find((p) => p.id === room.seatId)?.name ?? null}
+            onRename={(name) =>
+              room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
+          />
+        )}
+        {room?.lastError && (
+          <div className="banner warn" role="status">{describeError(room.lastError)}</div>
+        )}
+
         {winner && (
           <div className="banner win" role="status">
             <Trophy size={18} aria-hidden="true" className="mark" />
@@ -157,9 +189,10 @@ export function CricketTracker() {
 
         <PlayersCard
           players={state.players}
+          editable={isHost}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={removePlayer}
-          headerExtra={
+          headerExtra={isHost && (
             <div className="seg" role="group" aria-label="Game mode">
               {VARIANTS.map((v) => (
                 <button
@@ -174,14 +207,14 @@ export function CricketTracker() {
                 </button>
               ))}
             </div>
-          }
+          )}
         >
           <CricketBoard
             players={state.players}
             board={board}
             variant={state.variant}
             currentPlayerId={currentPlayer?.id ?? null}
-            onSelect={selectPlayer}
+            onSelect={isHost ? selectPlayer : () => {}}
           />
         </PlayersCard>
 
@@ -194,7 +227,7 @@ export function CricketTracker() {
           onRecord={(thrown) => dispatch({ type: 'recordTurn', darts: thrown })}
           onUndo={undo}
           canUndo={darts.length > 0 || state.turns.length > 0}
-          disabled={Boolean(winner)}
+          disabled={Boolean(winner) || (room ? !room.can('recordTurn') || room.sending : false)}
         />
 
         <section className="card">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { initialState, reducer, type Action } from './useGame';
-import type { GameState } from './types';
+import type { GameState } from '@shared/games/scrabble/types';
 
 const run = (state: GameState, ...actions: Action[]): GameState =>
   actions.reduce(reducer, state);

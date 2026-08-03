@@ -1,6 +1,6 @@
 import { Crown } from 'lucide-react';
-import type { Player, Turn } from '../lib/types';
-import { standings } from '../lib/scoring';
+import type { Player, Turn } from '@shared/games/scrabble/types';
+import { standings } from '@shared/games/scrabble/scoring';
 import { PlayersCard as SharedPlayersCard } from '../../shared/PlayersCard';
 
 interface Props {
@@ -10,14 +10,17 @@ interface Props {
   onAdd: (names: string) => void;
   onRemove: (id: string) => void;
   onSelect: (id: string) => void;
+  editable?: boolean;
 }
 
-export function PlayersCard({ players, turns, currentPlayerId, onAdd, onRemove, onSelect }: Props) {
+export function PlayersCard({
+  players, turns, currentPlayerId, onAdd, onRemove, onSelect, editable = true,
+}: Props) {
   const rows = standings(players, turns);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
 
   return (
-    <SharedPlayersCard players={players} onAdd={onAdd} onRemove={onRemove}>
+    <SharedPlayersCard players={players} onAdd={onAdd} onRemove={onRemove} editable={editable}>
       <ol className="scoreboard">
         {rows.map((row, i) => (
           <li
