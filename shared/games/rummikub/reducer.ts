@@ -24,6 +24,9 @@ function apply(state: RummikubState, action: Action, uid: IdSource): RummikubSta
     }
 
     case 'removePlayer': {
+      // Handing back the same state signals a no-op, which is how the room
+      // knows not to bump its revision and tell everyone about nothing.
+      if (!state.players.some((p) => p.id === action.id)) return state;
       const players = state.players.filter((p) => p.id !== action.id);
       // Rounds this player won make no sense without them, so they go. Rounds
       // they merely lost are kept and rescored without their penalty.

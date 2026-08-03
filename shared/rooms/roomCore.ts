@@ -477,8 +477,9 @@ function handleAction<S extends Snapshot>(
   const effects: Effect[] = [
     { to: 'all', message: { t: 'state', rev: next.rev, state: snapshot, cause } },
   ];
-  // Removing or renaming a player changes what presence should show.
-  if (membersChanged(state.members, next.members)) {
+  // Removing or renaming a player changes what presence shows, and recording a
+  // round ends the collection. Either way the room view has moved on.
+  if (membersChanged(state.members, next.members) || next.pending !== state.pending) {
     effects.push({ to: 'all', message: { t: 'room', room: roomView(next, ctx) } });
   }
   return { state: next, effects };

@@ -358,9 +358,10 @@ describe('a Scrabble room', () => {
     expect(within(guest).getByRole('button', { name: 'Dictionary' })).toBeEnabled();
   });
 
-  // The word is typed into local state the tracker clears on dispatch, so a
-  // refusal has to hand it back or the player loses what they typed.
-  it('gives a refused word back to the player', async () => {
+  // Closed off rather than refused after the fact, as cricket is. The
+  // reject-and-restore path still exists for the race where the turn moves
+  // between rendering and tapping.
+  it('closes off the entry when it is not your turn', async () => {
     const user = userEvent.setup();
     const room = createTestRoom('scrabble');
     const guestSession = room.addMember('Grace');
@@ -376,12 +377,12 @@ describe('a Scrabble room', () => {
     await waitFor(() => expect(scores(guest)).toHaveLength(3));
     await user.click(within(host).getByTitle("Make it Ada's turn"));
 
-    await user.type(within(guest).getByLabelText('Word played'), 'quiz');
-    await user.click(within(guest).getByRole('button', { name: 'Score turn' }));
-
     await waitFor(() =>
-      expect(within(guest).getByRole('status')).toHaveTextContent(/not your turn/i));
-    expect(scores(guest).find((r) => r.startsWith('Grace'))).toBe('Grace:0');
+      expect(within(guest).getByRole('button', { name: 'Score turn' })).toBeDisabled());
+    expect(within(guest).getByRole('button', { name: 'Pass' })).toBeDisabled();
+
+    // The host, whose turn it is not either, is never gated: they run the room.
+    expect(within(host).getByRole('button', { name: 'Score turn' })).toBeEnabled();
   });
 });
 
@@ -487,6 +488,32 @@ describe('playing alone', () => {
     expect(constructed).toBe(0);
     expect(localStorage.getItem('games.cricket.v1')).toContain('Ada');
     expect(screen.queryByText('Who is here')).not.toBeInTheDocument();
+
+    globalThis.WebSocket = original;
+  });
+
+  it('scores Scrabble exactly as it always did', async () => {
+    const user = userEvent.setup();
+    const original = globalThis.WebSocket;
+    let constructed = 0;
+    // @ts-expect-error - replaced for the duration of this test
+    globalThis.WebSocket = class {
+      constructor() {
+        constructed += 1;
+      }
+    };
+
+    render(<Solo><ScrabbleTracker /></Solo>);
+    await user.type(screen.getByLabelText('Player name'), 'Ada, Grace');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    await user.type(screen.getByLabelText('Word played'), 'quiz');
+    await user.click(screen.getByRole('button', { name: 'Score turn' }));
+
+    expect(screen.getByText('Ada', { selector: '.name' }).closest('li'))
+      .toHaveTextContent('22');
+    expect(constructed).toBe(0);
+    expect(localStorage.getItem('games.scrabble.v1')).toContain('Ada');
 
     globalThis.WebSocket = original;
   });

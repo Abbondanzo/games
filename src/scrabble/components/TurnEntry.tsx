@@ -22,12 +22,15 @@ interface Props {
   onScore: () => void;
   onPass: () => void;
   onOpenDictionary: () => void;
+  /** In a room, closed off until it is your turn. */
+  disabled?: boolean;
 }
 
 const IDLE: LookupView = { kind: 'idle' };
 
 export function TurnEntry({
   draft, setDraft, currentPlayer, turnNumber, onScore, onPass, onOpenDictionary,
+  disabled = false,
 }: Props) {
   const [check, setCheck] = useState<LookupView>(IDLE);
   const word = draftWord(draft);
@@ -165,10 +168,17 @@ export function TurnEntry({
             <button type="button" className="ghost" onClick={bankWord}>
               <Plus size={15} aria-hidden="true" /> Another word
             </button>
-            <button type="button" className="ghost" onClick={() => { onPass(); setCheck(IDLE); }}>
+            <button
+              type="button"
+              className="ghost"
+              disabled={disabled}
+              onClick={() => { onPass(); setCheck(IDLE); }}
+            >
               Pass
             </button>
-            <button type="submit" className="primary" disabled={!currentPlayer}>Score turn</button>
+            <button type="submit" className="primary" disabled={!currentPlayer || disabled}>
+              Score turn
+            </button>
           </div>
         </div>
       </form>

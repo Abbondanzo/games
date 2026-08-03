@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Crown, RotateCcw, Trash2 } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { RoundEntry } from './components/RoundEntry';
+import { RackCollection } from './components/RackCollection';
+import { OpenRound } from './components/OpenRound';
 import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
 import { RoomBar } from '../rooms/RoomBar';
@@ -123,11 +125,25 @@ export function RummikubTracker() {
           </ol>
         </PlayersCard>
 
-        <RoundEntry
-          players={state.players}
-          roundNumber={state.rounds.length + 1}
-          onScore={(winnerId, penalties) => dispatch({ type: 'recordRound', winnerId, penalties })}
-        />
+        {room ? (
+          room.pending ? (
+            <RackCollection
+              players={state.players}
+              roundNumber={state.rounds.length + 1}
+              room={room}
+              onScore={(winnerId, penalties) =>
+                dispatch({ type: 'recordRound', winnerId, penalties })}
+            />
+          ) : (
+            <OpenRound players={state.players} roundNumber={state.rounds.length + 1} room={room} />
+          )
+        ) : (
+          <RoundEntry
+            players={state.players}
+            roundNumber={state.rounds.length + 1}
+            onScore={(winnerId, penalties) => dispatch({ type: 'recordRound', winnerId, penalties })}
+          />
+        )}
 
         <section className="card">
           <div className="card-head">
