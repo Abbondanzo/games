@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { CricketTracker } from '../cricket/CricketTracker';
+import { ScrabbleTracker } from '../scrabble/ScrabbleTracker';
 import { RoomProvider } from './RoomProvider';
 import { createTestRoom, type TestRoom } from './testRoom';
 import type { StoredSession } from './storage';
@@ -229,6 +230,93 @@ describe('a host and a guest in one room', () => {
 
     await waitFor(() => expect(within(host).getByText('AB2D')).toBeInTheDocument());
     expect(within(guest).getByText('AB2D')).toBeInTheDocument();
+  });
+});
+
+/**
+ * The session is generic, so a second game is the test that it is not
+ * accidentally shaped around cricket.
+ */
+describe('a Scrabble room', () => {
+  function mountScrabble(room: TestRoom, session: StoredSession, label: string): HTMLElement {
+    const container = document.createElement('div');
+    container.dataset.client = label;
+    document.body.append(container);
+    render(
+      <RoomProvider value={{ transport: room.transport, session }}>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <ScrabbleTracker />
+        </MemoryRouter>
+      </RoomProvider>,
+      { container },
+    );
+    return container;
+  }
+
+  const scores = (client: HTMLElement) =>
+    within(client).getAllByRole('listitem')
+      .filter((li) => li.querySelector('.pts'))
+      .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`);
+
+  it('shows the host a word the guest scored', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('scrabble');
+    const guestSession = room.addMember('Grace');
+
+    const host = mountScrabble(room, room.hostSession, 'host');
+    const guest = mountScrabble(room, guestSession, 'guest');
+
+    // Grace joined, so she is the only player and it is her turn.
+    await waitFor(() => expect(scores(guest)).toEqual(['Grace:0']));
+
+    await user.type(within(guest).getByLabelText('Word played'), 'quiz');
+    await user.click(within(guest).getByRole('button', { name: 'Score turn' }));
+
+    await waitFor(() => expect(scores(host)).toEqual(['Grace:22']));
+    expect(scores(guest)).toEqual(['Grace:22']);
+  });
+
+  it('keeps the host controls to the host', async () => {
+    const room = createTestRoom('scrabble');
+    const guestSession = room.addMember('Grace');
+
+    const host = mountScrabble(room, room.hostSession, 'host');
+    const guest = mountScrabble(room, guestSession, 'guest');
+
+    await waitFor(() => expect(scores(guest)).toEqual(['Grace:0']));
+
+    for (const label of ['New game', 'Reset all']) {
+      expect(within(host).getByRole('button', { name: label })).toBeInTheDocument();
+      expect(within(guest).queryByRole('button', { name: label })).not.toBeInTheDocument();
+    }
+    // The dictionary is nobody's privilege.
+    expect(within(guest).getByRole('button', { name: 'Dictionary' })).toBeEnabled();
+  });
+
+  // The word is typed into local state the tracker clears on dispatch, so a
+  // refusal has to hand it back or the player loses what they typed.
+  it('gives a refused word back to the player', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('scrabble');
+    const guestSession = room.addMember('Grace');
+
+    const host = mountScrabble(room, room.hostSession, 'host');
+    const guest = mountScrabble(room, guestSession, 'guest');
+
+    await waitFor(() => expect(scores(guest)).toEqual(['Grace:0']));
+
+    // The host adds Ada and hands her the turn, so Grace's play is refused.
+    await user.type(within(host).getByLabelText('Player name'), 'Ada');
+    await user.click(within(host).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(scores(guest)).toHaveLength(2));
+    await user.click(within(host).getByTitle("Make it Ada's turn"));
+
+    await user.type(within(guest).getByLabelText('Word played'), 'quiz');
+    await user.click(within(guest).getByRole('button', { name: 'Score turn' }));
+
+    await waitFor(() =>
+      expect(within(guest).getByRole('status')).toHaveTextContent(/not your turn/i));
+    expect(scores(guest).find((r) => r.startsWith('Grace'))).toBe('Grace:0');
   });
 });
 

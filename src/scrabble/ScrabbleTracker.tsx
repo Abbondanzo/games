@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react';
 import { PlayersCard } from './components/PlayersCard';
 import { TurnEntry } from './components/TurnEntry';
 import { HistoryCard } from './components/HistoryCard';
@@ -67,9 +67,6 @@ export function ScrabbleTracker() {
         <h1>Scrabble</h1>
         <div className="topbar-actions">
           {!room && <HostRoomButton game="scrabble" />}
-          <button type="button" className="ghost" title="Look up a word" onClick={() => setDictOpen(true)}>
-            <BookOpen size={15} aria-hidden="true" /> <span className="btn-label">Dictionary</span>
-          </button>
           {isHost && (
             <>
               <button
