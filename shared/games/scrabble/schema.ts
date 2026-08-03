@@ -41,6 +41,7 @@ export const ScrabbleActionSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('pass') }),
   z.object({ type: z.literal('adjust'), playerId: Id, points: AdjustmentSchema }),
+  z.object({ type: z.literal('renamePlayer'), id: Id, name: z.string().min(1).max(24) }),
   z.object({ type: z.literal('undo') }),
   z.object({ type: z.literal('newGame') }),
   z.object({ type: z.literal('resetAll') }),

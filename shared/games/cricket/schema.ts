@@ -46,6 +46,7 @@ export const CricketActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('setCurrent'), id: Id }),
   z.object({ type: z.literal('setVariant'), variant: VariantSchema }),
   z.object({ type: z.literal('recordTurn'), darts: z.array(DartSchema).max(DARTS_PER_TURN) }),
+  z.object({ type: z.literal('renamePlayer'), id: Id, name: z.string().min(1).max(24) }),
   z.object({ type: z.literal('undo') }),
   z.object({ type: z.literal('newGame') }),
   z.object({ type: z.literal('resetAll') }),

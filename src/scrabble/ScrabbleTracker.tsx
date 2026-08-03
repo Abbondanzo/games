@@ -95,7 +95,15 @@ export function ScrabbleTracker() {
       </header>
 
       <main>
-        {room && <RoomBar room={room} onLeave={room.leave} />}
+        {room && (
+          <RoomBar
+            room={room}
+            onLeave={room.leave}
+            myName={state.players.find((p) => p.id === room.seatId)?.name ?? null}
+            onRename={(name) =>
+              room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
+          />
+        )}
         {room?.lastError && (
           <div className="banner warn" role="status">{describeError(room.lastError)}</div>
         )}

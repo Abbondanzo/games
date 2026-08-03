@@ -47,6 +47,23 @@ app rather than a web page.
 `src/pwa.test.ts` asserts the manifest fields, the icon sizes installers require, that every
 referenced icon exists on disk, and that the iOS meta tags and safe-area CSS are present.
 
+## Updates
+
+The app is precached, so a deploy does not reach anyone holding a tab open: the
+new files arrive in the background, but the page keeps running the code it
+started with until it reloads.
+
+That went wrong twice while rooms were being built. A "Close room" button did
+nothing, because the deployed room server predated the message it sends. A host
+naming dialog only appeared after a hard refresh. Both looked like bugs.
+
+So the service worker waits rather than swapping underneath you: when a new
+version is ready a small bar offers **Refresh**, which activates it and reloads.
+The registration also re-checks hourly, since a game can sit open all evening.
+
+`docs/rooms.md` covers the related case where the app and the room server are
+different versions, which the room strip reports in the same spirit.
+
 ## Not implemented
 
 iOS splash screens (`apple-touch-startup-image`). Without them there is a brief blank screen on

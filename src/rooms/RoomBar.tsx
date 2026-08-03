@@ -1,5 +1,5 @@
-import { Copy, DoorOpen, Lock, LockOpen, PowerOff, UserX, Users } from 'lucide-react';
-import { useState } from 'react';
+import { Copy, DoorOpen, Lock, LockOpen, Pencil, PowerOff, UserX, Users } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { VERSION_MESSAGES } from '@shared/rooms/protocol';
 import type { RoomHandle } from './session';
 
@@ -7,9 +7,26 @@ import type { RoomHandle } from './session';
  * The room, as a strip under the top bar: who is here, what your part is, and
  * the host's controls. Deliberately one row until you open it.
  */
-export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => void }) {
+interface Props {
+  room: RoomHandle;
+  onLeave: () => void;
+  /** Your player's current name, so the field starts from it. */
+  myName: string | null;
+  onRename: (name: string) => void;
+}
+
+export function RoomBar({ room, onLeave, myName, onRename }: Props) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState('');
+
+  function submitName(event: FormEvent) {
+    event.preventDefault();
+    const wanted = draftName.trim();
+    if (wanted && wanted !== myName) onRename(wanted);
+    setRenaming(false);
+  }
 
   const online = room.members.filter((m) => m.online).length;
   const isHost = room.role === 'host';
@@ -63,6 +80,38 @@ export function RoomBar({ room, onLeave }: { room: RoomHandle; onLeave: () => vo
 
       {open && (
         <div className="room-detail">
+          {myName !== null && (
+            renaming ? (
+              <form className="row rename-row" onSubmit={submitName}>
+                <input
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  maxLength={24}
+                  aria-label="Your name"
+                  autoComplete="off"
+                />
+                <button type="submit" className="primary">Save</button>
+                <button type="button" className="ghost" onClick={() => setRenaming(false)}>
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <p className="you-are">
+                You are <b>{myName}</b>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    setDraftName(myName);
+                    setRenaming(true);
+                  }}
+                >
+                  <Pencil size={13} aria-hidden="true" /> Change name
+                </button>
+              </p>
+            )
+          )}
+
           <ul className="chips">
             {room.members.map((m) => (
               <li key={m.memberId} className={m.online ? undefined : 'away'}>

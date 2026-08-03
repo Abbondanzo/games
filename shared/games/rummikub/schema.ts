@@ -26,6 +26,7 @@ export const RummikubActionSchema = z.discriminatedUnion('type', [
     winnerId: Id,
     penalties: z.record(Id, PenaltySchema),
   }),
+  z.object({ type: z.literal('renamePlayer'), id: Id, name: z.string().min(1).max(24) }),
   z.object({ type: z.literal('undo') }),
   z.object({ type: z.literal('newGame') }),
   z.object({ type: z.literal('resetAll') }),

@@ -539,3 +539,20 @@ button.ghost, button.primary, button.link {
 /* Leaving is one tap from the room strip, not buried in the detail panel. */
 .room-summary .leave-link { color: var(--muted); }
 .room-summary .leave-link:hover { color: var(--bad); }
+
+.you-are { display: flex; align-items: center; gap: .5rem; font-size: .85rem; margin: 0 0 .6rem; }
+.rename-row { margin-bottom: .6rem; }
+.rename-row input { flex: 1; }
+
+/* Sits above everything, because it is the one thing that fixes stale code. */
+.update-prompt {
+  position: fixed; z-index: 50;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: .75rem;
+  padding: .6rem .6rem .6rem 1rem;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
+  font-size: .85rem;
+}

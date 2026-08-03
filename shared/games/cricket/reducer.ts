@@ -19,6 +19,7 @@ export type Action =
   | { type: 'recordTurn'; darts: Dart[] }
   | { type: 'undo' }
   | { type: 'newGame' }
+  | { type: 'renamePlayer'; id: string; name: string }
   | { type: 'resetAll' };
 
 const nextIndex = (state: CricketState): number =>
@@ -90,6 +91,15 @@ function apply(state: CricketState, action: Action, uid: IdSource): CricketState
         currentIndex: thrownBy === -1
           ? (state.currentIndex - 1 + state.players.length) % state.players.length
           : thrownBy,
+      };
+    }
+
+    case 'renamePlayer': {
+      const name = action.name.trim();
+      if (!name) return state;
+      return {
+        ...state,
+        players: state.players.map((p) => (p.id === action.id ? { ...p, name } : p)),
       };
     }
 

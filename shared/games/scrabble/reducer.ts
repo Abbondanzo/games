@@ -16,6 +16,7 @@ export type Action =
   | { type: 'adjust'; playerId: string; points: number }
   | { type: 'undo' }
   | { type: 'newGame' }
+  | { type: 'renamePlayer'; id: string; name: string }
   | { type: 'resetAll' };
 
 const nextIndex = (state: GameState): number =>
@@ -105,6 +106,15 @@ function apply(state: GameState, action: Action, uid: IdSource): GameState {
         currentIndex: playedBy === -1
           ? (state.currentIndex - 1 + state.players.length) % state.players.length
           : playedBy,
+      };
+    }
+
+    case 'renamePlayer': {
+      const name = action.name.trim();
+      if (!name) return state;
+      return {
+        ...state,
+        players: state.players.map((p) => (p.id === action.id ? { ...p, name } : p)),
       };
     }
 

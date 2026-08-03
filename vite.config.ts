@@ -10,7 +10,10 @@ export default defineConfig({
       // The manifest is a static file in public/ so it can be reviewed and
       // tested directly rather than generated at build time.
       manifest: false,
-      registerType: 'autoUpdate',
+      // 'prompt' rather than 'autoUpdate': the new files land either way, but
+      // the open page keeps running the old ones until it reloads, so it is
+      // better to offer that than to leave someone on stale code unawares.
+      registerType: 'prompt',
       workbox: {
         // Everything the app needs is precached, so a game can be scored with
         // no connection. Only the dictionary lookup needs the network.
@@ -38,5 +41,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: false,
+    alias: {
+      // Only exists when Vite builds with the PWA plugin.
+      'virtual:pwa-register/react': fileURLToPath(
+        new URL('./src/test/pwaRegisterStub.ts', import.meta.url),
+      ),
+    },
   },
 });

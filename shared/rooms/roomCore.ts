@@ -477,8 +477,8 @@ function handleAction<S extends Snapshot>(
   const effects: Effect[] = [
     { to: 'all', message: { t: 'state', rev: next.rev, state: snapshot, cause } },
   ];
-  // Removing a player unseats whoever was holding that seat, so presence moved too.
-  if (seatsChanged(state.members, next.members)) {
+  // Removing or renaming a player changes what presence should show.
+  if (membersChanged(state.members, next.members)) {
     effects.push({ to: 'all', message: { t: 'room', room: roomView(next, ctx) } });
   }
   return { state: next, effects };
@@ -522,16 +522,26 @@ function reconcileSeats(
   snapshot: Snapshot,
   game: Game,
 ): Record<string, StoredMember> {
+  const players = new Map(playersIn(snapshot).map((p) => [p.id, p.name]));
   const seats = new Set(seatView[game](snapshot).playerIds);
+
   const next: Record<string, StoredMember> = {};
   for (const [id, member] of Object.entries(members)) {
-    next[id] = member.seatId && !seats.has(member.seatId) ? { ...member, seatId: null } : member;
+    if (member.seatId && !seats.has(member.seatId)) {
+      next[id] = { ...member, seatId: null };
+      continue;
+    }
+    // A seated member is shown under their player's name, so renaming the
+    // player renames them everywhere rather than leaving the two disagreeing.
+    const playerName = member.seatId ? players.get(member.seatId) : undefined;
+    next[id] = playerName && playerName !== member.name ? { ...member, name: playerName } : member;
   }
   return next;
 }
 
-const seatsChanged = (
+const membersChanged = (
   before: Record<string, StoredMember>,
   after: Record<string, StoredMember>,
 ): boolean =>
-  Object.keys(after).some((id) => before[id]?.seatId !== after[id]?.seatId);
+  Object.keys(after).some((id) =>
+    before[id]?.seatId !== after[id]?.seatId || before[id]?.name !== after[id]?.name);

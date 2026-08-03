@@ -108,6 +108,13 @@ export function permit(
     return known(game, type) ? ALLOW : deny('unknown-action');
   }
 
+  // Your own name is yours to set. The host can correct anyone's, which is
+  // needed for the people playing without a phone.
+  if (type === 'renamePlayer') {
+    if (!actor.seatId) return deny('not-your-seat');
+    return action.id === actor.seatId ? ALLOW : deny('not-your-seat');
+  }
+
   if (HOST_ONLY[game].includes(type)) return deny('host-only');
 
   if (type === 'undo' && SELF_UNDO[game]) {
@@ -126,6 +133,7 @@ export function permit(
 const known = (game: Game, type: string): boolean =>
   HOST_ONLY[game].includes(type)
   || ON_YOUR_TURN[game].includes(type)
+  || type === 'renamePlayer'
   || (type === 'undo' && SELF_UNDO[game]);
 
 /** Convenience for the UI: may this actor take this kind of action right now? */

@@ -12,6 +12,7 @@ export type Action =
   | { type: 'recordRound'; winnerId: string; penalties: Record<string, number> }
   | { type: 'undo' }
   | { type: 'newGame' }
+  | { type: 'renamePlayer'; id: string; name: string }
   | { type: 'resetAll' };
 
 function apply(state: RummikubState, action: Action, uid: IdSource): RummikubState {
@@ -43,6 +44,15 @@ function apply(state: RummikubState, action: Action, uid: IdSource): RummikubSta
 
     case 'undo':
       return state.rounds.length ? { ...state, rounds: state.rounds.slice(0, -1) } : state;
+
+    case 'renamePlayer': {
+      const name = action.name.trim();
+      if (!name) return state;
+      return {
+        ...state,
+        players: state.players.map((p) => (p.id === action.id ? { ...p, name } : p)),
+      };
+    }
 
     case 'newGame':
       return { ...state, rounds: [] };

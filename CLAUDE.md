@@ -99,6 +99,10 @@ it fail first.
 - **pnpm 11 blocks dependency build scripts.** `pnpm-workspace.yaml` has `allowBuilds: esbuild`.
   Without it install exits non-zero, which breaks `test` and `typecheck` too, since pnpm re-runs
   install before every script. The old `onlyBuiltDependencies` key is silently ignored.
+- **A deploy does not reach open tabs.** The app is precached, so the page keeps running the code
+  it loaded until it reloads. `UpdatePrompt` offers that; the service worker waits for the tap
+  rather than swapping silently. When something new "does not work", check the client is current
+  before debugging it - that has been the answer twice.
 - **Icons are committed.** Regenerate with `pnpm icons` after changing the artwork; nothing
   rasterises at build time.
 - **CI does not gate deployment.** Cloudflare Pages builds from the repo independently, so a red
