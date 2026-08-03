@@ -7,6 +7,7 @@
  * object-creation attack. Everything past this file is one room at a time.
  */
 import { mintCode, normaliseCode } from '../shared/rooms/codes';
+import { isAllowedOrigin, parseOrigins } from '../shared/rooms/origins';
 import { GAMES, type Game } from '../shared/rooms/protocol';
 
 export { Room } from './room';
@@ -23,8 +24,15 @@ interface RateLimit {
   limit(options: { key: string }): Promise<{ success: boolean }>;
 }
 
+/**
+ * Every Cloudflare Pages deployment gets its own subdomain, so previews need a
+ * wildcard or they cannot reach the room server at all. One label under this
+ * project only - `*.pages.dev` would admit every site on the platform.
+ */
 const DEFAULT_ORIGINS = [
   'https://games.abbondanzo.com',
+  'https://games-ccu.pages.dev',
+  'https://*.games-ccu.pages.dev',
   'http://localhost:5173',
   'http://localhost:4173',
 ];
@@ -32,17 +40,21 @@ const DEFAULT_ORIGINS = [
 /** How many codes to try before admitting defeat. Collisions are vanishingly rare. */
 const MINT_ATTEMPTS = 5;
 
-const allowedOrigins = (env: Env): string[] =>
-  env.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()) : DEFAULT_ORIGINS;
+const allowedOrigins = (env: Env): string[] => parseOrigins(env.ALLOWED_ORIGINS, DEFAULT_ORIGINS);
+
+const originAllowed = (request: Request, env: Env): boolean =>
+  isAllowedOrigin(request.headers.get('Origin') ?? '', allowedOrigins(env));
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get('Origin') ?? '';
-  if (!allowedOrigins(env).includes(origin)) return {};
+  // Vary regardless, or a cache could serve one origin's response to another.
+  if (!originAllowed(request, env)) return { vary: 'Origin' };
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-methods': 'GET, POST, OPTIONS',
     'access-control-allow-headers': 'content-type',
     'access-control-max-age': '86400',
+    vary: 'Origin',
   };
 }
 
@@ -80,8 +92,8 @@ export default {
     // rather than relying on the browser. Without this any site could open a
     // socket to a room using a token it had somehow seen.
     const origin = request.headers.get('Origin');
-    if (origin && !allowedOrigins(env).includes(origin)) {
-      return json({ error: 'forbidden' }, 403, {});
+    if (origin && !originAllowed(request, env)) {
+      return json({ error: 'forbidden' }, 403, { vary: 'Origin' });
     }
 
     const parts = url.pathname.split('/').filter(Boolean);

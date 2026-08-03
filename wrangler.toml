@@ -14,7 +14,9 @@ tag = "v1"
 new_sqlite_classes = ["Room"]
 
 [vars]
-ALLOWED_ORIGINS = "https://games.abbondanzo.com,https://games-ccu.pages.dev,http://localhost:5173,http://localhost:4173"
+# Pages gives every deployment its own subdomain, so previews need the wildcard.
+# One label under this project only; *.pages.dev would admit the whole platform.
+ALLOWED_ORIGINS = "https://games.abbondanzo.com,https://games-ccu.pages.dev,https://*.games-ccu.pages.dev,http://localhost:5173,http://localhost:4173"
 
 # Cloudflare's rate limiter. Joining is the one endpoint worth guarding: it is
 # where a guessed code would be tried.

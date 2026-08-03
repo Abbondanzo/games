@@ -76,7 +76,11 @@ sheet. The defences are proportionate.
 - **Tokens** are random and per member. No client message carries an identity;
   the room stamps it from the socket, so there is nothing to impersonate.
 - **Origin allowlist on the socket upgrade.** WebSocket upgrades bypass CORS, so
-  the room checks the origin itself.
+  the room checks the origin itself. The list allows a single leading `*.`
+  wildcard, because every Pages deployment gets its own subdomain and previews
+  would otherwise be locked out. It matches exactly one label under one project:
+  `*.pages.dev` would admit every site on the platform, and is not allowed.
+  Changing the list means redeploying the Worker.
 - **Every frame and every action payload is validated.** The protocol checks the
   frame; the game checks its own action, because only it knows what its actions
   carry.
