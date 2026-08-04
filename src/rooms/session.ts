@@ -10,8 +10,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   compareProtocol,
-  type ErrorCode, type Game, type GameAction, type Member, type PendingRound, type Role,
-  type Snapshot, type VersionGap,
+  type ErrorCode, type Game, type GameAction, type GoneReason, type Member, type PendingRound,
+  type Role, type Snapshot, type VersionGap,
 } from '@shared/rooms/protocol';
 import { can as canDo, seatView } from '@shared/rooms/permissions';
 import {
@@ -83,6 +83,11 @@ export interface GameSession<S, A> {
   room: RoomHandle | null;
   /** Called when the room refuses an action, so entry state can be put back. */
   onReject: (handler: (action: A, code: ErrorCode) => void) => void;
+  /**
+   * Set once the room this device was following has gone, so the tracker can
+   * say what happened rather than silently turning back into a solo game.
+   */
+  gone: GoneReason | null;
 }
 
 let requestCounter = 0;
@@ -120,6 +125,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
   const [inFlightCount, setInFlight] = useState(0);
   const [outdated, setOutdated] = useState<VersionGap | null>(null);
   const [pending, setPending] = useState<PendingRound | null>(null);
+  const [gone, setGone] = useState<GoneReason | null>(null);
 
   const transport = useRef<Transport | null>(null);
   const rev = useRef(0);
@@ -127,6 +133,12 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
   const stateRef = useRef<S>(initialState);
   const inFlight = useRef(new Map<string, A>());
   const rejectHandler = useRef<(action: A, code: ErrorCode) => void>(() => {});
+  /**
+   * Set when this device is the one walking out. The room closes the socket
+   * behind a member who leaves, and that close looks exactly like being
+   * removed; nobody needs telling about a door they shut themselves.
+   */
+  const walkingOut = useRef(false);
 
   // Read in the close handler, which cannot see the render's state.
   stateRef.current = state;
@@ -139,6 +151,22 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       // Storage can be unavailable; nothing more to do.
     }
   }, [storeKey]);
+
+  /**
+   * Stop following the room and go back to playing alone.
+   *
+   * Who keeps the game matters. The host started the room from a game that was
+   * already theirs, so it carries on here. For everyone else the room's game
+   * belongs to the host, and their own save has to be put back first: the solo
+   * persist effect fires as soon as the session clears, and would otherwise
+   * write the room's game straight over the top of it.
+   */
+  const stopFollowing = useCallback((keepTheRoomsGame: boolean) => {
+    if (keepTheRoomsGame) keepLocally();
+    else rawDispatch({ type: '__snapshot', state: readStored() ?? initialState });
+    clearSession(game);
+    setSession(null);
+  }, [game, keepLocally, readStored, initialState]);
 
   /* ── solo: persist exactly as before ── */
   useEffect(() => {
@@ -161,6 +189,13 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       token: session.token,
       handlers: {
         onStatus: setStatus,
+        // The room is gone rather than merely unreachable, which is the whole
+        // difference: this device must stop asking for it, now and next time.
+        onGone: (reason) => {
+          if (walkingOut.current) return;
+          stopFollowing(reason === 'ended' && roleRef.current === 'host');
+          setGone(reason);
+        },
         onMessage: (message) => {
           switch (message.t) {
             case 'welcome':
@@ -207,16 +242,15 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
             }
 
             case 'kicked':
-              clearSession(game);
-              setSession(null);
+              stopFollowing(false);
+              setGone('removed');
               break;
 
             case 'closed':
               // The host started this game and has just stopped sharing it, so
               // it carries on here rather than disappearing with the room.
-              if (roleRef.current === 'host') keepLocally();
-              clearSession(game);
-              setSession(null);
+              stopFollowing(roleRef.current === 'host');
+              setGone('ended');
               break;
           }
         },
@@ -228,7 +262,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       conn.close();
       transport.current = null;
     };
-  }, [session, game, options.transport, overrides.transport]);
+  }, [session, game, options.transport, overrides.transport, stopFollowing]);
 
   const dispatch = useCallback(
     (action: A) => {
@@ -276,12 +310,9 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       leave: () => {
         // A host has no way out that is not closing the room.
         if (role === 'host') return;
+        walkingOut.current = true;
         transport.current?.send({ t: 'leave', reqId: nextRequestId() });
-        // Put this device's own game back before the solo save is written, or
-        // the room's game would be written straight over the top of it.
-        rawDispatch({ type: '__snapshot', state: readStored() ?? initialState });
-        clearSession(game);
-        setSession(null);
+        stopFollowing(false);
       },
       close: () => transport.current?.send({ t: 'closeRoom', reqId: nextRequestId() }),
       openRound: (winnerId) =>
@@ -291,9 +322,9 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       cancelRound: () => transport.current?.send({ t: 'roundCancel', reqId: nextRequestId() }),
     };
   }, [session, game, state, role, seatId, members, locked, pending, status, inFlightCount,
-      lastError, outdated, readStored, initialState]);
+      lastError, outdated, stopFollowing]);
 
-  return { state, dispatch, room, onReject };
+  return { state, dispatch, room, onReject, gone };
 }
 
 /** Called after create or join to attach this tab to a room. */

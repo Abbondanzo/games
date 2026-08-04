@@ -7,15 +7,15 @@ import { OpenRound } from './components/OpenRound';
 import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
 import { RoomBar } from '../rooms/RoomBar';
+import { RoomNotices } from '../rooms/RoomNotices';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
-import { describeError } from '@shared/rooms/protocol';
 
 const describeGame = (s: { players: unknown[]; rounds: unknown[] }) =>
   summarise([[s.players.length, 'player'], [s.rounds.length, 'round']]);
 
 export function RummikubTracker() {
-  const { state, dispatch, room } = useRummikub();
+  const { state, dispatch, room, gone } = useRummikub();
   const isHost = !room || room.role === 'host';
   const rows = standings(state.players, state.rounds);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
@@ -92,9 +92,7 @@ export function RummikubTracker() {
               room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
           />
         )}
-        {room?.lastError && (
-          <div className="banner warn" role="status">{describeError(room.lastError)}</div>
-        )}
+        <RoomNotices lastError={room?.lastError} gone={gone} />
 
         <PlayersCard
           players={state.players}

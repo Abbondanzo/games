@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ERROR_CODES, ERROR_MESSAGES, MAX_FRAME_BYTES, PROTOCOL_VERSION, VERSION_MESSAGES,
+  CLOSE, ERROR_CODES, ERROR_MESSAGES, GONE_BY_CODE, GONE_MESSAGES,
+  MAX_FRAME_BYTES, PROTOCOL_VERSION, VERSION_MESSAGES,
   compareProtocol,
   type ClientMessage, type ServerMessage,
   decodeClientMessage, decodeServerMessage, encode,
@@ -152,6 +153,48 @@ describe('player-facing copy', () => {
   it('reads as sentences', () => {
     for (const [code, message] of Object.entries(ERROR_MESSAGES)) {
       expect(message, code).toMatch(/^[A-Z].*[.!]$/);
+    }
+  });
+
+  it('explains every way a room can end, in the same plain words', () => {
+    const JARGON = /\b(http|websocket|socket|close|code|token|unauthorised|server|\d{3})\b/i;
+    for (const reason of Object.keys(CLOSE)) {
+      const message = GONE_MESSAGES[reason as keyof typeof CLOSE];
+      expect(message, reason).toBeTruthy();
+      expect(message, reason).not.toMatch(JARGON);
+      expect(message, reason).toMatch(/^[A-Z].*[.!]$/);
+    }
+  });
+});
+
+/**
+ * A browser gives the client a number and nothing else, so the number is the
+ * whole message. These have to stay inside the range reserved for applications,
+ * and stay distinct, or two different endings would read as one.
+ */
+describe('close codes', () => {
+  it('are all in the range an application may use', () => {
+    for (const code of Object.values(CLOSE)) {
+      expect(code).toBeGreaterThanOrEqual(4000);
+      expect(code).toBeLessThanOrEqual(4999);
+    }
+  });
+
+  it('are distinct', () => {
+    const codes = Object.values(CLOSE);
+    expect(new Set(codes).size).toBe(codes.length);
+  });
+
+  it('read back to the reason they were sent for', () => {
+    for (const [reason, code] of Object.entries(CLOSE)) {
+      expect(GONE_BY_CODE[code]).toBe(reason);
+    }
+  });
+
+  // 1006 is what a browser reports for a socket that failed with no explanation.
+  it('do not claim an ordinary disconnection means the room is gone', () => {
+    for (const code of [1000, 1001, 1006, 1011]) {
+      expect(GONE_BY_CODE[code]).toBeUndefined();
     }
   });
 });

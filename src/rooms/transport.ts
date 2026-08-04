@@ -5,13 +5,21 @@
  * can wire several clients to one real room in-process and drive the whole
  * protocol without a network.
  */
-import { decodeServerMessage, encode, type ClientMessage, type ServerMessage } from '@shared/rooms/protocol';
+import {
+  GONE_BY_CODE, decodeServerMessage, encode,
+  type ClientMessage, type GoneReason, type ServerMessage,
+} from '@shared/rooms/protocol';
 
 export type ConnectionStatus = 'connecting' | 'open' | 'offline';
 
 export interface TransportHandlers {
   onMessage: (message: ServerMessage) => void;
   onStatus: (status: ConnectionStatus) => void;
+  /**
+   * The room will not have this device back. Nothing here retries afterwards,
+   * and the caller is expected to forget the room rather than offer it again.
+   */
+  onGone: (reason: GoneReason) => void;
 }
 
 export interface Transport {
@@ -31,6 +39,15 @@ export type TransportFactory = (options: TransportOptions) => Transport;
 /** Backoff is capped so a long outage does not leave someone waiting minutes. */
 const MAX_RETRY_MS = 15_000;
 const BASE_RETRY_MS = 500;
+
+/**
+ * Retrying stops after about a minute of failures. Not every reason a socket
+ * will not open can be explained - an old room still refuses the upgrade
+ * outright, and there the client sees nothing it can read - so the loop needs
+ * an end of its own, or the app sits there flickering between trying and
+ * failing. Coming back to the tab, or the network returning, starts it again.
+ */
+const MAX_ATTEMPTS = 8;
 
 export const webSocketTransport: TransportFactory = ({ baseUrl, code, token, handlers }) => {
   let socket: WebSocket | null = null;
@@ -67,8 +84,14 @@ export const webSocketTransport: TransportFactory = ({ baseUrl, code, token, han
     ws.onclose = (event) => {
       if (closed) return;
       handlers.onStatus('offline');
-      // 4001 unauthorised, 4003 removed: retrying will not help.
-      if (event.code === 4001 || event.code === 4003) return;
+
+      // The room said why. Retrying cannot change any of those answers.
+      const reason = GONE_BY_CODE[event.code];
+      if (reason) {
+        closed = true;
+        handlers.onGone(reason);
+        return;
+      }
       schedule();
     };
 
@@ -77,6 +100,7 @@ export const webSocketTransport: TransportFactory = ({ baseUrl, code, token, han
 
   function schedule() {
     if (timer) clearTimeout(timer);
+    if (attempt >= MAX_ATTEMPTS) return;
     // Jitter, so a room full of phones does not reconnect in lockstep.
     const delay = Math.min(BASE_RETRY_MS * 2 ** attempt, MAX_RETRY_MS) * (0.7 + Math.random() * 0.6);
     attempt += 1;
