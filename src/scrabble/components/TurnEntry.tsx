@@ -10,6 +10,7 @@ import {
   tilesFromWord,
   turnTotal,
 } from '@shared/games/scrabble/scoring';
+import { WhoseTurn, turnTone } from '../../rooms/WhoseTurn';
 import { runLookup, type LookupView } from '../lib/lookupView';
 import { TileRow } from './TileRow';
 import { ValidityBar } from './ValidityBar';
@@ -42,14 +43,7 @@ export function TurnEntry({
   const [check, setCheck] = useState<LookupView>(IDLE);
   const word = draftWord(draft);
 
-  // Null off a solo game, where there is only one person and nothing to say.
-  const turnState = yourTurn === null || !currentPlayer ? '' : yourTurn ? 'yours' : 'theirs';
-
-  let whoseTurn: JSX.Element | string;
-  if (!currentPlayer) whoseTurn = 'Add a player to start scoring';
-  else if (turnState === 'yours') whoseTurn = <b>Your turn</b>;
-  else if (turnState === 'theirs') whoseTurn = <>Waiting for <b>{currentPlayer.name}</b></>;
-  else whoseTurn = <>Now playing: <b>{currentPlayer.name}</b></>;
+  const tone = turnTone(currentPlayer?.name ?? null, yourTurn);
 
   const patch = (changes: Partial<Draft>) => setDraft((d) => ({ ...d, ...changes }));
 
@@ -99,12 +93,16 @@ export function TurnEntry({
   }
 
   return (
-    <section className={`card${turnState ? ` entry ${turnState}` : ''}`}>
+    <section className={`card${tone ? ` entry ${tone}` : ''}`}>
       <div className="card-head">
         <h2>Turn <span className="muted">#{turnNumber}</span></h2>
-        <div className={`whose-turn${turnState ? ` ${turnState}` : ''}`} role="status">
-          {whoseTurn}
-        </div>
+        <WhoseTurn
+          name={currentPlayer?.name ?? null}
+          yours={yourTurn}
+          nowPlaying="Now playing"
+          yoursLabel="Your turn"
+          empty="Add a player to start scoring"
+        />
       </div>
 
       <form onSubmit={submit}>

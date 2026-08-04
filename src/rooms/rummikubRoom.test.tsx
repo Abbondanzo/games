@@ -240,6 +240,60 @@ describe('scoring the round', () => {
   });
 });
 
+/**
+ * Rummikub gives a guest no game actions at all: rounds are collective, so
+ * everything that changes the game is the host's, and a guest takes part by
+ * sending their own rack. So none of the host's controls should be on offer.
+ */
+describe('controls a Rummikub guest may not use', () => {
+  it('does not offer undo, which only the host may do here', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('rummikub');
+    const guestSession = room.addMember('Grace');
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(scores(guest)).toHaveLength(2));
+    await collect(user, host, 'Host');
+    await user.click(within(host).getByRole('button', { name: /Score round/ }));
+
+    await waitFor(() =>
+      expect(within(host).getByRole('button', { name: 'Undo last' })).toBeInTheDocument());
+    expect(within(guest).queryByRole('button', { name: 'Undo last' })).not.toBeInTheDocument();
+  });
+
+  it('does not offer a guest the roster or the game controls', async () => {
+    const room = createTestRoom('rummikub');
+    const guestSession = room.addMember('Grace');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(scores(guest)).toHaveLength(2));
+    expect(within(guest).queryByLabelText('Player name')).not.toBeInTheDocument();
+    expect(within(guest).queryByRole('button', { name: 'New game' })).not.toBeInTheDocument();
+    expect(within(guest).queryByRole('button', { name: 'Reset all' })).not.toBeInTheDocument();
+  });
+
+  it('marks which row on the board is you', async () => {
+    const room = createTestRoom('rummikub');
+    const guestSession = room.addMember('Grace');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(scores(guest)).toHaveLength(2));
+    const mine = within(guest).getAllByRole('listitem').find((li) => li.querySelector('.you'));
+    expect(mine).toHaveTextContent('Grace');
+  });
+
+  it('leaves the host every one of them', async () => {
+    const room = createTestRoom('rummikub');
+    room.addMember('Grace');
+    const host = mount(room, room.hostSession, 'host');
+
+    await waitFor(() => expect(scores(host)).toHaveLength(2));
+    expect(within(host).getByLabelText('Player name')).toBeInTheDocument();
+    expect(within(host).getByRole('button', { name: 'New game' })).toBeInTheDocument();
+  });
+});
+
 /** The room path must not have disturbed the game people play on their own. */
 describe('playing Rummikub alone', () => {
   const solo = () => {

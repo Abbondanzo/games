@@ -191,6 +191,12 @@ input[type='text'], input[type='number'], select {
 
 /* A row nobody may reassign is text, not a button that would only refuse. */
 .scoreboard-row.static { cursor: default; }
+.player-head.static { cursor: default; }
+.cricket-board th.mine .name { color: var(--accent); }
+.cricket-board .you {
+  display: block; font-size: .62rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--accent); font-weight: 600;
+}
 
 /* ── letter tiles ── */
 .tiles { display: flex; flex-wrap: wrap; gap: .35rem; margin: .75rem 0 0; }

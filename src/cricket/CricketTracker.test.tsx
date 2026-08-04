@@ -56,6 +56,12 @@ async function playTurn(user: User, ...throws: Throw[]) {
 
 const missTurn = (user: User) => playTurn(user, ['Single', 'Miss'], ['Single', 'Miss'], ['Single', 'Miss']);
 
+/**
+ * The win banner. The turn header is also a live region, so that whoever is
+ * throwing is told when it becomes their turn.
+ */
+const banner = () => screen.queryAllByRole('status').find((el) => el.classList.contains('banner'));
+
 describe('setup', () => {
   it('shows the seven targets and a points row', async () => {
     const user = setup();
@@ -286,7 +292,7 @@ describe('winning', () => {
     await addPlayers(user, 'Ada, Grace');
     await adaClosesOut(user);
 
-    expect(screen.getByRole('status')).toHaveTextContent('Ada wins');
+    expect(banner()).toHaveTextContent('Ada wins');
     // Entry is locked: no more darts can be thrown.
     expect(screen.getByRole('button', { name: 'Miss' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Triple' })).toBeDisabled();
@@ -299,7 +305,7 @@ describe('winning', () => {
 
     cleanup();
     render(<Router><CricketTracker /></Router>);
-    expect(screen.getByRole('status')).toHaveTextContent('Ada wins');
+    expect(banner()).toHaveTextContent('Ada wins');
   });
 
   it('withholds the win from a player who closes out while behind', async () => {
@@ -319,7 +325,7 @@ describe('winning', () => {
     }
     await playTurn(user, ['Triple', 'Double Bull'], ['Single', 'Single Bull']);
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(banner()).toBeUndefined();
     expect(pointsFor(0)).toBe('0');
     expect(pointsFor(1)).toBe('60');
   });
@@ -416,7 +422,7 @@ describe('no points mode', () => {
     await user.click(screen.getByRole('button', { name: 'No points' }));
     await adaClosesOut(user);
 
-    expect(screen.getByRole('status')).toHaveTextContent('First to close every target');
+    expect(banner()).toHaveTextContent('First to close every target');
   });
 
   it('hides the points figure from the throw preview', async () => {

@@ -20,13 +20,30 @@ Three top-level directories, split by what can run where:
 ```
 shared/     pure domain, imported by both the app and the Worker. No React, no DOM.
   ids.ts
-  games/<game>/   types.ts, rules, reducer.ts, schema.ts
-  rooms/          protocol.ts, permissions.ts, roomCore.ts, codes.ts, games/<game>.ts
+  games/players.ts  roster rules every game shares
+  games/<game>/     types.ts, rules, reducer.ts, schema.ts
+  rooms/            protocol.ts, permissions.ts, roomCore.ts, codes.ts
+  rooms/games/      adapter.ts (the one adapter), index.ts (the registry), <game>.ts
 src/        the React app
   <game>/   <Game>Tracker.tsx, components/, lib/use<Game>.ts (hook + storage)
-  shared/   Home.tsx, PlayersCard.tsx
+  rooms/    whoAmI.ts, RoomStrip.tsx, WhoseTurn.tsx, session.ts, transport.ts
+  shared/   Home.tsx, PlayersCard.tsx, localStore.ts
 worker/     the room server: a Cloudflare Worker with a Durable Object per room
 ```
+
+**Ask the shared helpers rather than working it out again.** Three trackers each
+deriving the same thing is how they drift, and the drift is always in the case nobody
+thought about:
+
+- `src/rooms/whoAmI.ts` - am I the host, is it my turn, which player am I, is this
+  control closed off (`blocked`) or not on offer at all (`allowed`). Every one has to
+  answer for a solo game where there is no room, which is the part that was going wrong.
+- `src/shared/localStore.ts` - guarded `localStorage`. It throws rather than returning
+  null when a browser has storage off, and nothing in a test run ever throws.
+- `shared/games/players.ts` - name parsing, renaming, and where the turn pointer goes
+  when a player leaves.
+- `shared/rooms/games/index.ts` - the one registry of games the room can run, imported
+  by the Worker and the test room. Adding a game means adding it here, once.
 
 Import shared code as `@shared/...`; the alias is declared in `tsconfig.app.json` and
 `vite.config.ts`. **Anything needed by both sides lives in `shared/` and is imported, never
@@ -60,6 +77,10 @@ an opponent for darts thrown before they existed.
   so a schema and its type cannot drift.
 - **Accessible names must be distinct.** Two buttons reading "Ada" is a bug; a UI test caught
   exactly that in Rummikub, hence `aria-label="Enter tiles for Ada"`.
+- **Hide what a person may never do; disable what they may not do yet.** A control whose only
+  answer is "only the host can do that" should not be on screen. One that will work when it is
+  their turn should be disabled and say so. `allowed` and `blocked` in `whoAmI.ts` are the two
+  halves of that.
 - **Player-facing copy carries no jargon** - no status codes, no networking terms. Enforced by a
   guard in `dictionary.test.ts`.
 

@@ -18,7 +18,8 @@ import {
   ROOMS_URL, webSocketTransport,
   type ConnectionStatus, type Transport, type TransportFactory,
 } from './transport';
-import { clearSession, readSession, writeSession, type StoredSession } from './storage';
+import { clearSession, readSession, type StoredSession } from './storage';
+import { writeJson } from '../shared/localStore';
 import { useRoomOverrides } from './RoomProvider';
 
 /** Applied internally when a room broadcast arrives. Never sent over the wire. */
@@ -145,11 +146,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
 
   /** Writes what the room last sent into this device's own save. */
   const keepLocally = useCallback(() => {
-    try {
-      localStorage.setItem(storeKey, JSON.stringify(stateRef.current));
-    } catch {
-      // Storage can be unavailable; nothing more to do.
-    }
+    writeJson(storeKey, stateRef.current);
   }, [storeKey]);
 
   /**
@@ -171,11 +168,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
   /* ── solo: persist exactly as before ── */
   useEffect(() => {
     if (session) return;
-    try {
-      localStorage.setItem(storeKey, JSON.stringify(state));
-    } catch {
-      // Storage can be unavailable (private browsing); the session still works.
-    }
+    writeJson(storeKey, state);
   }, [session, state, storeKey]);
 
   /* ── in a room: stay connected ── */
@@ -325,9 +318,4 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       lastError, outdated, stopFollowing]);
 
   return { state, dispatch, room, onReject, gone };
-}
-
-/** Called after create or join to attach this tab to a room. */
-export function enterRoom(session: StoredSession): void {
-  writeSession(session);
 }

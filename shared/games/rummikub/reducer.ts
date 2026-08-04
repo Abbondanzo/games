@@ -1,4 +1,5 @@
 import { createIdSource, type IdSource } from '../../ids';
+import { parseNames, renamedTo } from '../players';
 import type { Round, RummikubState } from './types';
 
 /** Ids are minted per module, so each game numbers its own. */
@@ -18,7 +19,7 @@ export type Action =
 function apply(state: RummikubState, action: Action, uid: IdSource): RummikubState {
   switch (action.type) {
     case 'addPlayers': {
-      const names = action.names.split(',').map((n) => n.trim()).filter(Boolean);
+      const names = parseNames(action.names);
       if (!names.length) return state;
       return { ...state, players: [...state.players, ...names.map((name) => ({ id: uid(), name }))] };
     }
@@ -49,12 +50,8 @@ function apply(state: RummikubState, action: Action, uid: IdSource): RummikubSta
       return state.rounds.length ? { ...state, rounds: state.rounds.slice(0, -1) } : state;
 
     case 'renamePlayer': {
-      const name = action.name.trim();
-      if (!name) return state;
-      return {
-        ...state,
-        players: state.players.map((p) => (p.id === action.id ? { ...p, name } : p)),
-      };
+      const players = renamedTo(state.players, action.id, action.name);
+      return players ? { ...state, players } : state;
     }
 
     case 'newGame':

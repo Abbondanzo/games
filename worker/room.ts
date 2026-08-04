@@ -12,12 +12,9 @@ import {
   type Effect, type RoomState,
 } from '../shared/rooms/roomCore';
 import { CLOSE, decodeClientMessage, encode, type Game } from '../shared/rooms/protocol';
-import { cricketApply, cricketInitialState } from '../shared/rooms/games/cricket';
-import { scrabbleApply, scrabbleInitialState } from '../shared/rooms/games/scrabble';
-import { rummikubApply, rummikubInitialState } from '../shared/rooms/games/rummikub';
+import { GAME_SETUP } from '../shared/rooms/games';
 import type { ApplyAction } from '../shared/rooms/roomCore';
 import type { Snapshot } from '../shared/rooms/protocol';
-import type { IdSource } from '../shared/ids';
 
 /** A room with no traffic at all for this long is deleted, freeing its code. */
 const IDLE_MS = 4 * 60 * 60 * 1000;
@@ -34,17 +31,6 @@ interface Attachment {
 }
 
 const uid = () => crypto.randomUUID();
-
-interface GameSetup {
-  initial: () => Snapshot;
-  apply: (uid: IdSource) => ApplyAction<Snapshot>;
-}
-
-const GAME_SETUP: Record<Game, GameSetup> = {
-  cricket: { initial: cricketInitialState, apply: cricketApply },
-  scrabble: { initial: scrabbleInitialState, apply: scrabbleApply },
-  rummikub: { initial: rummikubInitialState, apply: rummikubApply },
-};
 
 export class Room extends DurableObject {
   /**

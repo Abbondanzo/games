@@ -1,4 +1,5 @@
 import { createIdSource, type IdSource } from '../../ids';
+import { advance, indexAfterRemoval, parseNames, renamedTo } from '../players';
 import type { CricketState, Dart, Turn, Variant } from './types';
 
 /** Ids are minted per module, so each game numbers its own. */
@@ -23,12 +24,12 @@ export type Action =
   | { type: 'resetAll' };
 
 const nextIndex = (state: CricketState): number =>
-  state.players.length ? (state.currentIndex + 1) % state.players.length : 0;
+  advance(state.currentIndex, state.players.length);
 
 function apply(state: CricketState, action: Action, uid: IdSource): CricketState {
   switch (action.type) {
     case 'addPlayers': {
-      const names = action.names.split(',').map((n) => n.trim()).filter(Boolean);
+      const names = parseNames(action.names);
       if (!names.length) return state;
       // Stamping the join point keeps darts already thrown scored as they were.
       const joinedAtTurn = state.turns.length;
@@ -42,22 +43,11 @@ function apply(state: CricketState, action: Action, uid: IdSource): CricketState
       const removedAt = state.players.findIndex((p) => p.id === action.id);
       if (removedAt === -1) return state;
 
-      const players = state.players.filter((p) => p.id !== action.id);
-      const turns = state.turns.filter((t) => t.playerId !== action.id);
-      if (!players.length) return { ...state, players, turns, currentIndex: 0 };
-
-      // Keep the same player up, not the same seat number. If the player who
-      // was up is the one leaving, the next in order takes over.
-      const upNow = state.players[state.currentIndex]?.id;
-      const stillHere = upNow !== undefined && upNow !== action.id
-        ? players.findIndex((p) => p.id === upNow)
-        : -1;
-
       return {
         ...state,
-        players,
-        turns,
-        currentIndex: stillHere === -1 ? removedAt % players.length : stillHere,
+        players: state.players.filter((p) => p.id !== action.id),
+        turns: state.turns.filter((t) => t.playerId !== action.id),
+        currentIndex: indexAfterRemoval(state.players, state.currentIndex, action.id),
       };
     }
 
@@ -95,12 +85,8 @@ function apply(state: CricketState, action: Action, uid: IdSource): CricketState
     }
 
     case 'renamePlayer': {
-      const name = action.name.trim();
-      if (!name) return state;
-      return {
-        ...state,
-        players: state.players.map((p) => (p.id === action.id ? { ...p, name } : p)),
-      };
+      const players = renamedTo(state.players, action.id, action.name);
+      return players ? { ...state, players } : state;
     }
 
     case 'newGame':

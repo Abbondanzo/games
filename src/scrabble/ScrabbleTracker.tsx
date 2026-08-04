@@ -6,9 +6,8 @@ import { TurnEntry } from './components/TurnEntry';
 import { HistoryCard } from './components/HistoryCard';
 import { DictionaryDrawer } from './components/DictionaryDrawer';
 import { useGame } from './lib/useGame';
-import { RoomBar } from '../rooms/RoomBar';
-import { RoomNotices } from '../rooms/RoomNotices';
-import { allowed, blocked, isHost as amHost, isMyTurn, myName, renameSelf } from '../rooms/whoAmI';
+import { RoomStrip } from '../rooms/RoomStrip';
+import { allowed, blocked, isHost as amHost, isMyTurn } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/scoring';
@@ -98,15 +97,7 @@ export function ScrabbleTracker() {
       </header>
 
       <main>
-        {room && (
-          <RoomBar
-            room={room}
-            onLeave={room.leave}
-            myName={myName(room, state.players)}
-            onRename={renameSelf(room, dispatch)}
-          />
-        )}
-        <RoomNotices lastError={room?.lastError} gone={gone} />
+        <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />
 
         <PlayersCard
           players={state.players}

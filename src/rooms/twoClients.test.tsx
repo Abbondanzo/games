@@ -42,6 +42,9 @@ function mount(
 
 const board = (client: HTMLElement) => within(client).getByRole('table');
 
+/** The warning shown before sharing clears a game, not the turn header. */
+const warning = () => screen.queryAllByRole('status').find((el) => el.classList.contains('banner'));
+
 const marksOn = (client: HTMLElement, target: string, column: number) => {
   const row = within(board(client)).getAllByRole('row')
     .find((r) => r.querySelector('th')?.textContent?.startsWith(target))!;
@@ -49,7 +52,8 @@ const marksOn = (client: HTMLElement, target: string, column: number) => {
 };
 
 const players = (client: HTMLElement) =>
-  within(board(client)).getAllByRole('columnheader').slice(1).map((h) => h.textContent);
+  within(board(client)).getAllByRole('columnheader').slice(1)
+    .map((h) => h.querySelector('.name')?.textContent);
 
 async function addPlayers(user: User, client: HTMLElement, names: string) {
   await user.type(within(client).getByLabelText('Player name'), names);
@@ -109,7 +113,7 @@ describe('a host and a guest in one room', () => {
     await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
     // The host is up first, so they hand the turn to Grace.
     await user.click(within(host).getByTitle("Make it Grace's turn"));
-    await waitFor(() => expect(within(guest).getByText(/Now throwing/)).toHaveTextContent('Grace'));
+    await waitFor(() => expect(within(guest).getByText('Your throw')).toBeInTheDocument());
 
     await throwDart(user, guest, 'Triple', 'Triple 20');
     await user.click(within(guest).getByRole('button', { name: 'End turn' }));
@@ -131,7 +135,8 @@ describe('a host and a guest in one room', () => {
     await addPlayers(user, host, 'Ada');
     await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace', 'Ada']));
     await user.click(within(host).getByTitle("Make it Ada's turn"));
-    await waitFor(() => expect(within(guest).getByText(/Now throwing/)).toHaveTextContent('Ada'));
+    await waitFor(() =>
+      expect(within(guest).getByText(/Waiting for/)).toHaveTextContent('Ada'));
 
     // The controls are closed off rather than failing after the fact.
     expect(within(guest).getByRole('button', { name: 'Miss' })).toBeDisabled();
@@ -301,6 +306,82 @@ describe('a host and a guest in one room', () => {
  * The session is generic, so a second game is the test that it is not
  * accidentally shaped around cricket.
  */
+describe('controls a cricket guest may not use', () => {
+  it('does not offer the turn pointer, which is the host to move', async () => {
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
+    expect(within(host).getByTitle("Make it Grace's turn")).toBeInTheDocument();
+    // It used to be a button wired to nothing, which is worse than no button.
+    expect(within(guest).queryByTitle("Make it Grace's turn")).not.toBeInTheDocument();
+    expect(within(guest).queryByRole('button', { name: /Make it/ })).not.toBeInTheDocument();
+  });
+
+  it('still shows a guest every column of the board', async () => {
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
+  });
+
+  it('marks which column on the board is you', async () => {
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
+    const mine = within(board(guest)).getAllByRole('columnheader')
+      .find((h) => h.querySelector('.you'));
+    expect(mine).toHaveTextContent('Grace');
+  });
+
+  // Undo is not host-only in cricket: it is yours while the last turn is yours.
+  it('offers undo to whoever threw last, and nobody else', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
+    await user.click(within(host).getByTitle("Make it Grace's turn"));
+    await waitFor(() => expect(within(guest).getByText('Your throw')).toBeInTheDocument());
+
+    await throwDart(user, guest, 'Triple', 'Triple 20');
+    await user.click(within(guest).getByRole('button', { name: 'End turn' }));
+
+    await waitFor(() =>
+      expect(within(guest).getByRole('button', { name: /Undo/ })).toBeEnabled());
+
+    // The host throws, so the last turn on the board is no longer the guest's.
+    await throwDart(user, host, 'Triple', 'Triple 19');
+    await user.click(within(host).getByRole('button', { name: 'End turn' }));
+
+    await waitFor(() =>
+      expect(within(guest).getByRole('button', { name: /Undo/ })).toBeDisabled());
+  });
+
+  it('still lets a guest clear the darts in their own hand', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('cricket');
+    const guestSession = room.addMember('Grace');
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
+    await user.click(within(host).getByTitle("Make it Grace's turn"));
+    await waitFor(() => expect(within(guest).getByText('Your throw')).toBeInTheDocument());
+
+    await throwDart(user, guest, 'Triple', 'Triple 20');
+    // Nothing has been sent to the room yet, so taking it back is nobody's business.
+    expect(within(guest).getByRole('button', { name: /Undo/ })).toBeEnabled();
+  });
+});
+
 describe('a Scrabble room', () => {
   function mountScrabble(room: TestRoom, session: StoredSession, label: string): HTMLElement {
     const container = document.createElement('div');
@@ -408,7 +489,7 @@ describe('starting to share', () => {
     render(solo(<CricketTracker />));
     await user.click(screen.getByRole('button', { name: 'Share' }));
 
-    expect(screen.getByRole('status')).toHaveTextContent('2 players and 1 turn');
+    expect(warning()).toHaveTextContent('2 players and 1 turn');
     // The button says what it does, rather than hiding it in the small print.
     expect(screen.getByRole('button', { name: /Clear and start sharing/ })).toBeInTheDocument();
   });
@@ -420,7 +501,7 @@ describe('starting to share', () => {
 
     expect(screen.queryByText(/will be cleared/)).not.toBeInTheDocument();
     // No warning styling either, so an empty game is a plain first step.
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(warning()).toBeUndefined();
     expect(screen.getByRole('button', { name: /^Start sharing$/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Clear and/ })).not.toBeInTheDocument();
   });
@@ -437,8 +518,8 @@ describe('starting to share', () => {
     render(solo(<CricketTracker />));
     await user.click(screen.getByRole('button', { name: 'Share' }));
 
-    expect(screen.getByRole('status')).toHaveTextContent('1 player');
-    expect(screen.getByRole('status')).not.toHaveTextContent('turn');
+    expect(warning()).toHaveTextContent('1 player');
+    expect(warning()).not.toHaveTextContent('turn');
   });
 
   it('does nothing until the button is pressed', async () => {

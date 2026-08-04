@@ -159,6 +159,10 @@ export interface Standing {
   closedAll: boolean;
 }
 
+/** Marks a player has on the board, across every target. */
+export const totalMarks = (board: BoardState, playerId: string): number =>
+  TARGETS.reduce((sum, t) => sum + (board.marks[playerId]?.[t] ?? 0), 0);
+
 /** Players in rank order - best first, which flips for cut-throat. */
 export function standings(
   players: readonly Player[],
@@ -196,9 +200,6 @@ export function previewTurn(
     variant,
   );
 
-  const totalMarks = (b: typeof before) =>
-    TARGETS.reduce((sum, t) => sum + (b.marks[playerId]?.[t] ?? 0), 0);
-
   // In cut-throat the damage lands on opponents, so report what the throw dealt.
   const dealt = (b: typeof before) =>
     variant === 'cutthroat'
@@ -206,7 +207,7 @@ export function previewTurn(
       : (b.points[playerId] ?? 0);
 
   return {
-    marks: totalMarks(after) - totalMarks(before),
+    marks: totalMarks(after, playerId) - totalMarks(before, playerId),
     points: dealt(after) - dealt(before),
   };
 }

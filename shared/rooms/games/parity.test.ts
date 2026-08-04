@@ -226,7 +226,7 @@ describe('round-tripping a snapshot', () => {
     ]],
     ['scrabble', scrabbleStart, scrabbleApply, [
       { type: 'addPlayers', names: 'Ada, Grace' },
-      { type: 'recordPlay', words: [{ text: 'QI', score: 11 }], bingo: false },
+      { type: 'recordPlay', words: [{ word: 'QI', points: 11 }], bingo: false },
     ]],
     ['rummikub', rummikubStart, rummikubApply, [
       { type: 'addPlayers', names: 'Ada, Grace' },

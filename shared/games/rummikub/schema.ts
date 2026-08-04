@@ -13,7 +13,9 @@ const PenaltySchema = z.number().int().min(0).max(1000);
 export const RoundSchema = z.object({
   id: z.string(),
   winnerId: z.string(),
-  penalties: z.record(z.string(), z.number().finite()),
+  // The same bounds the wire accepts. A stored game is no more trustworthy than
+  // a frame off a socket, and a negative penalty would pay the loser.
+  penalties: z.record(z.string(), PenaltySchema),
 });
 
 const Id = z.string().min(1).max(64);

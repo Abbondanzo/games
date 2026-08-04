@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import type { Game } from '@shared/rooms/protocol';
 import { GameSchema } from '@shared/rooms/protocol';
+import { readJson, removeKey, writeJson } from '../shared/localStore';
 
 const SessionSchema = z.object({
   game: GameSchema,
@@ -22,44 +23,20 @@ export type StoredSession = z.infer<typeof SessionSchema>;
 const key = (game: Game) => `games.room.${game}.v1`;
 
 export function readSession(game: Game): StoredSession | null {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(key(game));
-  } catch {
-    return null;
-  }
-  if (!raw) return null;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-
-  const result = SessionSchema.safeParse(parsed);
-  return result.success && result.data.game === game ? result.data : null;
+  const stored = readJson(key(game), SessionSchema);
+  // A session filed under one game naming another is not one to act on.
+  return stored?.game === game ? stored : null;
 }
 
-export function writeSession(session: StoredSession): void {
-  try {
-    localStorage.setItem(key(session.game), JSON.stringify(session));
-  } catch {
-    // Storage can be unavailable; the room still works for this tab.
-  }
-}
+export const writeSession = (session: StoredSession): void =>
+  writeJson(key(session.game), session);
 
-export function clearSession(game: Game): void {
-  try {
-    localStorage.removeItem(key(game));
-  } catch {
-    // Nothing to do.
-  }
-}
+export const clearSession = (game: Game): void => removeKey(key(game));
 
 /** The name this device last played under, offered as the default next time. */
 const NAME_KEY = 'games.name.v1';
 
+/** A bare string rather than JSON, from before any of this was structured. */
 export function readName(): string {
   try {
     return localStorage.getItem(NAME_KEY)?.slice(0, 24) ?? '';

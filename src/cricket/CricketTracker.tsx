@@ -4,11 +4,10 @@ import { ArrowLeft, RotateCcw, Trash2, Trophy } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { CricketBoard } from './components/CricketBoard';
 import { DartEntry } from './components/DartEntry';
-import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from '@shared/games/cricket/rules';
+import { computeBoard, dartShorthand, previewTurn, standings, totalMarks } from '@shared/games/cricket/rules';
 import { useCricket } from './lib/useCricket';
-import { RoomBar } from '../rooms/RoomBar';
-import { RoomNotices } from '../rooms/RoomNotices';
-import { blocked, isHost as amHost, myName, renameSelf } from '../rooms/whoAmI';
+import { RoomStrip } from '../rooms/RoomStrip';
+import { allowed, blocked, isHost as amHost, isMyTurn } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import type { Dart, Variant } from '@shared/games/cricket/types';
@@ -40,6 +39,7 @@ export function CricketTracker() {
   const isHost = amHost(room);
 
   const currentPlayer = state.players[state.currentIndex] ?? null;
+  const yourTurn = isMyTurn(room, currentPlayer?.id ?? null);
 
   /**
    * The board includes the throw in progress, so marks appear as each dart is
@@ -83,7 +83,7 @@ export function CricketTracker() {
     const player = state.players.find((p) => p.id === id);
     if (!player) return;
 
-    const marks = TARGETS.reduce((sum, t) => sum + (board.marks[id]?.[t] ?? 0), 0);
+    const marks = totalMarks(board, id);
     const points = board.points[id] ?? 0;
 
     if (marks > 0 || points > 0) {
@@ -168,15 +168,7 @@ export function CricketTracker() {
       </header>
 
       <main>
-        {room && (
-          <RoomBar
-            room={room}
-            onLeave={room.leave}
-            myName={myName(room, state.players)}
-            onRename={renameSelf(room, dispatch)}
-          />
-        )}
-        <RoomNotices lastError={room?.lastError} gone={gone} />
+        <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />
 
         {winner && (
           <div className="banner win" role="status">
@@ -212,7 +204,9 @@ export function CricketTracker() {
             board={board}
             variant={state.variant}
             currentPlayerId={currentPlayer?.id ?? null}
-            onSelect={isHost ? selectPlayer : () => {}}
+            onSelect={selectPlayer}
+            selectable={isHost}
+            youId={room?.seatId ?? null}
           />
         </PlayersCard>
 
@@ -224,8 +218,11 @@ export function CricketTracker() {
           onChangeDarts={setDarts}
           onRecord={(thrown) => dispatch({ type: 'recordTurn', darts: thrown })}
           onUndo={undo}
-          canUndo={darts.length > 0 || state.turns.length > 0}
+          // Clearing the throw in your own hand is always yours to do. Taking
+          // back a turn already on the board is not, unless it was yours.
+          canUndo={darts.length > 0 || (state.turns.length > 0 && allowed(room, 'undo'))}
           disabled={Boolean(winner) || blocked(room, 'recordTurn')}
+          yourTurn={yourTurn}
         />
 
         <section className="card">

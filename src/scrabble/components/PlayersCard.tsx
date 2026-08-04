@@ -26,6 +26,9 @@ export function PlayersCard({
 }: Props) {
   const rows = standings(players, turns);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
+  // Somebody leads once a turn has been played, whatever the numbers are. An
+  // adjustment can put every total below zero, and there is still a leader.
+  const anyPlay = turns.length > 0;
 
   return (
     <SharedPlayersCard players={players} onAdd={onAdd} onRemove={onRemove} editable={editable}>
@@ -37,7 +40,7 @@ export function PlayersCard({
               <span className="rank">{i + 1}.</span>
               <span className="name">{row.player.name}</span>
               {isYou && <span className="you">you</span>}
-              {best > 0 && row.score === best && (
+              {anyPlay && row.score === best && (
                 <span className="leader">
                   <Crown size={13} aria-hidden="true" /> leading
                 </span>
@@ -47,7 +50,7 @@ export function PlayersCard({
                   {row.words} word{row.words === 1 ? '' : 's'} · avg {row.average}
                 </span>
               )}
-              <span className="pts">{row.score}</span>
+              <span className={`pts${row.score < 0 ? ' neg' : ''}`}>{row.score}</span>
             </>
           );
 

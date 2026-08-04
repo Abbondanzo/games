@@ -4,6 +4,7 @@ import type { BoardState } from '@shared/games/cricket/rules';
 import { DARTS_PER_TURN, TARGETS, dartShorthand, targetLabel } from '@shared/games/cricket/rules';
 import type { CricketTarget, Dart, Player } from '@shared/games/cricket/types';
 import { MarkGlyph } from './MarkGlyph';
+import { WhoseTurn, turnTone } from '../../rooms/WhoseTurn';
 
 interface Props {
   currentPlayer: Player | null;
@@ -16,6 +17,12 @@ interface Props {
   onUndo: () => void;
   canUndo: boolean;
   disabled: boolean;
+  /**
+   * Whether the turn on the board is this device's, or null when playing alone
+   * and the question does not arise. Everyone at the table is looking at their
+   * own phone, so a name alone makes each of them work out whether it is them.
+   */
+  yourTurn?: boolean | null;
 }
 
 type Ring = 1 | 2 | 3;
@@ -28,6 +35,7 @@ const RINGS: { value: Ring; label: string; short: string }[] = [
 
 export function DartEntry({
   currentPlayer, board, preview, darts, onChangeDarts, onRecord, onUndo, canUndo, disabled,
+  yourTurn = null,
 }: Props) {
   const [ring, setRing] = useState<Ring>(1);
 
@@ -52,16 +60,19 @@ export function DartEntry({
   }
 
   const slots = Array.from({ length: DARTS_PER_TURN }, (_, i) => darts[i]);
+  const tone = turnTone(currentPlayer?.name ?? null, yourTurn);
 
   return (
-    <section className="card">
+    <section className={`card${tone ? ` entry ${tone}` : ''}`}>
       <div className="card-head">
         <h2>Throw</h2>
-        <div className="whose-turn">
-          {currentPlayer
-            ? <>Now throwing: <b>{currentPlayer.name}</b></>
-            : 'Add a player to start scoring'}
-        </div>
+        <WhoseTurn
+          name={currentPlayer?.name ?? null}
+          yours={yourTurn}
+          nowPlaying="Now throwing"
+          yoursLabel="Your throw"
+          empty="Add a player to start scoring"
+        />
       </div>
 
       <div className="seg ring-seg" role="group" aria-label="Ring">

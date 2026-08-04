@@ -1,39 +1,19 @@
 /**
- * Cricket, as the room sees it.
- *
- * The room holds an opaque snapshot, so this is where it becomes a real game
- * state and a real action. Both are validated: the action because it came off a
- * socket, and the state because a room created by an older deploy may not match
- * the shape this code expects.
+ * Cricket, as the room sees it. The work is in `adapter.ts`; this names the
+ * pieces and keeps the exports each caller already imports.
  */
 import { createReducer, initialState, type Action } from '../../games/cricket/reducer';
 import { CricketStateSchema, CricketActionSchema } from '../../games/cricket/schema';
-import type { GameAction, Snapshot } from '../protocol';
-import type { ApplyAction } from '../roomCore';
-import type { IdSource } from '../../ids';
+import { roomGame } from './adapter';
 
-export function decodeCricketAction(action: GameAction): Action | null {
-  const result = CricketActionSchema.safeParse(action);
-  return result.success ? result.data : null;
-}
+const game = roomGame({
+  stateSchema: CricketStateSchema,
+  actionSchema: CricketActionSchema,
+  createReducer,
+  initialState,
+});
 
-export const cricketInitialState = (): Snapshot => initialState;
-
-/**
- * Binds the room's own id source, so ids are minted once by the authority
- * rather than by whichever client happened to act.
- */
-export function cricketApply(uid: IdSource): ApplyAction<Snapshot> {
-  const reducer = createReducer(uid);
-  return (snapshot, action) => {
-    const state = CricketStateSchema.safeParse(snapshot);
-    const decoded = decodeCricketAction(action);
-    if (!state.success || !decoded) return null;
-
-    const next = reducer(state.data, decoded);
-    // A reducer hands back its input untouched when it declines an action. The
-    // parse above made a fresh object, so return the original to keep that
-    // signal intact: the room detects a no-op by identity.
-    return next === state.data ? snapshot : next;
-  };
-}
+export const cricketInitialState = game.initial;
+export const cricketApply = game.apply;
+export const decodeCricketAction: (action: Parameters<typeof game.decode>[0]) => Action | null =
+  game.decode;

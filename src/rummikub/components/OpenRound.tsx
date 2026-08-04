@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Users } from 'lucide-react';
 import type { RoomHandle } from '../../rooms/session';
 import type { Player } from '@shared/games/rummikub/types';
+import { WinnerPick } from './WinnerPick';
 
 interface Props {
   players: Player[];
@@ -40,22 +41,7 @@ export function OpenRound({ players, roundNumber, room }: Props) {
     <section className="card">
       <div className="card-head"><h2>Round <span className="muted">#{roundNumber}</span></h2></div>
 
-      <fieldset className="winner-pick">
-        <legend>Who went out?</legend>
-        <div className="seg wrap">
-          {players.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={winnerId === p.id ? 'on' : undefined}
-              aria-pressed={winnerId === p.id}
-              onClick={() => setWinnerId(p.id)}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <WinnerPick players={players} value={winnerId} onPick={setWinnerId} />
 
       <div className="total-row">
         <div className="total-actions">

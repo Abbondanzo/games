@@ -1,4 +1,5 @@
 import { createIdSource, type IdSource } from '../../ids';
+import { advance, indexAfterRemoval, parseNames, renamedTo } from '../players';
 import type { GameState, ScoredWord, Turn } from './types';
 import { BINGO_BONUS } from './scoring';
 
@@ -20,13 +21,12 @@ export type Action =
   | { type: 'resetAll' };
 
 const nextIndex = (state: GameState): number =>
-  state.players.length ? (state.currentIndex + 1) % state.players.length : 0;
+  advance(state.currentIndex, state.players.length);
 
 function apply(state: GameState, action: Action, uid: IdSource): GameState {
   switch (action.type) {
     case 'addPlayers': {
-      // "Ada, Grace" adds both - pasting a list is the fastest way to set up.
-      const names = action.names.split(',').map((n) => n.trim()).filter(Boolean);
+      const names = parseNames(action.names);
       if (!names.length) return state;
       return { ...state, players: [...state.players, ...names.map((name) => ({ id: uid(), name }))] };
     }
@@ -35,22 +35,10 @@ function apply(state: GameState, action: Action, uid: IdSource): GameState {
       const removedAt = state.players.findIndex((p) => p.id === action.id);
       if (removedAt === -1) return state;
 
-      const players = state.players.filter((p) => p.id !== action.id);
-      const turns = state.turns.filter((t) => t.playerId !== action.id);
-      if (!players.length) return { players, turns, currentIndex: 0 };
-
-      // Keep the same player up, not the same seat number. If the player who
-      // was up is the one leaving, the next in order takes over - which is the
-      // removed player's own index once everyone after them shifts down.
-      const upNow = state.players[state.currentIndex]?.id;
-      const stillHere = upNow !== undefined && upNow !== action.id
-        ? players.findIndex((p) => p.id === upNow)
-        : -1;
-
       return {
-        players,
-        turns,
-        currentIndex: stillHere === -1 ? removedAt % players.length : stillHere,
+        players: state.players.filter((p) => p.id !== action.id),
+        turns: state.turns.filter((t) => t.playerId !== action.id),
+        currentIndex: indexAfterRemoval(state.players, state.currentIndex, action.id),
       };
     }
 
@@ -110,12 +98,8 @@ function apply(state: GameState, action: Action, uid: IdSource): GameState {
     }
 
     case 'renamePlayer': {
-      const name = action.name.trim();
-      if (!name) return state;
-      return {
-        ...state,
-        players: state.players.map((p) => (p.id === action.id ? { ...p, name } : p)),
-      };
+      const players = renamedTo(state.players, action.id, action.name);
+      return players ? { ...state, players } : state;
     }
 
     case 'newGame':

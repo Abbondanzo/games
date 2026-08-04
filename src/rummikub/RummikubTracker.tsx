@@ -6,9 +6,8 @@ import { RackCollection } from './components/RackCollection';
 import { OpenRound } from './components/OpenRound';
 import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
-import { RoomBar } from '../rooms/RoomBar';
-import { RoomNotices } from '../rooms/RoomNotices';
-import { isHost as amHost, myName, renameSelf } from '../rooms/whoAmI';
+import { RoomStrip } from '../rooms/RoomStrip';
+import { allowed, isHost as amHost, mySeat } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 
@@ -21,6 +20,7 @@ export function RummikubTracker() {
   const rows = standings(state.players, state.rounds);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
   const name = (id: string) => state.players.find((p) => p.id === id)?.name ?? '-';
+  const you = mySeat(room, state.players);
 
   function removePlayer(id: string) {
     const player = state.players.find((p) => p.id === id);
@@ -84,15 +84,7 @@ export function RummikubTracker() {
       </header>
 
       <main>
-        {room && (
-          <RoomBar
-            room={room}
-            onLeave={room.leave}
-            myName={myName(room, state.players)}
-            onRename={renameSelf(room, dispatch)}
-          />
-        )}
-        <RoomNotices lastError={room?.lastError} gone={gone} />
+        <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />
 
         <PlayersCard
           players={state.players}
@@ -102,10 +94,11 @@ export function RummikubTracker() {
         >
           <ol className="scoreboard">
             {rows.map((row, i) => (
-              <li key={row.player.id}>
+              <li key={row.player.id} className={row.player.id === you?.id ? 'mine' : undefined}>
                 <div className="scoreboard-row static">
                   <span className="rank">{i + 1}.</span>
                   <span className="name">{row.player.name}</span>
+                  {row.player.id === you?.id && <span className="you">you</span>}
                   {state.rounds.length > 0 && row.score === best && (
                     <span className="leader">
                       <Crown size={13} aria-hidden="true" /> leading
@@ -146,7 +139,7 @@ export function RummikubTracker() {
         <section className="card">
           <div className="card-head">
             <h2>History</h2>
-            {state.rounds.length > 0 && (
+            {state.rounds.length > 0 && allowed(room, 'undo') && (
               <button type="button" className="link" onClick={() => dispatch({ type: 'undo' })}>
                 Undo last
               </button>
