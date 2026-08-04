@@ -2,6 +2,7 @@ import { Copy, DoorOpen, Lock, LockOpen, Pencil, PowerOff, UserX, Users } from '
 import { useState, type FormEvent } from 'react';
 import { VERSION_MESSAGES } from '@shared/rooms/protocol';
 import type { RoomHandle } from './session';
+import { writeName } from './storage';
 
 /**
  * The room, as a strip under the top bar: who is here, what your part is, and
@@ -24,7 +25,13 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
   function submitName(event: FormEvent) {
     event.preventDefault();
     const wanted = draftName.trim();
-    if (wanted && wanted !== myName) onRename(wanted);
+    if (wanted && wanted !== myName) {
+      onRename(wanted);
+      // Correcting your name here is the last word on what to call yourself, so
+      // it becomes the default for the next room rather than the name you
+      // arrived under.
+      writeName(wanted);
+    }
     setRenaming(false);
   }
 
