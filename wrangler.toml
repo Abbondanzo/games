@@ -14,11 +14,12 @@ tag = "v1"
 new_sqlite_classes = ["Room"]
 
 [vars]
-# Only the two origins that serve the live site. Previews used to be allowed
-# here through a wildcard, but they have a room server of their own now: a
-# branch is free to change the protocol, and a real game should not be the
-# thing that finds out.
-ALLOWED_ORIGINS = "https://games.abbondanzo.com,https://games-ccu.pages.dev"
+# Staging is a preview *version* of this Worker rather than a Worker of its own,
+# and a version carries these same vars, so this one list has to admit both the
+# live site and the previews that talk to the staging alias. Every Pages
+# deployment gets its own subdomain, hence the wildcard: one label under this
+# project only, since *.pages.dev would admit the whole platform.
+ALLOWED_ORIGINS = "https://games.abbondanzo.com,https://games-ccu.pages.dev,https://*.games-ccu.pages.dev"
 
 # Cloudflare's rate limiter. Joining is the one endpoint worth guarding: it is
 # where a guessed code would be tried.

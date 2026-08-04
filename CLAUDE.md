@@ -139,13 +139,16 @@ it fail first.
 - **There are two room servers, chosen by origin.** Only `games.abbondanzo.com` and
   `games-ccu.pages.dev` reach production; previews and local dev reach `games-rooms-preview`.
   `roomsUrlFor` decides it at runtime from the page's own origin, so there is no build variable
-  to forget. Deploy staging with `pnpm worker:deploy:staging` before opening a pull request that
-  changes the protocol, or its preview has nothing that speaks it.
-- **A Workers Builds project deploys the Worker it is connected to.** Giving the `games-rooms`
-  project a non-production deploy command of `wrangler deploy --env preview` does not publish
-  `games-rooms-preview`; it overrides the name and publishes the branch to production with
-  staging's variables, which stops the live site reaching its own rooms. Staging needs a Workers
-  Builds project of its own. Tried and reverted; see `docs/deployment.md`.
+  to forget. Staging is the `staging` preview alias of `games-rooms`, put up by every branch
+  push, so a protocol change has a room that speaks it.
+- **Staging shares production's rooms.** A preview alias is a version of the same Worker, so the
+  Durable Objects, the variables and the rate limit are production's. Fine for trying a change;
+  not a sandbox. A branch that changes the shape of a snapshot is writing into storage the live
+  site reads.
+- **A Workers Builds project deploys the Worker it is connected to.** `wrangler deploy --env
+  preview` from the `games-rooms` project does not publish `games-rooms-preview`; it overrides
+  the name and publishes the branch to production with staging's variables, which stops the live
+  site reaching its own rooms. Tried and reverted; see `docs/deployment.md`.
 - **The room is the authority, not the host.** Clients send requests and render
   what comes back; only the room runs a reducer. A guest gets no optimistic update, because it
   cannot mint the same ids.

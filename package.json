@@ -17,6 +17,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "worker:dev": "wrangler dev --env preview --port 8787",
     "worker:deploy": "wrangler deploy",
+    "worker:upload:staging": "wrangler versions upload --preview-alias staging",
     "worker:deploy:staging": "wrangler deploy --env preview"
   },
   "dependencies": {

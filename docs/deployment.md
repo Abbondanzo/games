@@ -37,26 +37,30 @@ integration does:
 | --- | --- |
 | Build command | `pnpm install --frozen-lockfile` |
 | Deploy command | `pnpm worker:deploy` |
+| Non-production branch command | `pnpm worker:upload:staging` |
 | Root directory | the repo root, where `wrangler.toml` is |
-| Non-production branches | build, and **do not** deploy |
 
 The install step is needed because the Worker bundles zod and the shared library. Connecting it
 keeps API tokens out of the repo, which the GitHub Actions route would not.
 
-**A Workers Builds project deploys one Worker, and it is the one it is connected to.** Workers
-Builds offers a separate deploy command for non-production branches, and pointing it at
-`pnpm worker:deploy:staging` looks like an easy way to have branches publish staging. It is not:
-`wrangler deploy --env preview` asks for a Worker named `games-rooms-preview`, the build is bound
-to `games-rooms`, and the name is overridden rather than refused. The result is a branch's code
-published to **production**, carrying staging's variables - including an origin list with no
-`games.abbondanzo.com` in it, which stops the live site opening a room at all.
+**A Workers Builds project deploys one Worker, and it is the one it is connected to.** So a
+non-production branch cannot publish a *differently named* Worker from here. Pointing the
+non-production command at `wrangler deploy --env preview` does not publish `games-rooms-preview`:
+the name is overridden rather than refused, and the branch is published to **production** wearing
+staging's variables - including an origin list with no `games.abbondanzo.com` in it, which stops
+the live site opening a room at all. Tried, and reverted. If it happens again, recover with
+`pnpm worker:deploy` from a checkout of `main`.
 
-This was tried and reverted. If it is ever tried again, recover with `pnpm worker:deploy` from a
-checkout of `main`.
+What works instead is a **preview version** of the same Worker:
 
-So staging is deployed separately: by hand with `pnpm worker:deploy:staging`, or by connecting
-`games-rooms-preview` as its own Workers Builds project, which is the only way a build can
-publish it.
+```
+wrangler versions upload --preview-alias staging
+```
+
+A version is uploaded but takes no traffic, so production carries on serving what it was
+serving. The alias gives it a fixed address - `staging-games-rooms.abbondanzo.workers.dev` -
+which is what makes it usable as a target the client can name, since an unaliased version URL
+changes on every upload.
 
 ## Two room servers
 
@@ -72,30 +76,36 @@ runtime, not from a build variable. A variable that has to be set in a dashboard
 will eventually be missing, and the failure would be silent: a preview writing into somebody's
 real game. It is an allowlist, so an origin nobody anticipated gets staging, which is harmless.
 
-Staging is the `preview` environment in `wrangler.toml`, and a Worker of its own called
-`games-rooms-preview`. It has its own Durable Object storage, its own rate limit budget, and an
-origin list that admits previews and localhost but not the live site. Deploy it with:
-
-```
-pnpm worker:deploy:staging
-```
-
+Staging is the `staging` preview alias of `games-rooms`, refreshed by every branch push.
 `VITE_ROOMS_URL` still overrides everything, for pointing at a wrangler running locally.
 
-**A protocol change has somewhere to go.** Deploy staging, open the pull request, and the preview
-exercises the new protocol against a room server that speaks it, without touching production.
-Before staging existed a preview could only reach the live room server, so a preview of a
-protocol change was guaranteed to show a version mismatch and could not be tested at all.
+**A protocol change has somewhere to go.** Push the branch: the Pages preview and the staging
+version go up together, and the preview exercises the new protocol against a room server that
+speaks it, while production carries on unchanged. Before staging existed a preview could only
+reach the live room server, so a preview of a protocol change was guaranteed to show a version
+mismatch and could not be tested at all.
 
-To have that happen without remembering, connect `games-rooms-preview` to this repo as a second
-Workers Builds project - deploy command `pnpm worker:deploy:staging`, non-production branch
-deploys turned on - so every branch push refreshes it. That is a second project rather than a
-second command on the first, for the reason above: a build deploys the Worker it is bound to.
+**Staging is a version of production, not a copy of it.** That is the price of the alias, and it
+is worth knowing exactly:
 
-**Staging is shared, and holds whatever was pushed last.** With one pull request in flight that
-is invisible; with two, the second takes staging away from the first. Per-branch room servers
-would need the Pages preview to discover its own branch's Worker URL at build time, which it has
-no way to do.
+- **The rooms are the same rooms.** Durable Objects belong to the Worker, and a version is the
+  same Worker, so a room made from a preview lives in the same storage as a real game and runs
+  the branch's Durable Object code. Codes are random and rooms expire after four hours, so a
+  collision is unlikely rather than impossible - but a branch that changes the shape of a
+  snapshot is writing into storage the live site reads.
+- **The variables are the same variables**, which is why `ALLOWED_ORIGINS` above has to admit
+  previews as well as the live site. Narrowing it to the live site would leave the preview unable
+  to reach its own staging alias.
+- **The rate limit budget is the same budget.**
+
+The `preview` environment in `wrangler.toml` still exists and is genuinely separate on all three
+counts. `pnpm worker:deploy:staging` publishes it, and `pnpm worker:dev` runs it locally, which
+is what admits a localhost origin. Connecting `games-rooms-preview` as its own Workers Builds
+project is the way to get that isolation automatically, at the cost of a second project and a
+second build on every push.
+
+**Staging holds whatever was pushed last.** With one pull request in flight that is invisible;
+with two, the second takes staging away from the first.
 
 **Both auto-deploying means they race**, on `main`. If Pages wins, new clients briefly talk to an old room.
 That is worth knowing but not worth avoiding: the app is precached, so some clients are stale
