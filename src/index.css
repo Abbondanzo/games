@@ -556,3 +556,9 @@ button.ghost, button.primary, button.link {
   box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
   font-size: .85rem;
 }
+
+.my-rack { margin: .75rem 0; padding: .75rem; background: var(--card-2); border-radius: 10px; }
+.my-rack-head { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .5rem; }
+.my-rack .rack-title { font-weight: 600; font-size: .9rem; }
+.my-rack .rack-total { width: 100%; margin: .5rem 0; text-align: left; }
+.my-rack .primary { margin-top: .6rem; width: 100%; }

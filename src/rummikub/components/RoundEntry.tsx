@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Delete, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import type { Player } from '@shared/games/rummikub/types';
-import { JOKER_PENALTY, TILE_VALUES, potFor } from '@shared/games/rummikub/rules';
+import { JOKER_PENALTY, potFor } from '@shared/games/rummikub/rules';
+import { TileButtons } from './TileButtons';
 
 interface Props {
   players: Player[];
@@ -122,31 +123,12 @@ export function RoundEntry({ players, roundNumber, onScore }: Props) {
                 ))}
               </ul>
 
-              <div className="tile-pad" role="group" aria-label="Tile values">
-                {TILE_VALUES.map((v) => (
-                  <button key={v} type="button" onClick={() => addTile(v)} disabled={!focusedId}>
-                    {v}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="joker"
-                  onClick={() => addTile(JOKER_PENALTY)}
-                  disabled={!focusedId}
-                  title="A joker left on the rack costs 30"
-                >
-                  Joker
-                </button>
-                <button
-                  type="button"
-                  className="undo"
-                  onClick={undoTile}
-                  disabled={!focusedId || !(taps[focusedId] ?? []).length}
-                  aria-label="Remove last tile"
-                >
-                  <Delete size={16} aria-hidden="true" />
-                </button>
-              </div>
+              <TileButtons
+                onAdd={addTile}
+                onUndo={undoTile}
+                canUndo={Boolean(focusedId && (taps[focusedId] ?? []).length)}
+                disabled={!focusedId}
+              />
 
               <div className="total-row">
                 <div className="total">

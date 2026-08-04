@@ -10,8 +10,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   compareProtocol,
-  type ErrorCode, type Game, type GameAction, type Member, type Role, type Snapshot,
-  type VersionGap,
+  type ErrorCode, type Game, type GameAction, type Member, type PendingRound, type Role,
+  type Snapshot, type VersionGap,
 } from '@shared/rooms/protocol';
 import { can as canDo, seatView } from '@shared/rooms/permissions';
 import {
@@ -37,6 +37,8 @@ export interface RoomHandle {
   seatId: string | null;
   members: Member[];
   locked: boolean;
+  /** A Rummikub round being collected, if the host has opened one. */
+  pending: PendingRound | null;
   status: ConnectionStatus;
   /** True while a request is in flight, so entry controls can wait. */
   sending: boolean;
@@ -58,6 +60,10 @@ export interface RoomHandle {
   leave: () => void;
   /** Ends the room for everyone. Host only. */
   close: () => void;
+  /** Rummikub: the host opens a round, everyone fills in their own rack. */
+  openRound: (winnerId: string) => void;
+  submitRack: (seatId: string, total: number) => void;
+  cancelRound: () => void;
 }
 
 export interface GameSessionOptions<S extends Snapshot, A> {
@@ -111,8 +117,9 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
   const [seatId, setSeatId] = useState<string | null>(null);
   const [role, setRole] = useState<Role>('player');
   const [lastError, setLastError] = useState<ErrorCode | null>(null);
-  const [pending, setPending] = useState(0);
+  const [inFlightCount, setInFlight] = useState(0);
   const [outdated, setOutdated] = useState<VersionGap | null>(null);
+  const [pending, setPending] = useState<PendingRound | null>(null);
 
   const transport = useRef<Transport | null>(null);
   const rev = useRef(0);
@@ -164,13 +171,14 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
               setSeatId(message.you.seatId);
               setMembers(message.room.members);
               setLocked(message.room.locked);
+              setPending(message.room.pending);
               rawDispatch({ type: '__snapshot', state: message.state });
               break;
 
             case 'state':
               rev.current = message.rev;
               inFlight.current.clear();
-              setPending(0);
+              setInFlight(0);
               setLastError(null);
               rawDispatch({ type: '__snapshot', state: message.state });
               break;
@@ -178,6 +186,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
             case 'room': {
               setMembers(message.room.members);
               setLocked(message.room.locked);
+              setPending(message.room.pending);
               const me = message.room.members.find((m) => m.memberId === session.memberId);
               if (me) {
                 setSeatId(me.seatId);
@@ -189,7 +198,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
 
             case 'error': {
               setLastError(message.code);
-              setPending((n) => Math.max(0, n - 1));
+              setInFlight((n) => Math.max(0, n - 1));
               const action = message.reqId ? inFlight.current.get(message.reqId) : undefined;
               if (message.reqId) inFlight.current.delete(message.reqId);
               // Give the tracker its entry back, or the player loses what they typed.
@@ -229,7 +238,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       }
       const reqId = nextRequestId();
       inFlight.current.set(reqId, action);
-      setPending((n) => n + 1);
+      setInFlight((n) => n + 1);
       setLastError(null);
       transport.current?.send({
         t: 'action',
@@ -256,8 +265,9 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       seatId,
       members,
       locked,
+      pending,
       status,
-      sending: pending > 0,
+      sending: inFlightCount > 0,
       lastError,
       outdated,
       can: (actionType: string) => canDo(game, view, actor, actionType),
@@ -274,9 +284,14 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
         setSession(null);
       },
       close: () => transport.current?.send({ t: 'closeRoom', reqId: nextRequestId() }),
+      openRound: (winnerId) =>
+        transport.current?.send({ t: 'roundOpen', reqId: nextRequestId(), winnerId }),
+      submitRack: (seatId, total) =>
+        transport.current?.send({ t: 'rackSubmit', reqId: nextRequestId(), seatId, total }),
+      cancelRound: () => transport.current?.send({ t: 'roundCancel', reqId: nextRequestId() }),
     };
-  }, [session, game, state, role, seatId, members, locked, status, pending, lastError, outdated,
-      readStored, initialState]);
+  }, [session, game, state, role, seatId, members, locked, pending, status, inFlightCount,
+      lastError, outdated, readStored, initialState]);
 
   return { state, dispatch, room, onReject };
 }

@@ -25,11 +25,29 @@ worker and manifest are scoped to the origin root. Subpath hosting is not suppor
 
 ## The room server
 
-`worker/` is a separate Cloudflare Worker, deployed by hand with
-`pnpm worker:deploy`. It is not built by Pages and not touched by CI, so the site and the room
-server are two independent artefacts.
+`worker/` is a separate Cloudflare Worker. It is not built by Pages and not touched by CI, so
+the site and the room server are two independent artefacts that happen to share a repo. The
+Worker carries no UI; the site carries no server. What they do share is `shared/`, imported by
+both so the room runs the same scoring code the app does.
 
-Deploy the Worker first when a protocol field is added. The app is precached by a service
+Deploy it by hand with `pnpm worker:deploy`, or connect the repo to it with Cloudflare's Workers
+Builds, which works the same way the Pages integration does:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `pnpm install --frozen-lockfile` |
+| Deploy command | `pnpm worker:deploy` |
+| Root directory | the repo root, where `wrangler.toml` is |
+
+The install step is needed because the Worker bundles zod and the shared library. Connecting it
+keeps API tokens out of the repo, which the GitHub Actions route would not.
+
+**Both auto-deploying means they race.** If Pages wins, new clients briefly talk to an old room.
+That is worth knowing but not worth avoiding: the app is precached, so some clients are stale
+whatever the deploy order, which is why the version banner exists. For a breaking protocol
+change, deploy the Worker by hand first and then push.
+
+Deploy the Worker first when a client-to-server message is added. The app is precached by a service
 worker, so a client can be running weeks-old code; protocol changes have to stay additive. See
 [rooms.md](rooms.md).
 

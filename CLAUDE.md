@@ -75,15 +75,18 @@ throw inside the room.
 
 ## Testing
 
-`pnpm test` runs everything under jsdom. Around 430 tests across three layers:
+`pnpm test` runs everything under jsdom. Around 600 tests across three layers:
 
 1. **Rules** (`<game>.test.ts`) - pure functions, table-driven where it helps.
 2. **Reducers** (`use<Game>.test.ts`) - actions in, state out, no rendering.
 3. **Trackers** (`<Game>Tracker.test.tsx`) - Testing Library, driving the real UI.
 
 Plus `App.test.tsx` (routing, house-style guards), `pwa.test.ts` (manifest, icons, iOS tags),
-and the rooms tests - of which `twoClients.test.tsx` is the one to keep working: it renders a
-host and a guest side by side against a real room in-process.
+and the rooms tests. Three of those earn their keep: `twoClients.test.tsx` and
+`rummikubRoom.test.tsx` render a host and a guest side by side against a real room in-process,
+and `shared/rooms/games/parity.test.ts` runs the same script through the plain reducer and
+through the room and demands identical results, so the longer road a room action takes cannot
+quietly change the game.
 
 Query by role and accessible name, not test ids - the one exception is a couple of live-total
 readouts. When fixing a bug, add the regression test with a comment naming the failure, and make

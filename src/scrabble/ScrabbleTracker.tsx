@@ -125,6 +125,7 @@ export function ScrabbleTracker() {
           turnNumber={turnNumber}
           onScore={scoreTurn}
           onPass={pass}
+          disabled={room ? !room.can('recordPlay') || room.sending : false}
           onOpenDictionary={() => setDictOpen(true)}
         />
 
