@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { VERSION_MESSAGES } from '@shared/rooms/protocol';
 import type { RoomHandle } from './session';
 import { writeName } from './storage';
+import { isHost as amHost } from './whoAmI';
 
 /**
  * The room, as a strip under the top bar: who is here, what your part is, and
@@ -36,7 +37,7 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
   }
 
   const online = room.members.filter((m) => m.online).length;
-  const isHost = room.role === 'host';
+  const isHost = amHost(room);
 
   function endRoom() {
     const others = room.members.length - 1;

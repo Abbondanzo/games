@@ -173,6 +173,25 @@ input[type='text'], input[type='number'], select {
 .whose-turn { font-size: .85rem; color: var(--muted); text-align: right; }
 .whose-turn b { color: var(--text); }
 
+/* In a room, whose turn it is decides whether you can do anything, so it is
+   said plainly and shown on the card rather than left to be worked out. */
+.whose-turn.yours b { color: var(--good); }
+.whose-turn.theirs { font-style: italic; }
+.card.entry.yours { border-color: var(--good); }
+.card.entry.theirs { opacity: .82; }
+
+/* Which row is yours, for the same reason: a name only tells you if you
+   remember which name you typed. */
+.scoreboard .you {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--accent); border: 1px solid var(--accent);
+  border-radius: 999px; padding: 0 .35rem;
+}
+.scoreboard li.mine .scoreboard-row { background: color-mix(in srgb, var(--accent) 8%, var(--card-2)); }
+
+/* A row nobody may reassign is text, not a button that would only refuse. */
+.scoreboard-row.static { cursor: default; }
+
 /* ── letter tiles ── */
 .tiles { display: flex; flex-wrap: wrap; gap: .35rem; margin: .75rem 0 0; }
 .tile {
@@ -415,7 +434,6 @@ button.ghost, button.primary, button.link {
 
 /* ─────────────────────────── rummikub ─────────────────────────── */
 
-.scoreboard-row.static { cursor: default; }
 .scoreboard .pts.neg { color: var(--bad); }
 
 .winner-pick { border: none; margin: 0 0 .85rem; padding: 0; }

@@ -8,6 +8,7 @@ import { DictionaryDrawer } from './components/DictionaryDrawer';
 import { useGame } from './lib/useGame';
 import { RoomBar } from '../rooms/RoomBar';
 import { RoomNotices } from '../rooms/RoomNotices';
+import { allowed, blocked, isHost as amHost, isMyTurn, myName, renameSelf } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/scoring';
@@ -26,12 +27,14 @@ export function ScrabbleTracker() {
     }
   });
 
-  const isHost = !room || room.role === 'host';
+  const isHost = amHost(room);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [dictOpen, setDictOpen] = useState(false);
 
   const currentPlayer = state.players[state.currentIndex] ?? null;
   const turnNumber = state.turns.filter((t) => t.kind !== 'adjust').length + 1;
+
+  const yourTurn = isMyTurn(room, currentPlayer?.id ?? null);
 
   function scoreTurn() {
     // Whatever is still in the entry box counts as part of this turn.
@@ -99,9 +102,8 @@ export function ScrabbleTracker() {
           <RoomBar
             room={room}
             onLeave={room.leave}
-            myName={state.players.find((p) => p.id === room.seatId)?.name ?? null}
-            onRename={(name) =>
-              room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
+            myName={myName(room, state.players)}
+            onRename={renameSelf(room, dispatch)}
           />
         )}
         <RoomNotices lastError={room?.lastError} gone={gone} />
@@ -111,6 +113,8 @@ export function ScrabbleTracker() {
           turns={state.turns}
           currentPlayerId={currentPlayer?.id ?? null}
           editable={isHost}
+          selectable={isHost}
+          youId={room?.seatId ?? null}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={(id) => dispatch({ type: 'removePlayer', id })}
           onSelect={(id) => dispatch({ type: 'setCurrent', id })}
@@ -123,13 +127,16 @@ export function ScrabbleTracker() {
           turnNumber={turnNumber}
           onScore={scoreTurn}
           onPass={pass}
-          disabled={room ? !room.can('recordPlay') || room.sending : false}
+          disabled={blocked(room, 'recordPlay')}
+          yourTurn={yourTurn}
           onOpenDictionary={() => setDictOpen(true)}
         />
 
         <HistoryCard
           players={state.players}
           turns={state.turns}
+          canUndo={allowed(room, 'undo')}
+          canAdjust={isHost}
           onUndo={() => dispatch({ type: 'undo' })}
           onAdjust={(playerId, points) => dispatch({ type: 'adjust', playerId, points })}
         />

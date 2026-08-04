@@ -8,6 +8,7 @@ import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from '@s
 import { useCricket } from './lib/useCricket';
 import { RoomBar } from '../rooms/RoomBar';
 import { RoomNotices } from '../rooms/RoomNotices';
+import { blocked, isHost as amHost, myName, renameSelf } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import type { Dart, Variant } from '@shared/games/cricket/types';
@@ -36,7 +37,7 @@ export function CricketTracker() {
     if (action.type === 'recordTurn') setDarts(action.darts);
   });
 
-  const isHost = !room || room.role === 'host';
+  const isHost = amHost(room);
 
   const currentPlayer = state.players[state.currentIndex] ?? null;
 
@@ -171,9 +172,8 @@ export function CricketTracker() {
           <RoomBar
             room={room}
             onLeave={room.leave}
-            myName={state.players.find((p) => p.id === room.seatId)?.name ?? null}
-            onRename={(name) =>
-              room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
+            myName={myName(room, state.players)}
+            onRename={renameSelf(room, dispatch)}
           />
         )}
         <RoomNotices lastError={room?.lastError} gone={gone} />
@@ -225,7 +225,7 @@ export function CricketTracker() {
           onRecord={(thrown) => dispatch({ type: 'recordTurn', darts: thrown })}
           onUndo={undo}
           canUndo={darts.length > 0 || state.turns.length > 0}
-          disabled={Boolean(winner) || (room ? !room.can('recordTurn') || room.sending : false)}
+          disabled={Boolean(winner) || blocked(room, 'recordTurn')}
         />
 
         <section className="card">

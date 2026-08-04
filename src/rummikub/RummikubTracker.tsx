@@ -8,6 +8,7 @@ import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
 import { RoomBar } from '../rooms/RoomBar';
 import { RoomNotices } from '../rooms/RoomNotices';
+import { isHost as amHost, myName, renameSelf } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 
@@ -16,7 +17,7 @@ const describeGame = (s: { players: unknown[]; rounds: unknown[] }) =>
 
 export function RummikubTracker() {
   const { state, dispatch, room, gone } = useRummikub();
-  const isHost = !room || room.role === 'host';
+  const isHost = amHost(room);
   const rows = standings(state.players, state.rounds);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
   const name = (id: string) => state.players.find((p) => p.id === id)?.name ?? '-';
@@ -87,9 +88,8 @@ export function RummikubTracker() {
           <RoomBar
             room={room}
             onLeave={room.leave}
-            myName={state.players.find((p) => p.id === room.seatId)?.name ?? null}
-            onRename={(name) =>
-              room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
+            myName={myName(room, state.players)}
+            onRename={renameSelf(room, dispatch)}
           />
         )}
         <RoomNotices lastError={room?.lastError} gone={gone} />

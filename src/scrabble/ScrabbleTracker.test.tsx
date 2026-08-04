@@ -41,7 +41,11 @@ const dictResponse = (word: string) => ({
   }],
 });
 
-const bar = () => screen.getByRole('status');
+/**
+ * The word check, specifically. The turn header is also a status region, so
+ * that whoever is playing is told when it becomes their turn.
+ */
+const bar = () => screen.getAllByRole('status').find((el) => el.classList.contains('validity'))!;
 const originalDelay = retryConfig.delayMs;
 
 beforeEach(() => {

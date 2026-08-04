@@ -11,10 +11,18 @@ interface Props {
   onRemove: (id: string) => void;
   onSelect: (id: string) => void;
   editable?: boolean;
+  /**
+   * Whether tapping a row hands them the turn. Only the host may, so for
+   * everyone else the rows are plain text rather than dead buttons.
+   */
+  selectable?: boolean;
+  /** The player this device is entering for, marked so it can be picked out. */
+  youId?: string | null;
 }
 
 export function PlayersCard({
-  players, turns, currentPlayerId, onAdd, onRemove, onSelect, editable = true,
+  players, turns, currentPlayerId, onAdd, onRemove, onSelect,
+  editable = true, selectable = true, youId = null,
 }: Props) {
   const rows = standings(players, turns);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
@@ -22,19 +30,13 @@ export function PlayersCard({
   return (
     <SharedPlayersCard players={players} onAdd={onAdd} onRemove={onRemove} editable={editable}>
       <ol className="scoreboard">
-        {rows.map((row, i) => (
-          <li
-            key={row.player.id}
-            className={row.player.id === currentPlayerId ? 'active' : undefined}
-          >
-            <button
-              type="button"
-              className="scoreboard-row"
-              onClick={() => onSelect(row.player.id)}
-              title={`Make it ${row.player.name}'s turn`}
-            >
+        {rows.map((row, i) => {
+          const isYou = row.player.id === youId;
+          const inside = (
+            <>
               <span className="rank">{i + 1}.</span>
               <span className="name">{row.player.name}</span>
+              {isYou && <span className="you">you</span>}
               {best > 0 && row.score === best && (
                 <span className="leader">
                   <Crown size={13} aria-hidden="true" /> leading
@@ -46,9 +48,32 @@ export function PlayersCard({
                 </span>
               )}
               <span className="pts">{row.score}</span>
-            </button>
-          </li>
-        ))}
+            </>
+          );
+
+          return (
+            <li
+              key={row.player.id}
+              className={[
+                row.player.id === currentPlayerId ? 'active' : '',
+                isYou ? 'mine' : '',
+              ].filter(Boolean).join(' ') || undefined}
+            >
+              {selectable ? (
+                <button
+                  type="button"
+                  className="scoreboard-row"
+                  onClick={() => onSelect(row.player.id)}
+                  title={`Make it ${row.player.name}'s turn`}
+                >
+                  {inside}
+                </button>
+              ) : (
+                <div className="scoreboard-row static">{inside}</div>
+              )}
+            </li>
+          );
+        })}
       </ol>
     </SharedPlayersCard>
   );

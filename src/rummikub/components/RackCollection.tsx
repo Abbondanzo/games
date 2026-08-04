@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Trophy, X } from 'lucide-react';
 import type { RoomHandle } from '../../rooms/session';
+import { isHost as amHost } from '../../rooms/whoAmI';
 import type { Player } from '@shared/games/rummikub/types';
 import { JOKER_PENALTY } from '@shared/games/rummikub/rules';
 import { TileButtons } from './TileButtons';
@@ -27,7 +28,7 @@ export function RackCollection({ players, roundNumber, room, onScore }: Props) {
 
   const missing = losers.filter((p) => pending.racks[p.id] === undefined);
   const pot = Object.values(pending.racks).reduce((a, b) => a + b, 0);
-  const isHost = room.role === 'host';
+  const isHost = amHost(room);
 
   return (
     <section className="card">

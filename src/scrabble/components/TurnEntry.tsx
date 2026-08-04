@@ -24,16 +24,32 @@ interface Props {
   onOpenDictionary: () => void;
   /** In a room, closed off until it is your turn. */
   disabled?: boolean;
+  /**
+   * Whether the turn on the board is this device's, or null when playing alone
+   * and the question does not arise. Worth saying outright: at a table everyone
+   * is looking at their own phone, and "Now playing: Ada" makes you work out
+   * whether Ada is you.
+   */
+  yourTurn?: boolean | null;
 }
 
 const IDLE: LookupView = { kind: 'idle' };
 
 export function TurnEntry({
   draft, setDraft, currentPlayer, turnNumber, onScore, onPass, onOpenDictionary,
-  disabled = false,
+  disabled = false, yourTurn = null,
 }: Props) {
   const [check, setCheck] = useState<LookupView>(IDLE);
   const word = draftWord(draft);
+
+  // Null off a solo game, where there is only one person and nothing to say.
+  const turnState = yourTurn === null || !currentPlayer ? '' : yourTurn ? 'yours' : 'theirs';
+
+  let whoseTurn: JSX.Element | string;
+  if (!currentPlayer) whoseTurn = 'Add a player to start scoring';
+  else if (turnState === 'yours') whoseTurn = <b>Your turn</b>;
+  else if (turnState === 'theirs') whoseTurn = <>Waiting for <b>{currentPlayer.name}</b></>;
+  else whoseTurn = <>Now playing: <b>{currentPlayer.name}</b></>;
 
   const patch = (changes: Partial<Draft>) => setDraft((d) => ({ ...d, ...changes }));
 
@@ -83,13 +99,11 @@ export function TurnEntry({
   }
 
   return (
-    <section className="card">
+    <section className={`card${turnState ? ` entry ${turnState}` : ''}`}>
       <div className="card-head">
         <h2>Turn <span className="muted">#{turnNumber}</span></h2>
-        <div className="whose-turn">
-          {currentPlayer
-            ? <>Now playing: <b>{currentPlayer.name}</b></>
-            : 'Add a player to start scoring'}
+        <div className={`whose-turn${turnState ? ` ${turnState}` : ''}`} role="status">
+          {whoseTurn}
         </div>
       </div>
 
