@@ -30,21 +30,28 @@ the site and the room server are two independent artefacts that happen to share 
 Worker carries no UI; the site carries no server. What they do share is `shared/`, imported by
 both so the room runs the same scoring code the app does.
 
-Deploy it by hand with `pnpm worker:deploy`, or connect the repo to it with Cloudflare's Workers
-Builds, which works the same way the Pages integration does:
+It is connected to the repo through Cloudflare's Workers Builds, which works the way the Pages
+integration does, except that it takes two deploy commands - one for the production branch and
+one for everything else:
 
 | Setting | Value |
 | --- | --- |
 | Build command | `pnpm install --frozen-lockfile` |
 | Deploy command | `pnpm worker:deploy` |
+| Non-production branch deploy command | `pnpm worker:deploy:staging` |
 | Root directory | the repo root, where `wrangler.toml` is |
 
 The install step is needed because the Worker bundles zod and the shared library. Connecting it
 keeps API tokens out of the repo, which the GitHub Actions route would not.
 
-**Only deploy from `main`.** The deploy command is a plain `wrangler deploy`, which publishes
-production. If non-production branch deployments are turned on in Workers Builds, every pull
-request would publish over the live room server. Non-production branches should build and stop.
+So `main` publishes production and every other branch publishes staging, and **which one a
+branch can reach is settled by Cloudflare rather than by anything in this repo**. That is worth
+keeping. A single deploy command that worked the branch out for itself would put the decision in
+a script living on the branch being deployed, where neither branch protection nor review would
+catch a mistake, because the branch is not `main`.
+
+Deploy by hand with `pnpm worker:deploy` or `pnpm worker:deploy:staging` if you ever need to -
+for a breaking protocol change, where the Worker has to lead the client.
 
 ## Two room servers
 
@@ -62,20 +69,23 @@ real game. It is an allowlist, so an origin nobody anticipated gets staging, whi
 
 Staging is the `preview` environment in `wrangler.toml`. It has its own Durable Object storage,
 its own rate limit budget, and an origin list that admits previews and localhost but not the
-live site. Deploy it with:
+live site. Pushing any branch but `main` deploys it, so it carries whatever was pushed last.
+`VITE_ROOMS_URL` still overrides everything, for pointing at a wrangler running locally.
 
-```
-pnpm worker:deploy:staging
-```
+**A protocol change has somewhere to go.** Push the branch and both halves of it deploy: the
+Pages preview and the staging room server. The preview exercises the new protocol against a room
+that speaks it, without touching production. Before staging existed a preview could only reach
+the live room server, so a preview of a protocol change was guaranteed to show a version mismatch
+and could not be tested at all.
 
-It only needs redeploying when the Worker changes in a way a preview depends on - which, for a
-protocol change, is the point of it. `VITE_ROOMS_URL` still overrides everything, for pointing
-at a wrangler running locally.
+**Staging is shared, and holds the last branch pushed.** With one pull request in flight that is
+invisible; with two, the second push takes staging away from the first. Per-branch room servers
+would need the Pages preview to discover its own branch's Worker URL at build time, which it has
+no way to do.
 
-**A protocol change now has somewhere to go.** Deploy staging, open the pull request, and the
-preview exercises the new protocol against a room server that speaks it, without touching
-production. Previously a preview could only ever reach the live room server, so a preview of a
-protocol change was guaranteed to show a version mismatch and could not be tested at all.
+**Staging does not track `main`.** A merge deploys production and leaves staging where it was,
+until the next branch push. That is the right way round - staging exists to run ahead - but it
+means staging is not a mirror of production and should not be read as one.
 
 **Both auto-deploying means they race**, on `main`. If Pages wins, new clients briefly talk to an old room.
 That is worth knowing but not worth avoiding: the app is precached, so some clients are stale
