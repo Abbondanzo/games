@@ -31,27 +31,32 @@ Worker carries no UI; the site carries no server. What they do share is `shared/
 both so the room runs the same scoring code the app does.
 
 It is connected to the repo through Cloudflare's Workers Builds, which works the way the Pages
-integration does, except that it takes two deploy commands - one for the production branch and
-one for everything else:
+integration does:
 
 | Setting | Value |
 | --- | --- |
 | Build command | `pnpm install --frozen-lockfile` |
 | Deploy command | `pnpm worker:deploy` |
-| Non-production branch deploy command | `pnpm worker:deploy:staging` |
 | Root directory | the repo root, where `wrangler.toml` is |
+| Non-production branches | build, and **do not** deploy |
 
 The install step is needed because the Worker bundles zod and the shared library. Connecting it
 keeps API tokens out of the repo, which the GitHub Actions route would not.
 
-So `main` publishes production and every other branch publishes staging, and **which one a
-branch can reach is settled by Cloudflare rather than by anything in this repo**. That is worth
-keeping. A single deploy command that worked the branch out for itself would put the decision in
-a script living on the branch being deployed, where neither branch protection nor review would
-catch a mistake, because the branch is not `main`.
+**A Workers Builds project deploys one Worker, and it is the one it is connected to.** Workers
+Builds offers a separate deploy command for non-production branches, and pointing it at
+`pnpm worker:deploy:staging` looks like an easy way to have branches publish staging. It is not:
+`wrangler deploy --env preview` asks for a Worker named `games-rooms-preview`, the build is bound
+to `games-rooms`, and the name is overridden rather than refused. The result is a branch's code
+published to **production**, carrying staging's variables - including an origin list with no
+`games.abbondanzo.com` in it, which stops the live site opening a room at all.
 
-Deploy by hand with `pnpm worker:deploy` or `pnpm worker:deploy:staging` if you ever need to -
-for a breaking protocol change, where the Worker has to lead the client.
+This was tried and reverted. If it is ever tried again, recover with `pnpm worker:deploy` from a
+checkout of `main`.
+
+So staging is deployed separately: by hand with `pnpm worker:deploy:staging`, or by connecting
+`games-rooms-preview` as its own Workers Builds project, which is the only way a build can
+publish it.
 
 ## Two room servers
 
@@ -67,25 +72,30 @@ runtime, not from a build variable. A variable that has to be set in a dashboard
 will eventually be missing, and the failure would be silent: a preview writing into somebody's
 real game. It is an allowlist, so an origin nobody anticipated gets staging, which is harmless.
 
-Staging is the `preview` environment in `wrangler.toml`. It has its own Durable Object storage,
-its own rate limit budget, and an origin list that admits previews and localhost but not the
-live site. Pushing any branch but `main` deploys it, so it carries whatever was pushed last.
+Staging is the `preview` environment in `wrangler.toml`, and a Worker of its own called
+`games-rooms-preview`. It has its own Durable Object storage, its own rate limit budget, and an
+origin list that admits previews and localhost but not the live site. Deploy it with:
+
+```
+pnpm worker:deploy:staging
+```
+
 `VITE_ROOMS_URL` still overrides everything, for pointing at a wrangler running locally.
 
-**A protocol change has somewhere to go.** Push the branch and both halves of it deploy: the
-Pages preview and the staging room server. The preview exercises the new protocol against a room
-that speaks it, without touching production. Before staging existed a preview could only reach
-the live room server, so a preview of a protocol change was guaranteed to show a version mismatch
-and could not be tested at all.
+**A protocol change has somewhere to go.** Deploy staging, open the pull request, and the preview
+exercises the new protocol against a room server that speaks it, without touching production.
+Before staging existed a preview could only reach the live room server, so a preview of a
+protocol change was guaranteed to show a version mismatch and could not be tested at all.
 
-**Staging is shared, and holds the last branch pushed.** With one pull request in flight that is
-invisible; with two, the second push takes staging away from the first. Per-branch room servers
+To have that happen without remembering, connect `games-rooms-preview` to this repo as a second
+Workers Builds project - deploy command `pnpm worker:deploy:staging`, non-production branch
+deploys turned on - so every branch push refreshes it. That is a second project rather than a
+second command on the first, for the reason above: a build deploys the Worker it is bound to.
+
+**Staging is shared, and holds whatever was pushed last.** With one pull request in flight that
+is invisible; with two, the second takes staging away from the first. Per-branch room servers
 would need the Pages preview to discover its own branch's Worker URL at build time, which it has
 no way to do.
-
-**Staging does not track `main`.** A merge deploys production and leaves staging where it was,
-until the next branch push. That is the right way round - staging exists to run ahead - but it
-means staging is not a mirror of production and should not be read as one.
 
 **Both auto-deploying means they race**, on `main`. If Pages wins, new clients briefly talk to an old room.
 That is worth knowing but not worth avoiding: the app is precached, so some clients are stale

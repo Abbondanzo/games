@@ -139,8 +139,13 @@ it fail first.
 - **There are two room servers, chosen by origin.** Only `games.abbondanzo.com` and
   `games-ccu.pages.dev` reach production; previews and local dev reach `games-rooms-preview`.
   `roomsUrlFor` decides it at runtime from the page's own origin, so there is no build variable
-  to forget. Pushing a branch deploys staging automatically, so a protocol change gets a room
-  that speaks it; `main` deploys production. Cloudflare decides which, not this repo.
+  to forget. Deploy staging with `pnpm worker:deploy:staging` before opening a pull request that
+  changes the protocol, or its preview has nothing that speaks it.
+- **A Workers Builds project deploys the Worker it is connected to.** Giving the `games-rooms`
+  project a non-production deploy command of `wrangler deploy --env preview` does not publish
+  `games-rooms-preview`; it overrides the name and publishes the branch to production with
+  staging's variables, which stops the live site reaching its own rooms. Staging needs a Workers
+  Builds project of its own. Tried and reverted; see `docs/deployment.md`.
 - **The room is the authority, not the host.** Clients send requests and render
   what comes back; only the room runs a reducer. A guest gets no optimistic update, because it
   cannot mint the same ids.
