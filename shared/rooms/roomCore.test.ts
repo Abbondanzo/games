@@ -653,13 +653,47 @@ describe('coming back to a room', () => {
     }
   });
 
-  it('will not hand over a player somebody is still using', () => {
+  it('will not hand a player to a different device while it is in use', () => {
     const { state, seat } = twoPeters();
-    // Nobody left, so the same device arriving again is a second person.
-    const other = arrive(state, 'm2', 'Peter', 'phone');
+    const other = arrive(state, 'm2', 'Peter', 'another-phone');
 
     expect(other.ok && other.member.seatId).not.toBe(seat);
     expect(other.ok && players(other.state)).toEqual(['Peter', 'Peter 2', 'Peter 3']);
+  });
+
+  /**
+   * Tapping the invite link while already in the room. This used to make a
+   * second player beside a member that would never reconnect, which was a
+   * "Grace 2" on the board and, repeated, a room nobody else could get into.
+   */
+  it('replaces itself rather than arriving twice', () => {
+    const { state, seat } = twoPeters();
+    const again = arrive(state, 'm2', 'Peter', 'phone');
+
+    expect(again.ok && again.member.seatId).toBe(seat);
+    expect(again.ok && players(again.state)).toEqual(['Peter', 'Peter 2']);
+  });
+
+  it('drops the member it replaced, and closes its socket', () => {
+    const { state } = twoPeters();
+    const again = arrive(state, 'm2', 'Peter', 'phone');
+    if (!again.ok) throw new Error(again.code);
+
+    expect(again.state.members.m1).toBeUndefined();
+    expect(again.state.members.m2).toBeDefined();
+    expect(again.effects).toContainEqual({ to: 'close', memberId: 'm1' });
+  });
+
+  it('cannot be used to fill the room', () => {
+    let state = twoPeters().state;
+    for (let i = 0; i < MAX_MEMBERS + 5; i += 1) {
+      const again = arrive(state, `rep${i}`, 'Peter', 'phone');
+      if (!again.ok) throw new Error(again.code);
+      state = again.state;
+    }
+    // One host, one Peter, however many times they came through the door.
+    expect(Object.keys(state.members)).toHaveLength(2);
+    expect(players(state)).toEqual(['Peter', 'Peter 2']);
   });
 
   it('makes a new player when theirs has been taken off the board', () => {
@@ -807,8 +841,51 @@ describe('being removed from a game', () => {
   // The host is shown who they have thrown out, by name and by a handle that
   // is not the device key.
   it('shows the host who they removed', () => {
-    const view = roomView(kick(withGrace().state), ctx());
+    const view = roomView(kick(withGrace().state), ctx(), true);
     expect(view.removed).toEqual([{ ref: 'm1', name: 'Grace' }]);
+  });
+
+  /**
+   * And nobody else. It names people who were thrown out, to a table the host
+   * did not choose to tell. The UI hiding it is presentation; this is the rule.
+   */
+  it('tells nobody else', () => {
+    expect(roomView(kick(withGrace().state), ctx()).removed).toEqual([]);
+  });
+
+  /** The room frame aimed at one member, as opposed to the broadcast. */
+  const roomFrameFor = (effects: Effect[], memberId: string) => {
+    const found = effects.find(
+      (e) => e.to === 'member' && e.memberId === memberId
+        && (e as { message: ServerMessage }).message.t === 'room',
+    ) as { message: ServerMessage } | undefined;
+    return found?.message;
+  };
+
+  it('reaches the host on the wire, and only the host', () => {
+    const { state } = withGrace();
+    const withAlan = arrive(state, 'm3', 'Alan', 'his-phone');
+    if (!withAlan.ok) throw new Error(withAlan.code);
+    const { effects } = act(withAlan.state, HOST.memberId, { t: 'kick', memberId: 'm3' });
+
+    // What everybody gets names nobody.
+    expect(sentTo(effects, 'all').find((m) => m.t === 'room'))
+      .toMatchObject({ room: { removed: [] } });
+    // What the host gets names Alan.
+    expect(roomFrameFor(effects, HOST.memberId))
+      .toMatchObject({ room: { removed: [{ ref: 'm3', name: 'Alan' }] } });
+  });
+
+  it('goes with the room when it is handed over', () => {
+    const withAlan = arrive(withGrace().state, 'm3', 'Alan', 'his-phone');
+    if (!withAlan.ok) throw new Error(withAlan.code);
+    // Grace is removed, then the room is handed to Alan.
+    const kicked = kick(withAlan.state);
+    const { effects } = act(kicked, HOST.memberId, {
+      t: 'makeHost', reqId: 'r1', memberId: 'm3',
+    });
+
+    expect(roomFrameFor(effects, 'm3')).toMatchObject({ room: { removed: [{ name: 'Grace' }] } });
   });
 
   it('says nothing about it in what the room hands out', () => {
@@ -948,6 +1025,22 @@ describe('claiming a player set up in advance', () => {
 
     // Not even a different row, and not by claiming one.
     expect(arrive(kicked, 'm2', 'Ada', 'phone', ada).ok).toBe(false);
+  });
+
+  /**
+   * Occupancy cannot depend on the client having cooperated. A member seated
+   * without a device key leaves no entry in `devices`, and their player would
+   * otherwise fall back into the claimable list the moment they left.
+   */
+  it('does not offer a row somebody held without a device key', () => {
+    const { state, grace } = laidOut();
+    const taken = arrive(state, 'm1', 'Grace', null, grace);
+    if (!taken.ok) throw new Error(taken.code);
+    const left = act(taken.state, 'm1', { t: 'leave', reqId: 'l1' }).state;
+
+    expect(claimable(left).map((p) => p.id)).not.toContain(grace);
+    const thief = arrive(left, 'm2', 'Grace', 'phone', grace);
+    expect(thief.ok && thief.member.seatId).not.toBe(grace);
   });
 
   it('remembers the device, so leaving and returning still works', () => {

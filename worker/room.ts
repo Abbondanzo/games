@@ -134,12 +134,18 @@ export class Room extends DurableObject {
   }
 
   private async handleJoin(request: Request): Promise<Response> {
-    const state = await this.load();
-    if (!state) return json({ error: 'no-room' }, 404);
-
+    // Read before touching storage. Awaiting the body reopens the input gate,
+    // so a load either side of it can be overwritten by a join that arrived in
+    // between - which drops a member whose token has already been filed, and
+    // tells them they were removed by a host who did nothing of the kind.
     const body = (await request.json()) as {
       name: string; device?: unknown; claim?: unknown;
     };
+    const deviceKey = await deviceKeyOf(body.device);
+
+    const state = await this.load();
+    if (!state) return json({ error: 'no-room' }, 404);
+
     const memberId = uid();
     const token = uid();
 
@@ -151,7 +157,7 @@ export class Room extends DurableObject {
         now: Date.now(),
         // Who this device already is, if the room has met it. Unguessable, so
         // an absent or invented one simply means a new player.
-        deviceKey: await deviceKeyOf(body.device),
+        deviceKey,
         // Or a row the host laid out that this joiner says is them. Checked
         // against what is actually claimable, so a stale one falls through.
         claim: typeof body.claim === 'string' ? body.claim : null,
@@ -163,6 +169,8 @@ export class Room extends DurableObject {
     const tokens = (await this.ctx.storage.get<Record<string, string>>('tokens')) ?? {};
     await this.ctx.storage.put('tokens', { ...tokens, [token]: memberId });
     await this.save(result.state);
+    // A device rejoining replaces the member it had, so that one's token goes.
+    if (result.effects.some((e) => e.to === 'close')) await this.forgetTokens(result.state);
     // Joining adds a player, so whoever is already connected needs to see it.
     this.dispatch(result.effects);
 

@@ -47,9 +47,17 @@ export const clearSession = (game: Game): void => removeKey(key(game));
  * - It outlives the session, which is cleared on the way out. That is the whole
  *   point: leaving is what it is for.
  */
-const DeviceSchema = z.object({ code: z.string(), secret: z.string() });
+const DeviceSchema = z.record(z.string(), z.string()).catch({});
 
 const deviceKey = (game: Game) => `games.room.${game}.device.v1`;
+
+/**
+ * How many rooms a device stays recognisable in. One slot was not enough: it
+ * meant hosting or joining any other room forgot the first, so coming back to
+ * it made a second player - the very thing this exists to prevent - and made a
+ * removal two taps from being undone.
+ */
+const KEEP_ROOMS = 8;
 
 const mintSecret = (): string => {
   const bytes = new Uint8Array(24);
@@ -62,11 +70,12 @@ const mintSecret = (): string => {
  * and coming back; a different room gets a different secret.
  */
 export function deviceFor(game: Game, code: string): string {
-  const stored = readJson(deviceKey(game), DeviceSchema);
-  if (stored?.code === code) return stored.secret;
+  const stored = readJson(deviceKey(game), DeviceSchema) ?? {};
+  const known = stored[code];
+  if (known) return known;
 
   const secret = mintSecret();
-  writeJson(deviceKey(game), { code, secret });
+  rememberDevice(game, code, secret);
   return secret;
 }
 
@@ -76,8 +85,13 @@ export function deviceFor(game: Game, code: string): string {
  */
 export const newDevice = (): string => mintSecret();
 
-export const rememberDevice = (game: Game, code: string, secret: string): void =>
-  writeJson(deviceKey(game), { code, secret });
+export function rememberDevice(game: Game, code: string, secret: string): void {
+  const stored = readJson(deviceKey(game), DeviceSchema) ?? {};
+  // Oldest out first, so this cannot grow without bound. Insertion order is
+  // what object key order gives, which is all the ordering needed.
+  const kept = Object.entries({ ...stored, [code]: secret }).slice(-KEEP_ROOMS);
+  writeJson(deviceKey(game), Object.fromEntries(kept));
+}
 
 /** The name this device last played under, offered as the default next time. */
 const NAME_KEY = 'games.name.v1';

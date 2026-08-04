@@ -76,6 +76,15 @@ export interface RoomState<S extends Snapshot = Snapshot> {
    * Absent on rooms made before this existed, so always read it with `?? {}`.
    */
   devices?: Record<string, string>;
+  /**
+   * Every player anyone has ever been seated on, device key or not.
+   *
+   * `devices` would nearly do, but only nearly: a member seated without one
+   * leaves no entry there, so their player would fall back into the claimable
+   * list the moment they left and anybody with the code could take their score.
+   * Occupancy should not depend on the client having cooperated.
+   */
+  everHeld?: string[];
   /** A Rummikub round being collected, if one is open. */
   pending: PendingRound | null;
   lastActiveAt: number;
@@ -98,6 +107,14 @@ export interface Context {
  * the room. The game module narrows the payload before its reducer ever sees it.
  */
 export type ApplyAction<S> = (state: S, action: GameAction) => S | null;
+
+/** Tells the host what only the host may see, alongside the general broadcast. */
+const alsoTellHost = <S extends Snapshot>(state: RoomState<S>, ctx: Context): Effect[] => {
+  const host = Object.values(state.members).find((m) => m.role === 'host');
+  return host
+    ? [{ to: 'member', memberId: host.memberId, message: { t: 'room', room: roomView(state, ctx, true) } }]
+    : [];
+};
 
 export type Effect =
   | { to: 'all'; message: ServerMessage }
@@ -123,6 +140,7 @@ export interface Outcome<S extends Snapshot = Snapshot> {
 export function claimable<S extends Snapshot>(state: RoomState<S>): { id: string; name: string }[] {
   const spokenFor = new Set<string>([
     ...Object.values(state.devices ?? {}),
+    ...(state.everHeld ?? []),
     ...Object.values(state.members).map((m) => m.seatId ?? ''),
   ]);
   return playersIn(state.snapshot).filter((p) => !spokenFor.has(p.id));
@@ -130,7 +148,18 @@ export function claimable<S extends Snapshot>(state: RoomState<S>): { id: string
 
 /* ─────────────────────────── views ─────────────────────────── */
 
-export function roomView<S extends Snapshot>(state: RoomState<S>, ctx: Context): RoomView {
+/**
+ * What the room looks like to whoever is being told.
+ *
+ * `removed` is the host's business and nobody else's: it names people who were
+ * thrown out, to a table the host did not choose to tell. Everyone else gets an
+ * empty list, and that is enforced here rather than by the UI hiding it.
+ */
+export function roomView<S extends Snapshot>(
+  state: RoomState<S>,
+  ctx: Context,
+  forHost = false,
+): RoomView {
   const online = new Set(ctx.online);
   const members: Member[] = Object.values(state.members).map((m) => ({
     memberId: m.memberId,
@@ -143,7 +172,9 @@ export function roomView<S extends Snapshot>(state: RoomState<S>, ctx: Context):
     members,
     locked: state.locked,
     pending: state.pending,
-    removed: Object.values(state.kicked ?? {}).map(({ ref, name }) => ({ ref, name })),
+    removed: forHost
+      ? Object.values(state.kicked ?? {}).map(({ ref, name }) => ({ ref, name }))
+      : [],
   };
 }
 
@@ -230,6 +261,7 @@ export function createRoom<S extends Snapshot>(input: {
     devices: input.host.deviceKey && seated.seatId
       ? { [input.host.deviceKey]: seated.seatId }
       : {},
+    everHeld: seated.seatId ? [seated.seatId] : [],
     pending: null,
     lastActiveAt: input.now,
   };
@@ -287,7 +319,21 @@ export function join<S extends Snapshot>(
     return { ok: false, code: 'kicked-out' };
   }
 
-  const claimed = new Set(Object.values(state.members).map((m) => m.seatId));
+  /**
+   * A device joining while it is already in the room, which is one tap on the
+   * invite link away. Its old member is dropped and its player handed straight
+   * back, rather than a second one made beside a member that will never
+   * reconnect - which was both a "Grace 2" on the board and, eleven taps later,
+   * a full room.
+   */
+  const stale = Object.values(state.members)
+    .find((m) => input.deviceKey && m.deviceKey === input.deviceKey);
+
+  const others = stale
+    ? Object.fromEntries(Object.entries(state.members).filter(([id]) => id !== stale.memberId))
+    : state.members;
+
+  const claimed = new Set(Object.values(others).map((m) => m.seatId));
 
   /**
    * The player this device already is.
@@ -351,19 +397,28 @@ export function join<S extends Snapshot>(
     ...state,
     snapshot: seated.snapshot,
     rev: added ? state.rev + 1 : state.rev,
-    members: { ...state.members, [input.memberId]: member },
+    members: { ...others, [input.memberId]: member },
     // Remembered whichever way they were seated, so the next time they arrive
     // is a return rather than another new player.
     devices: input.deviceKey && seated.seatId
       ? { ...devices, [input.deviceKey]: seated.seatId }
       : devices,
+    // And remembered whether or not a device key came with it, so the player
+    // never falls back into the claimable list once somebody has had it.
+    everHeld: seated.seatId && !(state.everHeld ?? []).includes(seated.seatId)
+      ? [...(state.everHeld ?? []), seated.seatId]
+      : state.everHeld,
     lastActiveAt: input.now,
   };
 
-  // Whoever is already connected needs to see the new player arrive.
-  const effects: Effect[] = added
-    ? [{ to: 'all', message: { t: 'state', rev: next.rev, state: seated.snapshot, cause: null } }]
-    : [];
+  // Whoever is already connected needs to see the new player arrive, and the
+  // socket of a member being replaced has to go with it.
+  const effects: Effect[] = [
+    ...(stale ? [{ to: 'close' as const, memberId: stale.memberId }] : []),
+    ...(added
+      ? [{ to: 'all' as const, message: { t: 'state' as const, rev: next.rev, state: seated.snapshot, cause: null } }]
+      : []),
+  ];
 
   return { ok: true, member, state: next, effects };
 }
@@ -404,7 +459,8 @@ export function connect<S extends Snapshot>(
     },
     rev: state.rev,
     state: state.snapshot,
-    room: roomView(state, ctx),
+    // Per member, so the host's own copy is the one that names who was removed.
+    room: roomView(state, ctx, member.role === 'host'),
   };
 
   return {
@@ -503,7 +559,15 @@ export function handle<S extends Snapshot>(
         [heir.memberId]: { ...heir, role: 'host' as const },
       };
       const next = { ...touched, members };
-      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+      // The list of who was removed goes with the room, off the old host and
+      // on to the new one.
+      return {
+        state: next,
+        effects: [
+          { to: 'all', message: { t: 'room', room: roomView(next, ctx) } },
+          ...alsoTellHost(next, ctx),
+        ],
+      };
     }
 
     case 'roundOpen': {
@@ -582,7 +646,13 @@ export function handle<S extends Snapshot>(
 
       const kicked = Object.fromEntries(entries.filter(([key]) => key !== found[0]));
       const next = { ...touched, kicked };
-      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+      return {
+        state: next,
+        effects: [
+          { to: 'all', message: { t: 'room', room: roomView(next, ctx) } },
+          ...alsoTellHost(next, ctx),
+        ],
+      };
     }
 
     case 'roundCancel': {
@@ -701,6 +771,7 @@ function handleKick<S extends Snapshot>(
       { to: 'member', memberId: targetId, message: { t: 'kicked' } },
       { to: 'close', memberId: targetId },
       { to: 'all', message: { t: 'room', room: roomView(next, ctx) } },
+      ...alsoTellHost(next, ctx),
     ],
   };
 }

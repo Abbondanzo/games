@@ -186,6 +186,30 @@ export const ServerMessageSchema = z.discriminatedUnion('t', [
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;
 
+/* ─────────────────────────── the join and create bodies ─────────────────────────── */
+
+/**
+ * The two HTTP requests, which are as untrusted as anything off a socket and
+ * were the last thing here not saying so.
+ *
+ * The name cap is the one that matters. A name is kept on the member and
+ * rebroadcast to every device on every presence change, so an unbounded one is
+ * not a silly display name, it is a room nobody can play in.
+ */
+export const CreateRequestSchema = z.object({
+  game: GameSchema,
+  name: Name.default('Host'),
+  device: z.string().max(256).optional(),
+});
+export type CreateRequest = z.infer<typeof CreateRequestSchema>;
+
+export const JoinRequestSchema = z.object({
+  name: Name,
+  device: z.string().max(256).optional(),
+  claim: Id.nullish(),
+});
+export type JoinRequest = z.infer<typeof JoinRequestSchema>;
+
 /* ─────────────────────────── decoding ─────────────────────────── */
 
 /**

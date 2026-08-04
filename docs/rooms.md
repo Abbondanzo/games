@@ -205,8 +205,9 @@ sheet. The defences are proportionate.
   shape is checked there too, because `idFromName` will create an object for any
   string - without that check, enumeration would become an object-creation
   attack.
-- **Kicking locks the room**, or the person kicked would simply rejoin with a
-  fresh identity.
+- **Removing somebody is written against their device** and lasts the game,
+  whether the room is locked or not. It used to work by locking the room,
+  which made throwing one person out a decision about everybody else.
 - **Tokens** are random and per member. No client message carries an identity;
   the room stamps it from the socket, so there is nothing to impersonate.
 - **Origin allowlist on the socket upgrade.** WebSocket upgrades bypass CORS, so

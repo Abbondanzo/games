@@ -87,6 +87,36 @@ describe('the secret a device keeps for a room', () => {
     expect(deviceFor('cricket', 'AB23')).not.toBe(deviceFor('cricket', 'CD45'));
   });
 
+  /**
+   * One slot per game was not enough. Joining or hosting anything else forgot
+   * the first room, so coming back to it made a second player - and put a
+   * removal two taps from being undone.
+   */
+  it('is not forgotten by visiting another room', () => {
+    const first = deviceFor('cricket', 'AB23');
+    deviceFor('cricket', 'CD45');
+    rememberDevice('cricket', 'EF67', newDevice());
+
+    expect(deviceFor('cricket', 'AB23')).toBe(first);
+  });
+
+  it('does not grow without bound', () => {
+    const codes = Array.from({ length: 30 }, (_, i) => `R${i}`);
+    for (const code of codes) deviceFor('cricket', code);
+
+    const stored = JSON.parse(localStorage.getItem('games.room.cricket.device.v1')!) as object;
+    expect(Object.keys(stored).length).toBeLessThanOrEqual(8);
+    // The most recent survive; the oldest are the ones dropped.
+    expect(Object.keys(stored)).toContain('R29');
+    expect(Object.keys(stored)).not.toContain('R0');
+  });
+
+  it('shrugs at a stored value that is nonsense', () => {
+    localStorage.setItem('games.room.cricket.device.v1', '"not an object"');
+    // A fresh one, rather than a throw or an empty string.
+    expect(deviceFor('cricket', 'AB23').length).toBeGreaterThanOrEqual(24);
+  });
+
   it('is a different one for a different game', () => {
     expect(deviceFor('cricket', 'AB23')).not.toBe(deviceFor('scrabble', 'AB23'));
   });
