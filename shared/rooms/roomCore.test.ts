@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_MEMBERS, connect, createRoom, disconnect, handle, join, roomView,
+  MAX_MEMBERS, claimable, connect, createRoom, disconnect, handle, join, roomView,
   type ApplyAction, type Context, type Effect, type RoomState,
 } from './roomCore';
 import type { ClientMessage, ServerMessage } from './protocol';
@@ -372,14 +372,18 @@ describe('host controls', () => {
   });
 
   // Kicking without locking is theatre - they would rejoin with a fresh id.
-  it('locks the room when kicking, and closes the socket', () => {
+  /**
+   * Kicking used to lock the room, because locking was the only thing stopping
+   * a rejoin. It is not any more, and throwing one person out should not be a
+   * decision about everybody else.
+   */
+  it('removes the member and closes the socket, without touching the lock', () => {
     const room = withGuest(newRoom(), 'm1', 'Grace');
     const { state, effects } = act(room, HOST.memberId, { t: 'kick', memberId: 'm1' });
 
     expect(state.members.m1).toBeUndefined();
-    expect(state.locked).toBe(true);
+    expect(state.locked).toBe(false);
     expect(effects).toContainEqual({ to: 'close', memberId: 'm1' });
-    expect(join(state, { memberId: 'm1-again', name: 'Grace', now: 1 }, cricketApply()).ok).toBe(false);
   });
 
   it('will not let the host kick themselves', () => {
@@ -697,7 +701,6 @@ describe('coming back to a room', () => {
  * somebody's phone goes to sleep.
  */
 describe('coming back to a locked room', () => {
-  const players = (state: RoomState<Snapshot>) => asCricket(state.snapshot).players.map((p) => p.name);
 
   const lock = (state: RoomState<Snapshot>) =>
     act(state, HOST.memberId, { t: 'lock', locked: true }).state;
@@ -740,39 +743,221 @@ describe('coming back to a locked room', () => {
     expect(arrive(lock(state), 'm2', 'Alan').ok).toBe(false);
   });
 
-  /**
-   * Kicking locks the room for the express purpose of keeping one person out,
-   * so letting people back in must not quietly undo it.
-   */
-  it('does not let a device the host removed come back', () => {
-    const { state } = withGrace();
-    const kicked = act(state, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
-
-    const back = arrive(kicked, 'm2', 'Grace', 'phone');
-    expect(back.ok).toBe(false);
-    expect(!back.ok && back.code).toBe('room-locked');
-  });
-
-  // Unlocking is the host opening the door, and it does not restore the seat.
-  it('gives a removed device a new player once the host unlocks', () => {
-    const { state, seat } = withGrace();
-    const kicked = act(state, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
-    const opened = act(kicked, HOST.memberId, { t: 'lock', locked: false }).state;
-
-    const back = arrive(opened, 'm2', 'Grace', 'phone');
-    expect(back.ok && back.member.seatId).not.toBe(seat);
-    expect(back.ok && players(back.state)).toEqual(['Host', 'Grace', 'Grace 2']);
-  });
-
-  // Rooms made before any of this have neither list, and must still work.
+  // Rooms made before any of this have no device list, and must still work.
   it('copes with a room that predates all of it', () => {
     const { state } = withGrace();
     const old = { ...leaves(lock(state), 'm1') } as Partial<RoomState<Snapshot>>;
-    delete old.barred;
     delete old.devices;
 
     const back = arrive(old as RoomState<Snapshot>, 'm2', 'Grace', 'phone');
     expect(back.ok).toBe(false);
     expect(!back.ok && back.code).toBe('room-locked');
+  });
+});
+
+/**
+ * Being removed, which is about a device and nothing else.
+ *
+ * It used to work by locking the room, so it was tangled up with a decision
+ * about everybody else, and unlocking quietly undid it. Now it is written down
+ * against the device and lasts the game, until the host says otherwise.
+ */
+describe('being removed from a game', () => {
+  const players = (state: RoomState<Snapshot>) => asCricket(state.snapshot).players.map((p) => p.name);
+
+  const arrive = (
+    state: RoomState<Snapshot>,
+    memberId: string,
+    name: string,
+    deviceKey?: string | null,
+    claim?: string | null,
+  ) => join(state, { memberId, name, now: 1, deviceKey, claim }, cricketApply());
+
+  const withGrace = () => {
+    const joined = arrive(newRoom(), 'm1', 'Grace', 'phone');
+    if (!joined.ok) throw new Error(joined.code);
+    return { state: joined.state, seat: joined.member.seatId! };
+  };
+
+  const kick = (state: RoomState<Snapshot>, memberId = 'm1') =>
+    act(state, HOST.memberId, { t: 'kick', memberId }).state;
+
+  it('turns that device away', () => {
+    const back = arrive(kick(withGrace().state), 'm2', 'Grace', 'phone');
+    expect(back.ok).toBe(false);
+    expect(!back.ok && back.code).toBe('kicked-out');
+  });
+
+  it('still turns it away after the host unlocks the room', () => {
+    let state = kick(withGrace().state);
+    state = act(state, HOST.memberId, { t: 'lock', locked: true }).state;
+    state = act(state, HOST.memberId, { t: 'lock', locked: false }).state;
+
+    expect(arrive(state, 'm2', 'Grace', 'phone').ok).toBe(false);
+  });
+
+  it('leaves their player on the board, and nobody else can take it', () => {
+    const { state, seat } = withGrace();
+    const kicked = kick(state);
+
+    expect(players(kicked)).toEqual(['Host', 'Grace']);
+    expect(claimable(kicked).map((p) => p.id)).not.toContain(seat);
+  });
+
+  // The host is shown who they have thrown out, by name and by a handle that
+  // is not the device key.
+  it('shows the host who they removed', () => {
+    const view = roomView(kick(withGrace().state), ctx());
+    expect(view.removed).toEqual([{ ref: 'm1', name: 'Grace' }]);
+  });
+
+  it('says nothing about it in what the room hands out', () => {
+    const view = JSON.stringify(roomView(kick(withGrace().state), ctx()));
+    expect(view).not.toContain('phone');
+    expect(view).not.toContain('sha256');
+  });
+
+  it('lets the host change their mind', () => {
+    const { state, seat } = withGrace();
+    const kicked = kick(state);
+    const forgiven = act(kicked, HOST.memberId, { t: 'allowBack', reqId: 'r1', ref: 'm1' }).state;
+
+    expect(roomView(forgiven, ctx()).removed).toEqual([]);
+    const back = arrive(forgiven, 'm2', 'Grace', 'phone');
+    // And their own player is waiting, since it was never given away.
+    expect(back.ok && back.member.seatId).toBe(seat);
+  });
+
+  it("is the host's alone to undo", () => {
+    const { state } = withGrace();
+    const kicked = kick(state);
+    const guest = withGuest(kicked, 'm3', 'Alan');
+    const { effects } = act(guest, 'm3', { t: 'allowBack', reqId: 'r1', ref: 'm1' });
+
+    expect(firstError(effects)?.code).toBe('host-only');
+  });
+
+  it('shrugs at a handle that means nothing', () => {
+    const { effects } = act(kick(withGrace().state), HOST.memberId, {
+      t: 'allowBack', reqId: 'r1', ref: 'nobody',
+    });
+    expect(firstError(effects)?.code).toBe('unknown-action');
+  });
+
+  // Clearing storage makes a new device, and the host can remove that too.
+  it('does not stop them coming back as somebody new', () => {
+    const back = arrive(kick(withGrace().state), 'm2', 'Grace', 'another-phone');
+    expect(back.ok).toBe(true);
+    expect(back.ok && players(back.state)).toEqual(['Host', 'Grace', 'Grace 2']);
+  });
+});
+
+/**
+ * Claiming a row the host laid out before anyone arrived.
+ *
+ * The host types "Ada, Grace" while setting up, and those rows are meant to be
+ * taken - that is what they are for. The line is that a row some device already
+ * answers for is not on offer to anybody.
+ */
+describe('claiming a player set up in advance', () => {
+  const players = (state: RoomState<Snapshot>) => asCricket(state.snapshot).players.map((p) => p.name);
+
+  const arrive = (
+    state: RoomState<Snapshot>,
+    memberId: string,
+    name: string,
+    deviceKey?: string | null,
+    claim?: string | null,
+  ) => join(state, { memberId, name, now: 1, deviceKey, claim }, cricketApply());
+
+  /** A host who typed the table out before anyone turned up. */
+  const laidOut = () => {
+    const room = newRoom();
+    const state = act(room, HOST.memberId, {
+      t: 'action', reqId: 'r1', rev: room.rev, action: { type: 'addPlayers', names: 'Ada, Grace' },
+    }).state;
+    const seats = asCricket(state.snapshot).players;
+    return { state, ada: seats[1]!.id, grace: seats[2]!.id };
+  };
+
+  it('offers the rows the host typed, and not the host', () => {
+    const { state, ada, grace } = laidOut();
+    expect(claimable(state).map((p) => p.id)).toEqual([ada, grace]);
+  });
+
+  it('takes the row rather than making another', () => {
+    const { state, grace } = laidOut();
+    const joined = arrive(state, 'm1', 'Grace', 'phone', grace);
+
+    expect(joined.ok && joined.member.seatId).toBe(grace);
+    expect(joined.ok && players(joined.state)).toEqual(['Host', 'Ada', 'Grace']);
+  });
+
+  it("is that device's from then on, and nobody else's", () => {
+    const { state, grace } = laidOut();
+    const taken = arrive(state, 'm1', 'Grace', 'phone', grace);
+    if (!taken.ok) throw new Error(taken.code);
+
+    expect(claimable(taken.state).map((p) => p.id)).not.toContain(grace);
+    // Even once they have gone, it stays theirs.
+    const left = act(taken.state, 'm1', { t: 'leave', reqId: 'l1' }).state;
+    expect(claimable(left).map((p) => p.id)).not.toContain(grace);
+  });
+
+  it('will not hand a claimed row to somebody else who asks for it', () => {
+    const { state, grace } = laidOut();
+    const taken = arrive(state, 'm1', 'Grace', 'phone', grace);
+    if (!taken.ok) throw new Error(taken.code);
+    const left = act(taken.state, 'm1', { t: 'leave', reqId: 'l1' }).state;
+
+    const thief = arrive(left, 'm2', 'Grace', 'another-phone', grace);
+    expect(thief.ok && thief.member.seatId).not.toBe(grace);
+    expect(thief.ok && players(thief.state)).toEqual(['Host', 'Ada', 'Grace', 'Grace 2']);
+  });
+
+  it("will not hand over the host's own player", () => {
+    const { state } = laidOut();
+    const hostSeat = state.members[HOST.memberId]!.seatId!;
+    const thief = arrive(state, 'm1', 'Host', 'phone', hostSeat);
+
+    expect(thief.ok && thief.member.seatId).not.toBe(hostSeat);
+  });
+
+  it('falls back to a new player when the row has gone', () => {
+    const { state, grace } = laidOut();
+    const removed = act(state, HOST.memberId, {
+      t: 'action', reqId: 'r2', rev: state.rev, action: { type: 'removePlayer', id: grace },
+    }).state;
+
+    const joined = arrive(removed, 'm1', 'Grace', 'phone', grace);
+    expect(joined.ok && players(joined.state)).toEqual(['Host', 'Ada', 'Grace']);
+  });
+
+  it('gets into a locked room, since it makes no new player', () => {
+    const { state, grace } = laidOut();
+    const locked = act(state, HOST.memberId, { t: 'lock', locked: true }).state;
+
+    expect(arrive(locked, 'm1', 'Grace', 'phone', grace).ok).toBe(true);
+  });
+
+  it('is refused to a device the host removed', () => {
+    const { state, ada, grace } = laidOut();
+    const joined = arrive(state, 'm1', 'Grace', 'phone', grace);
+    if (!joined.ok) throw new Error(joined.code);
+    const kicked = act(joined.state, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
+
+    // Not even a different row, and not by claiming one.
+    expect(arrive(kicked, 'm2', 'Ada', 'phone', ada).ok).toBe(false);
+  });
+
+  it('remembers the device, so leaving and returning still works', () => {
+    const { state, grace } = laidOut();
+    const taken = arrive(state, 'm1', 'Grace', 'phone', grace);
+    if (!taken.ok) throw new Error(taken.code);
+    const left = act(taken.state, 'm1', { t: 'leave', reqId: 'l1' }).state;
+
+    // No claim this time: the device is enough.
+    const back = arrive(left, 'm2', 'Whatever', 'phone');
+    expect(back.ok && back.member.seatId).toBe(grace);
   });
 });

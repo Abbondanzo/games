@@ -172,8 +172,43 @@ describe('a host and a guest in one room', () => {
     await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
 
     await waitFor(() => expect(room.state().members[guestSession.memberId]).toBeUndefined());
-    // Kicking closes the room, or they would simply rejoin.
-    expect(room.state().locked).toBe(true);
+    // Removing one person is not a decision about everybody else, so the door
+    // is left as the host set it. Their device is what is kept out.
+    expect(room.state().locked).toBe(false);
+    expect(() => room.addMember('Grace', 'her-phone')).not.toThrow();
+  });
+
+  it('keeps a removed device out for the rest of the game', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('cricket');
+    const guest = room.addMember('Grace', 'her-phone');
+    const host = mount(room, room.hostSession, 'host');
+    mount(room, guest, 'guest');
+
+    await user.click(within(host).getByRole('button', { name: 'Who is here' }));
+    await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
+    await waitFor(() => expect(room.state().members[guest.memberId]).toBeUndefined());
+
+    expect(() => room.addMember('Grace', 'her-phone')).toThrow(/kicked-out/);
+  });
+
+  it('shows the host who they removed, and lets them back', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('cricket');
+    const guest = room.addMember('Grace', 'her-phone');
+    const host = mount(room, room.hostSession, 'host');
+    mount(room, guest, 'guest');
+
+    await user.click(within(host).getByRole('button', { name: 'Who is here' }));
+    await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
+
+    await waitFor(() =>
+      expect(within(host).getByText('Removed from this game')).toBeInTheDocument());
+    await user.click(within(host).getByRole('button', { name: 'Let Grace back into the game' }));
+
+    await waitFor(() =>
+      expect(within(host).queryByText('Removed from this game')).not.toBeInTheDocument());
+    expect(() => room.addMember('Grace', 'her-phone')).not.toThrow();
   });
 
   // A host leaving would strand the game on the server, so the only way out

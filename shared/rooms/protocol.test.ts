@@ -27,7 +27,7 @@ const SERVER: ServerMessage[] = [
     you: { memberId: 'm1', role: 'host', seatId: null, name: 'Ada' },
     rev: 0,
     state: { players: [], turns: [] },
-    room: { members: [], locked: false, pending: null },
+    room: { members: [], locked: false, pending: null, removed: [] },
   },
   { t: 'state', rev: 3, state: { players: [] }, cause: { memberId: 'm1', actionType: 'pass' } },
   { t: 'state', rev: 4, state: {}, cause: null },
@@ -37,6 +37,7 @@ const SERVER: ServerMessage[] = [
       members: [{ memberId: 'm1', name: 'Ada', role: 'host', seatId: 'p1', online: true }],
       locked: true,
       pending: { winnerId: 'p1', racks: { p2: 24 } },
+      removed: [{ ref: 'm9', name: 'Alan' }],
     },
   },
   { t: 'error', reqId: 'r1', code: 'not-your-turn' },
@@ -211,12 +212,12 @@ describe('what a client is allowed to read', () => {
   it('drops anything the room did not declare', () => {
     const frame = JSON.stringify({
       t: 'room',
-      room: { members: [], locked: false, pending: null },
+      room: { members: [], locked: false, pending: null, removed: [] },
       devices: { 'sha256:secret': 'p1' },
     });
 
     const decoded = decodeServerMessage(frame);
-    expect(decoded).toEqual({ t: 'room', room: { members: [], locked: false, pending: null } });
+    expect(decoded).toEqual({ t: 'room', room: { members: [], locked: false, pending: null, removed: [] } });
     expect(JSON.stringify(decoded)).not.toContain('secret');
   });
 
@@ -230,6 +231,7 @@ describe('what a client is allowed to read', () => {
         }],
         locked: false,
         pending: null,
+        removed: [],
       },
     });
 

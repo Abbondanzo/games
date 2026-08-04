@@ -27,7 +27,7 @@ export interface TestRoom {
    * Adds a member as a join would. `device` is the secret that device keeps for
    * this room: pass the same one twice to test somebody coming back.
    */
-  addMember: (name: string, device?: string | null) => StoredSession;
+  addMember: (name: string, device?: string | null, claim?: string | null) => StoredSession;
   /** The host's session, created with the room. */
   hostSession: StoredSession;
   /** Hands a session to this tab, as create or join would. */
@@ -92,13 +92,13 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
     hostSession: { game, code: 'AB2D', token: 'host-token', memberId: hostId },
     state: () => state,
 
-    addMember(name, device) {
+    addMember(name, device, claim) {
       const memberId = nextId();
       const token = `token-${memberId}`;
       // The Worker hashes the secret before the room sees it; the prefix stands
       // in for that, so nothing here can pass a raw secret off as a key.
       const deviceKey = device ? `sha256:${device}` : null;
-      const result = join(state, { memberId, name, now: 1_000, deviceKey }, apply);
+      const result = join(state, { memberId, name, now: 1_000, deviceKey, claim }, apply);
       if (!result.ok) throw new Error(`join refused: ${result.code}`);
       state = result.state;
       deliver(result.effects);

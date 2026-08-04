@@ -451,6 +451,12 @@ button.ghost, button.primary, button.link {
 
 .scoreboard .pts.neg { color: var(--bad); }
 
+.claim { border: none; margin: 0; padding: 0; }
+.claim legend { font-size: .82rem; color: var(--muted); padding: 0 0 .4rem; }
+.claim .hint { margin-top: .4rem; }
+.removed-list { margin-top: .6rem; }
+.removed-list .muted { font-size: .8rem; margin: 0 0 .35rem; }
+
 .winner-pick { border: none; margin: 0 0 .85rem; padding: 0; }
 .winner-pick legend { font-size: .82rem; color: var(--muted); padding: 0 0 .4rem; }
 .seg.wrap { flex-wrap: wrap; width: fit-content; max-width: 100%; }

@@ -13,6 +13,7 @@ import {
 } from '../shared/rooms/roomCore';
 import { CLOSE, decodeClientMessage, encode, type Game } from '../shared/rooms/protocol';
 import { GAME_SETUP } from '../shared/rooms/games';
+import { claimable } from '../shared/rooms/roomCore';
 import type { ApplyAction } from '../shared/rooms/roomCore';
 import type { Snapshot } from '../shared/rooms/protocol';
 
@@ -136,7 +137,9 @@ export class Room extends DurableObject {
     const state = await this.load();
     if (!state) return json({ error: 'no-room' }, 404);
 
-    const body = (await request.json()) as { name: string; device?: unknown };
+    const body = (await request.json()) as {
+      name: string; device?: unknown; claim?: unknown;
+    };
     const memberId = uid();
     const token = uid();
 
@@ -149,10 +152,13 @@ export class Room extends DurableObject {
         // Who this device already is, if the room has met it. Unguessable, so
         // an absent or invented one simply means a new player.
         deviceKey: await deviceKeyOf(body.device),
+        // Or a row the host laid out that this joiner says is them. Checked
+        // against what is actually claimable, so a stale one falls through.
+        claim: typeof body.claim === 'string' ? body.claim : null,
       },
       this.applyFor(state.game),
     );
-    if (!result.ok) return json({ error: result.code }, 409);
+    if (!result.ok) return json({ error: result.code }, result.code === 'kicked-out' ? 403 : 409);
 
     const tokens = (await this.ctx.storage.get<Record<string, string>>('tokens')) ?? {};
     await this.ctx.storage.put('tokens', { ...tokens, [token]: memberId });
@@ -166,7 +172,13 @@ export class Room extends DurableObject {
   private async handlePeek(): Promise<Response> {
     const state = await this.load();
     if (!state) return json({ error: 'no-room' }, 404);
-    return json({ game: state.game, open: !state.locked });
+    // The rows a host laid out in advance, so a joiner can say which is them
+    // before typing a name. Only ever the unspoken-for ones.
+    return json({
+      game: state.game,
+      open: !state.locked,
+      claimable: claimable(state).map(({ id, name }) => ({ id, name })),
+    });
   }
 
   private async handleSocket(url: URL): Promise<Response> {

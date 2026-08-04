@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import {
   compareProtocol,
   type ErrorCode, type Game, type GameAction, type GoneReason, type Member, type PendingRound,
-  type Role, type Snapshot, type VersionGap,
+  type Removed, type Role, type Snapshot, type VersionGap,
 } from '@shared/rooms/protocol';
 import { can as canDo, seatView } from '@shared/rooms/permissions';
 import {
@@ -55,6 +55,9 @@ export interface RoomHandle {
   kick: (memberId: string) => void;
   /** Hand the room over. The giver becomes an ordinary player. Host only. */
   makeHost: (memberId: string) => void;
+  /** Who the host has removed, so they can change their mind. Host only. */
+  removed: Removed[];
+  allowBack: (ref: string) => void;
   /**
    * Stop following the room. Guests only: a host cannot leave, because the game
    * lives in the room and walking out would strand it with nobody able to
@@ -129,6 +132,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
   const [outdated, setOutdated] = useState<VersionGap | null>(null);
   const [pending, setPending] = useState<PendingRound | null>(null);
   const [gone, setGone] = useState<GoneReason | null>(null);
+  const [removed, setRemoved] = useState<Removed[]>([]);
 
   const transport = useRef<Transport | null>(null);
   const rev = useRef(0);
@@ -202,6 +206,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
               setMembers(message.room.members);
               setLocked(message.room.locked);
               setPending(message.room.pending);
+              setRemoved(message.room.removed);
               rawDispatch({ type: '__snapshot', state: message.state });
               break;
 
@@ -217,6 +222,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
               setMembers(message.room.members);
               setLocked(message.room.locked);
               setPending(message.room.pending);
+              setRemoved(message.room.removed);
               const me = message.room.members.find((m) => m.memberId === session.memberId);
               if (me) {
                 setSeatId(me.seatId);
@@ -304,6 +310,9 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       kick: (memberId) => transport.current?.send({ t: 'kick', memberId }),
       makeHost: (memberId) =>
         transport.current?.send({ t: 'makeHost', reqId: nextRequestId(), memberId }),
+      removed,
+      allowBack: (ref) =>
+        transport.current?.send({ t: 'allowBack', reqId: nextRequestId(), ref }),
       leave: () => {
         // A host has no way out that is not closing the room.
         if (role === 'host') return;
@@ -321,7 +330,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       cancelRound: () => transport.current?.send({ t: 'roundCancel', reqId: nextRequestId() }),
     };
   }, [session, game, state, role, seatId, members, locked, pending, status, inFlightCount,
-      lastError, outdated, stopFollowing]);
+      lastError, outdated, removed, stopFollowing]);
 
   return { state, dispatch, room, onReject, gone };
 }

@@ -157,16 +157,38 @@ Names are still made distinct - a second Grace becomes "Grace 2", compared
 without regard to case so the board does not carry a "Grace" and a "grace" - but
 that is about telling rows apart, not people.
 
-**A host typing the roster in advance** no longer has those people claim their
-own rows, since claiming would have to go by name. They join as themselves and
-the host removes the spares.
+**Claiming a row the host laid out.** Hosts often set the table up before anyone
+arrives, typing everybody in, and those rows are there to be taken. Looking the
+code up happens as soon as it is complete, so the question comes *before* the
+name field - by the time you have typed a name you have already made a second
+player.
+
+A row is on offer exactly while no device has ever answered for it. Once
+somebody takes it, it is theirs: it stays theirs while they are away, and
+another device asking for it by id gets a new player instead. The host's own row
+is never on offer, because their device answered for it when they made the room.
+
+There is nothing to verify in a claim and nothing to verify it with - the host
+wrote "Grace" so that Grace could take it, and the room code is what stands
+between that and a stranger. That is the same trust the code already carries,
+and the host can remove anybody who abuses it.
 
 **Locking stops new players, not people coming back.** A host locks the room
 once everyone is at the table, which is exactly when somebody's phone goes to
-sleep, so a join the room recognises is let through while one that would create
-a player is refused. Kicking is the exception: it locks the room for the express
-purpose of keeping one person out, so it bars that seat and forgets the device,
-and unlocking gives them a new player rather than their old one.
+sleep. A join that takes an existing player is let through - coming back, or
+claiming a row - and one that would make a new player is refused.
+
+**Being removed is about a device, and lasts the game.** It used to work by
+locking the room, which tangled throwing one person out up with a decision about
+everybody else, and unlocking quietly undid it. Now the device is written down
+and turned away however the door is set, until the host says otherwise: they are
+shown who they have removed and can let them back, by a public handle rather
+than by the key the list is really kept on. Their player stays on the board with
+its score, and stays spoken for, so nobody can claim it while they are out.
+
+Clearing storage makes a new device, and there is no defence against that beyond
+removing them again. The alternative - locking the room on every kick - was
+worse, because it punished the whole table for one person.
 
 **Rummikub** is the exception. A round records every rack at once, so it cannot
 be seat-scoped. The host opens a round, each player submits their own rack, and

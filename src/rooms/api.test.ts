@@ -79,8 +79,25 @@ describe('looking a code up', () => {
   it('reports which game it belongs to', async () => {
     mockFetch(async () => respond(200, { game: 'rummikub', open: true }));
     await expect(peekRoom('AB2D')).resolves.toEqual({
-      ok: true, value: { game: 'rummikub', open: true },
+      ok: true, value: { game: 'rummikub', open: true, claimable: [] },
     });
+  });
+
+  it('reports who is waiting to be claimed', async () => {
+    mockFetch(async () => respond(200, {
+      game: 'cricket', open: true, claimable: [{ id: 'p1', name: 'Ada' }],
+    }));
+    await expect(peekRoom('AB2D')).resolves.toEqual({
+      ok: true,
+      value: { game: 'cricket', open: true, claimable: [{ id: 'p1', name: 'Ada' }] },
+    });
+  });
+
+  // An older room says nothing about it, and that is simply nobody waiting.
+  it('treats a malformed claim list as nobody waiting', async () => {
+    mockFetch(async () => respond(200, { game: 'cricket', open: true, claimable: 'lots' }));
+    const result = await peekRoom('AB2D');
+    expect(result.ok && result.value.claimable).toEqual([]);
   });
 
   it('says nothing is there for an unknown code', async () => {

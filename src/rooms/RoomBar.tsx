@@ -154,6 +154,27 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
             ))}
           </ul>
 
+          {isHost && room.removed.length > 0 && (
+            <div className="removed-list">
+              <p className="muted">Removed from this game</p>
+              <ul className="chips">
+                {room.removed.map((person) => (
+                  <li key={person.ref}>
+                    {person.name}
+                    <button
+                      type="button"
+                      className="link"
+                      aria-label={`Let ${person.name} back into the game`}
+                      onClick={() => room.allowBack(person.ref)}
+                    >
+                      Let back in
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="room-actions">
             <button type="button" className="ghost" onClick={() => void copyLink()}>
               <Copy size={15} aria-hidden="true" /> {copied ? 'Copied' : 'Copy invite'}
@@ -187,9 +208,10 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
             <p className="hint">
               Share the code or the link. Anyone who joins can pick their name and enter their
               own scores; only you can change the rules. Stopping new players closes the door
-              without ending anything. You can put someone else in charge, which is how to leave
-              without ending the game. Closing the room ends it for everyone and keeps the game
-              on this device.
+              without ending anything. Removing somebody keeps them out for the rest of the game,
+              whether the room is open or not, until you let them back. You can put someone else
+              in charge, which is how to leave without ending the game. Closing the room ends it
+              for everyone and keeps the game on this device.
             </p>
           )}
         </div>

@@ -134,8 +134,12 @@ export default {
     const code = parts[1] ? normaliseCode(parts[1]) : null;
     if (!code) return json({ error: 'bad-code' }, 400, cors);
 
-    // GET /rooms/:code - peek, so a deep link knows which game to open
+    // GET /rooms/:code - peek, so a deep link knows which game to open and who
+    // is waiting to be claimed. It names people, so it is rate limited too.
     if (parts.length === 2 && request.method === 'GET') {
+      if (!(await withinLimit(request, env))) {
+        return json({ error: 'rate-limited' }, 429, cors);
+      }
       return forward(env, code, 'peek', cors);
     }
 

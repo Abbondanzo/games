@@ -34,6 +34,12 @@ export interface StoredMember {
   name: string;
   role: Role;
   seatId: string | null;
+  /**
+   * The device behind this member, so removing them can be made to stick.
+   * Server-side only: `roomView` names the fields clients get, and this is not
+   * one of them.
+   */
+  deviceKey?: string;
   /** Recent request ids, newest last. */
   seen: string[];
 }
@@ -47,11 +53,17 @@ export interface RoomState<S extends Snapshot = Snapshot> {
   members: Record<string, StoredMember>;
   locked: boolean;
   /**
-   * Seats the host has removed somebody from, which a locked room will not hand
-   * back. Without this, letting people return would quietly undo kicking.
-   * Absent on rooms made before this existed, so always read it with `?? []`.
+   * Devices the host has removed, for the rest of the game.
+   *
+   * Keyed on the device rather than on the seat or the name, so it survives
+   * everything they could change, and independent of the lock: locking is about
+   * whether new people may arrive, and has nothing to say about somebody the
+   * host has thrown out. `ref` is the member id they had, a public handle the
+   * host can undo them by without the key itself ever leaving the room.
+   *
+   * Absent on rooms made before this existed, so always read it with `?? {}`.
    */
-  barred?: string[];
+  kicked?: Record<string, { ref: string; name: string }>;
   /**
    * Which player a device is, keyed by an opaque digest of a secret only that
    * device holds. This is how somebody who leaves gets their player back.
@@ -99,6 +111,23 @@ export interface Outcome<S extends Snapshot = Snapshot> {
   effects: Effect[];
 }
 
+/**
+ * Players a joiner may say they are.
+ *
+ * A host who sets the table up before anyone arrives types the names, and those
+ * rows are meant to be claimed - that is what they are for. But only those: a
+ * player some device already answers for belongs to that device, and no name
+ * anybody types can take it away. So a row is claimable exactly while nobody
+ * has ever held it, which by construction excludes the host's own.
+ */
+export function claimable<S extends Snapshot>(state: RoomState<S>): { id: string; name: string }[] {
+  const spokenFor = new Set<string>([
+    ...Object.values(state.devices ?? {}),
+    ...Object.values(state.members).map((m) => m.seatId ?? ''),
+  ]);
+  return playersIn(state.snapshot).filter((p) => !spokenFor.has(p.id));
+}
+
 /* ─────────────────────────── views ─────────────────────────── */
 
 export function roomView<S extends Snapshot>(state: RoomState<S>, ctx: Context): RoomView {
@@ -110,7 +139,12 @@ export function roomView<S extends Snapshot>(state: RoomState<S>, ctx: Context):
     seatId: m.seatId,
     online: online.has(m.memberId),
   }));
-  return { members, locked: state.locked, pending: state.pending };
+  return {
+    members,
+    locked: state.locked,
+    pending: state.pending,
+    removed: Object.values(state.kicked ?? {}).map(({ ref, name }) => ({ ref, name })),
+  };
 }
 
 const actorOf = (member: StoredMember): Actor => ({
@@ -186,6 +220,7 @@ export function createRoom<S extends Snapshot>(input: {
         name: seated.name,
         role: 'host',
         seatId: seated.seatId,
+        ...(input.host.deviceKey ? { deviceKey: input.host.deviceKey } : {}),
         seen: [],
       },
     },
@@ -232,14 +267,27 @@ function distinctName(wanted: string, taken: readonly string[]): string {
  */
 export function join<S extends Snapshot>(
   state: RoomState<S>,
-  input: { memberId: string; name: string; now: number; deviceKey?: string | null },
+  input: {
+    memberId: string;
+    name: string;
+    now: number;
+    deviceKey?: string | null;
+    /** A player set up in advance that this joiner says is them. */
+    claim?: string | null;
+  },
   apply: ApplyAction<S>,
 ): JoinResult<S> {
   if (Object.keys(state.members).length >= MAX_MEMBERS) return { ok: false, code: 'room-full' };
 
-  const claimed = new Set(Object.values(state.members).map((m) => m.seatId));
-  const barred = new Set(state.barred ?? []);
   const devices = state.devices ?? {};
+
+  // Removed by the host, and that is the end of it for this game. Nothing else
+  // here can talk its way past this, and unlocking the room does not either.
+  if (input.deviceKey && (state.kicked ?? {})[input.deviceKey]) {
+    return { ok: false, code: 'kicked-out' };
+  }
+
+  const claimed = new Set(Object.values(state.members).map((m) => m.seatId));
 
   /**
    * The player this device already is.
@@ -252,16 +300,29 @@ export function join<S extends Snapshot>(
    *
    * The key is a digest of a secret only that device holds, so it cannot be
    * guessed from anything the room hands out. Even then it is a request rather
-   * than a fact: the seat has to still exist, be free, and not be one the host
-   * has barred.
+   * than a fact: the player has to still exist and be free.
    */
   const held = input.deviceKey ? devices[input.deviceKey] : undefined;
-  const returning = held && !claimed.has(held) && !barred.has(held)
+  const mine = held && !claimed.has(held)
     ? playersIn(state.snapshot).find((p) => p.id === held)
     : undefined;
 
-  const seated = returning
-    ? { snapshot: state.snapshot, seatId: returning.id, name: returning.name }
+  /**
+   * Or a row the host typed out in advance, which this joiner says is them.
+   *
+   * There is nothing to verify here and nothing to verify it with: the host
+   * wrote "Grace" so that Grace could take it, and the only thing standing
+   * between that and a stranger is the room code. What it cannot do is take a
+   * player away from a device that already answers for one, which is what
+   * `claimable` is for.
+   */
+  const claiming = !mine && input.claim
+    ? claimable(state).find((p) => p.id === input.claim)
+    : undefined;
+
+  const taking = mine ?? claiming;
+  const seated = taking
+    ? { snapshot: state.snapshot, seatId: taking.id, name: taking.name }
     : seatNewcomer(state.game, state.snapshot, input.name, apply);
   const added = seated.snapshot !== state.snapshot;
 
@@ -271,27 +332,18 @@ export function join<S extends Snapshot>(
    * A host locks the room once everyone is at the table, and that is exactly
    * when somebody drops their phone in their pocket and comes back to find the
    * door shut on a player that is sitting there with their score on it. So a
-   * join that takes back an existing player is allowed through; one that would
-   * make a new player is not.
-   *
-   * Except for a seat the host removed somebody from. Kicking locks the room
-   * for the express purpose of keeping that person out, and letting them take
-   * their old player back would undo it. Unlocking is the host deciding to open
-   * the door again, to them along with everybody else.
-   *
-   * Anyone returning still needs the code and the name, which is what they
-   * needed before it was locked, and the host can remove them again.
+   * join that takes an existing player is allowed through - whether coming back
+   * or claiming a row the host laid out - and one that would make a new player
+   * is not. Somebody the host removed was turned away well before here.
    */
-  if (state.locked) {
-    const barred = seated.seatId !== null && (state.barred ?? []).includes(seated.seatId);
-    if (added || barred) return { ok: false, code: 'room-locked' };
-  }
+  if (state.locked && added) return { ok: false, code: 'room-locked' };
 
   const member: StoredMember = {
     memberId: input.memberId,
     name: seated.name,
     role: 'player',
     seatId: seated.seatId,
+    ...(input.deviceKey ? { deviceKey: input.deviceKey } : {}),
     seen: [],
   };
 
@@ -516,6 +568,23 @@ export function handle<S extends Snapshot>(
       };
     }
 
+    /**
+     * Undoing a removal. The host is shown who they have thrown out and can
+     * change their mind; `ref` is the public handle for an entry the room keeps
+     * against a device key it never hands out.
+     */
+    case 'allowBack': {
+      if (member.role !== 'host') return fail(touched, memberId, message.reqId, 'host-only');
+
+      const entries = Object.entries(touched.kicked ?? {});
+      const found = entries.find(([, entry]) => entry.ref === message.ref);
+      if (!found) return fail(touched, memberId, message.reqId, 'unknown-action');
+
+      const kicked = Object.fromEntries(entries.filter(([key]) => key !== found[0]));
+      const next = { ...touched, kicked };
+      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+    }
+
     case 'roundCancel': {
       if (member.role !== 'host') return fail(touched, memberId, message.reqId, 'host-only');
       const next = { ...touched, pending: null };
@@ -607,26 +676,24 @@ function handleKick<S extends Snapshot>(
   if (targetId === actor.memberId) return fail(state, actor.memberId, null, 'host-only');
   if (!state.members[targetId]) return { state, effects: [] };
 
-  const seatId = state.members[targetId]?.seatId ?? null;
+  const target = state.members[targetId]!;
   const members = { ...state.members };
   delete members[targetId];
 
-  // Kicking without locking is theatre: they would simply rejoin with a new id.
-  // Barring the seat closes the other way back, since a locked room does let
-  // somebody who left of their own accord take their old player back.
-  const barred = seatId && !(state.barred ?? []).includes(seatId)
-    ? [...(state.barred ?? []), seatId]
-    : state.barred;
+  /**
+   * Written down against the device, and that is what makes it stick. The room
+   * is not locked as a side effect: that used to be the only thing stopping a
+   * rejoin, and it made throwing one person out into a decision about everybody
+   * else. The host locks the door if they want the door locked.
+   *
+   * Their player stays on the board with its score, and stays spoken for, so
+   * nobody can claim it while they are out.
+   */
+  const kicked = target.deviceKey
+    ? { ...(state.kicked ?? {}), [target.deviceKey]: { ref: targetId, name: target.name } }
+    : state.kicked;
 
-  // And forgotten, so unlocking later does not quietly hand the seat straight
-  // back to the device the host removed.
-  const devices = Object.fromEntries(
-    Object.entries(state.devices ?? {}).filter(([, seat]) => seat !== seatId),
-  );
-
-  const next: RoomState<S> = {
-    ...state, members, locked: true, devices, ...(barred ? { barred } : {}),
-  };
+  const next: RoomState<S> = { ...state, members, ...(kicked ? { kicked } : {}) };
 
   return {
     state: next,

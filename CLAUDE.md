@@ -169,8 +169,12 @@ it fail first.
   the socket, never in `roomView`, and the closed message schemas mean a leak would be stripped
   by the client's own decode. Do not reintroduce name matching; it was there, it was spoofable,
   and it did not even work for two people called Peter.
-- **Locking lets a returning device back in but not a new one.** Kicking bars the seat and
-  forgets the device, so unlocking gives that person a new player rather than their old one.
+- **Locking lets a returning device back in but not a new one.** Being removed is separate and
+  lasts the game: it is keyed on the device, survives the door being unlocked, and the host is
+  shown the list and can undo it. Kicking deliberately does not lock the room any more.
+- **A player is claimable only while no device has ever held it.** That is what lets a host lay
+  the table out in advance and have people take their rows, without letting anybody take a row
+  that is already somebody's. `claimable()` in `roomCore.ts` is the one definition.
 - **Play order is fixed by the first turn.** `movePlayer` is refused once a game has any
   turns, because the roster order is the turn order and moving somebody would hand the turn
   to a different player. The UI hides the buttons then, but the reducer is what enforces it.
