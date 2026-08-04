@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { ScrabbleTracker } from './ScrabbleTracker';
+import { scoreboard } from '../rooms/testClient';
 import { clearDictionaryCache, retryConfig } from './lib/dictionary';
 
 const Router = ({ children }: { children: ReactNode }) => (
@@ -21,10 +22,7 @@ function setup() {
 const wordBox = () => screen.getByLabelText('Word played');
 const total = () => Number(screen.getByTestId('turn-total').textContent);
 const tiles = () => within(screen.getByRole('group', { name: 'Letters played' })).getAllByRole('button');
-const board = () =>
-  screen.getAllByRole('listitem')
-    .filter((li) => li.querySelector('.pts'))
-    .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`);
+const board = () => scoreboard();
 
 async function addPlayers(user: ReturnType<typeof userEvent.setup>, names: string) {
   await user.type(screen.getByLabelText('Player name'), names);

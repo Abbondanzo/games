@@ -7,14 +7,13 @@
  * because a name saved but never offered back is the same as not saving it.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { CricketTracker } from '../cricket/CricketTracker';
 import { HostRoomButton } from './HostRoomButton';
 import { JoinRoom } from './JoinRoom';
-import { RoomProvider } from './RoomProvider';
 import { createTestRoom } from './testRoom';
+import { mountClient } from './testClient';
 import { readName, writeName } from './storage';
 import * as api from './api';
 
@@ -25,11 +24,8 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-const wrap = (node: React.ReactNode) => (
-  <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-    {node}
-  </MemoryRouter>
-);
+/** Hosting is offered from inside a tracker, so it needs the game it is for. */
+const Share = () => <HostRoomButton game="cricket" />;
 
 describe('what is remembered', () => {
   it('is nothing at all before you have played', () => {
@@ -63,7 +59,7 @@ describe('what is remembered', () => {
 describe('hosting a room', () => {
   /** The form lives behind the Share button. */
   const openShare = async (user: ReturnType<typeof userEvent.setup>) => {
-    render(wrap(<HostRoomButton game="cricket" />));
+    mountClient(Share);
     await user.click(screen.getByRole('button', { name: /Share/ }));
   };
 
@@ -113,7 +109,7 @@ describe('hosting a room', () => {
 describe('joining a room', () => {
   it('starts the field from the name last used', () => {
     writeName('Grace');
-    render(wrap(<JoinRoom />));
+    mountClient(JoinRoom);
 
     expect(screen.getByLabelText('Your name')).toHaveValue('Grace');
   });
@@ -128,7 +124,7 @@ describe('joining a room', () => {
     const reload = vi.fn();
     vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, reload });
 
-    render(wrap(<JoinRoom />));
+    mountClient(JoinRoom);
     await user.type(screen.getByLabelText('Room code'), 'AB23');
     await user.type(screen.getByLabelText('Your name'), 'Grace');
     await user.click(screen.getByRole('button', { name: /Join/ }));
@@ -140,7 +136,7 @@ describe('joining a room', () => {
     const user = userEvent.setup();
     vi.spyOn(api, 'peekRoom').mockResolvedValue({ ok: false, error: 'no-room' });
 
-    render(wrap(<JoinRoom />));
+    mountClient(JoinRoom);
     await user.type(screen.getByLabelText('Room code'), 'AB23');
     await user.type(screen.getByLabelText('Your name'), 'Grace');
     await user.click(screen.getByRole('button', { name: /Join/ }));
@@ -155,15 +151,7 @@ describe('joining a room', () => {
  * one saved, so the next room offered a name you had already rejected.
  */
 describe('renaming yourself in a room', () => {
-  const inRoom = () => {
-    const room = createTestRoom('cricket');
-    render(
-      <RoomProvider value={{ transport: room.transport(), session: room.hostSession }}>
-        {wrap(<CricketTracker />)}
-      </RoomProvider>,
-    );
-    return room;
-  };
+  const inRoom = () => mountClient(CricketTracker, { room: createTestRoom('cricket') });
 
   it('makes the new name the one offered next time', async () => {
     const user = userEvent.setup();

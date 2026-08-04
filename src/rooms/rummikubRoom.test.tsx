@@ -7,35 +7,19 @@
  * protocol, and check the solo path is untouched by it.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { RummikubTracker } from '../rummikub/RummikubTracker';
-import { RoomProvider } from './RoomProvider';
 import { createTestRoom, type TestRoom } from './testRoom';
 import type { StoredSession } from './storage';
+import { countingSockets, mountClient, myRow, scoreboard } from './testClient';
 
 type User = ReturnType<typeof userEvent.setup>;
 
-function mount(room: TestRoom, session: StoredSession, label: string): HTMLElement {
-  const container = document.createElement('div');
-  container.dataset.client = label;
-  document.body.append(container);
-  render(
-    <RoomProvider value={{ transport: room.transport(), session }}>
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <RummikubTracker />
-      </MemoryRouter>
-    </RoomProvider>,
-    { container },
-  );
-  return container;
-}
+const mount = (room: TestRoom, session: StoredSession, label: string) =>
+  mountClient(RummikubTracker, { room, session, label });
 
-const scores = (client: HTMLElement) =>
-  within(client).getAllByRole('listitem')
-    .filter((li) => li.querySelector('.pts'))
-    .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`);
+const scores = scoreboard;
 
 /** Host opens a round naming who went out. */
 async function collect(user: User, host: HTMLElement, winner: string) {
@@ -279,8 +263,7 @@ describe('controls a Rummikub guest may not use', () => {
     const guest = mount(room, guestSession, 'guest');
 
     await waitFor(() => expect(scores(guest)).toHaveLength(2));
-    const mine = within(guest).getAllByRole('listitem').find((li) => li.querySelector('.you'));
-    expect(mine).toHaveTextContent('Grace');
+    expect(myRow(guest)).toHaveTextContent('Grace');
   });
 
   it('leaves the host every one of them', async () => {
@@ -296,15 +279,7 @@ describe('controls a Rummikub guest may not use', () => {
 
 /** The room path must not have disturbed the game people play on their own. */
 describe('playing Rummikub alone', () => {
-  const solo = () => {
-    render(
-      <RoomProvider value={{ session: null }}>
-        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <RummikubTracker />
-        </MemoryRouter>
-      </RoomProvider>,
-    );
-  };
+  const solo = () => mountClient(RummikubTracker);
 
   it('still scores a round the old way, with no room in sight', async () => {
     const user = userEvent.setup();
@@ -317,26 +292,20 @@ describe('playing Rummikub alone', () => {
     await user.type(screen.getByLabelText('Tiles left for Grace'), '24');
     await user.click(screen.getByRole('button', { name: 'Score round' }));
 
-    expect(screen.getAllByRole('listitem')
-      .filter((li) => li.querySelector('.pts'))
-      .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`))
-      .toEqual(['Ada:24', 'Grace:-24']);
+    expect(scoreboard()).toEqual(['Ada:24', 'Grace:-24']);
   });
 
   it('never constructs a socket', async () => {
     const user = userEvent.setup();
-    const original = globalThis.WebSocket;
-    let constructed = 0;
-    // @ts-expect-error - replaced for the duration of this test
-    globalThis.WebSocket = class { constructor() { constructed += 1; } };
+    const sockets = countingSockets();
 
     solo();
     await user.type(screen.getByLabelText('Player name'), 'Ada');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
-    expect(constructed).toBe(0);
+    expect(sockets.count()).toBe(0);
     expect(localStorage.getItem('games.rummikub.v1')).toContain('Ada');
-    globalThis.WebSocket = original;
+    sockets.restore();
   });
 
   it('shows the tile pad and the winner picker, not the room wording', async () => {

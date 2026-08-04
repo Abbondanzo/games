@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Crown, RotateCcw, Trash2 } from 'lucide-react';
+import { Crown, RotateCcw, Trash2 } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { RoundEntry } from './components/RoundEntry';
 import { RackCollection } from './components/RackCollection';
@@ -7,6 +6,7 @@ import { OpenRound } from './components/OpenRound';
 import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
 import { RoomStrip } from '../rooms/RoomStrip';
+import { TopBar } from '../shared/TopBar';
 import { allowed, isHost as amHost, mySeat } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
@@ -53,35 +53,29 @@ export function RummikubTracker() {
 
   return (
     <>
-      <header className="topbar">
-        <Link className="back" to="/" aria-label="All games">
-          <ArrowLeft size={20} aria-hidden="true" />
-        </Link>
-        <h1>Rummikub</h1>
-        <div className="topbar-actions">
-          {!room && <HostRoomButton game="rummikub" existing={describeGame(state)} />}
-          {isHost && (
-            <>
-              <button
-                type="button"
-                className="ghost"
-                onClick={newGame}
-                title="Clear the rounds and keep the players"
-              >
-                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
-              </button>
-              <button
-                type="button"
-                className="ghost danger"
-                onClick={resetAll}
-                title="Clear the rounds and the players"
-              >
-                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+      <TopBar title="Rummikub">
+        {!room && <HostRoomButton game="rummikub" existing={describeGame(state)} />}
+        {isHost && (
+          <>
+            <button
+              type="button"
+              className="ghost"
+              onClick={newGame}
+              title="Clear the rounds and keep the players"
+            >
+              <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
+            </button>
+            <button
+              type="button"
+              className="ghost danger"
+              onClick={resetAll}
+              title="Clear the rounds and the players"
+            >
+              <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
+            </button>
+          </>
+        )}
+    </TopBar>
 
       <main>
         <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />

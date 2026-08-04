@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DoorOpen } from 'lucide-react';
 import { CODE_LENGTH, normaliseCode } from '@shared/rooms/codes';
+import { TopBar } from '../shared/TopBar';
 import { ROOM_ERRORS, joinRoom, peekRoom, type RoomError } from './api';
 import { readName, writeName, writeSession } from './storage';
 
@@ -64,50 +65,52 @@ export function JoinRoom() {
   }
 
   return (
-    <main className="home">
-      <h1>Join a game</h1>
-      <p className="sub">Enter the code the host gave you, and the name you want on the scoreboard.</p>
+    <>
+      <TopBar title="Join a game" />
+      <main className="home">
+        <p className="sub">Enter the code the host gave you, and the name you want on the scoreboard.</p>
 
-      <form className="card join-form" onSubmit={submit}>
-        <label className="field">
-          <span>Room code</span>
-          <input
-            className="code-input"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            maxLength={CODE_LENGTH + 2}
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            aria-label="Room code"
-          />
-        </label>
+        <form className="card join-form" onSubmit={submit}>
+          <label className="field">
+            <span>Room code</span>
+            <input
+              className="code-input"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              maxLength={CODE_LENGTH + 2}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              aria-label="Room code"
+            />
+          </label>
 
-        <label className="field">
-          <span>Your name</span>
-          <input
-            ref={nameRef}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={24}
-            autoComplete="off"
-            aria-label="Your name"
-          />
-        </label>
+          <label className="field">
+            <span>Your name</span>
+            <input
+              ref={nameRef}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={24}
+              autoComplete="off"
+              aria-label="Your name"
+            />
+          </label>
 
-        <button type="submit" className="primary" disabled={busy || !name.trim()}>
-          <DoorOpen size={15} aria-hidden="true" /> {busy ? 'Joining' : 'Join'}
-        </button>
-        <p className="hint">You will be added to the game straight away.</p>
+          <button type="submit" className="primary" disabled={busy || !name.trim()}>
+            <DoorOpen size={15} aria-hidden="true" /> {busy ? 'Joining' : 'Join'}
+          </button>
+          <p className="hint">You will be added to the game straight away.</p>
 
-        {error && (
-          <p className="room-error" role="status">
-            {error === 'bad-code' ? 'That is not a valid code. Check and try again.'
-              : error === 'no-name' ? 'Enter the name you want on the scoreboard.'
-              : ROOM_ERRORS[error]}
-          </p>
-        )}
-      </form>
-    </main>
+          {error && (
+            <p className="room-error" role="status">
+              {error === 'bad-code' ? 'That is not a valid code. Check and try again.'
+                : error === 'no-name' ? 'Enter the name you want on the scoreboard.'
+                : ROOM_ERRORS[error]}
+            </p>
+          )}
+        </form>
+      </main>
+    </>
   );
 }

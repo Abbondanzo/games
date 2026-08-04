@@ -55,9 +55,29 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { name: 'Games' })).toBeInTheDocument();
   });
 
-  it('links back to the game list from the tracker', () => {
-    renderAt('/scrabble');
-    expect(screen.getByRole('link', { name: 'All games' })).toHaveAttribute('href', '/');
+  /**
+   * Installed as an app there is no browser chrome, so a page without a way
+   * back is a page you cannot leave. The join page shipped without one.
+   */
+  it.each(['/scrabble', '/cricket', '/rummikub', '/join', '/join/AB23'])(
+    'gives %s a way back to the game list',
+    (path) => {
+      renderAt(path);
+      expect(screen.getByRole('link', { name: 'All games' })).toHaveAttribute('href', '/');
+    },
+  );
+
+  it('names every page it opens', () => {
+    for (const [path, title] of [
+      ['/scrabble', 'Scrabble'],
+      ['/cricket', 'Cricket'],
+      ['/rummikub', 'Rummikub'],
+      ['/join', 'Join a game'],
+    ] as const) {
+      const { unmount } = renderAt(path);
+      expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument();
+      unmount();
+    }
   });
 });
 

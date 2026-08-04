@@ -7,42 +7,20 @@
  * makes each of them work out whether that name is theirs.
  */
 import { describe, expect, it } from 'vitest';
-import { render, waitFor, within } from '@testing-library/react';
+import { waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { ScrabbleTracker } from '../scrabble/ScrabbleTracker';
-import { RoomProvider } from './RoomProvider';
-import { createTestRoom, type TestRoom } from './testRoom';
-import type { StoredSession } from './storage';
+import { createTestRoom } from './testRoom';
+import { mountClient, mountPair, myRow, playerNames, scoreboard } from './testClient';
 
 type User = ReturnType<typeof userEvent.setup>;
 
-function mount(room: TestRoom, session: StoredSession, label: string): HTMLElement {
-  const container = document.createElement('div');
-  container.dataset.client = label;
-  document.body.append(container);
-  render(
-    <RoomProvider value={{ transport: room.transport(), session }}>
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <ScrabbleTracker />
-      </MemoryRouter>
-    </RoomProvider>,
-    { container },
-  );
-  return container;
-}
-
-const names = (client: HTMLElement) =>
-  within(client).getAllByRole('listitem')
-    .filter((li) => li.querySelector('.pts'))
-    .map((li) => li.querySelector('.name')?.textContent);
+const names = playerNames;
 
 /** Sets up a host and one guest, with the guest's own player made. */
 async function table() {
   const room = createTestRoom('scrabble');
-  const guestSession = room.addMember('Grace');
-  const host = mount(room, room.hostSession, 'host');
-  const guest = mount(room, guestSession, 'guest');
+  const { host, guest } = mountPair(ScrabbleTracker, room, room.addMember('Grace'));
   await waitFor(() => expect(names(guest)).toEqual(['Host', 'Grace']));
   return { room, host, guest };
 }
@@ -142,15 +120,14 @@ describe('knowing whether it is your turn', () => {
   it('marks which player on the board is you', async () => {
     const { guest } = await table();
 
-    const mine = within(guest).getAllByRole('listitem').find((li) => li.querySelector('.you'));
+    const mine = myRow(guest);
     expect(mine).toHaveTextContent('Grace');
     expect(mine).toHaveClass('mine');
   });
 
   it('marks nobody as you on the host device when the host is the host', async () => {
     const { host } = await table();
-    const mine = within(host).getAllByRole('listitem').find((li) => li.querySelector('.you'));
-    expect(mine).toHaveTextContent('Host');
+    expect(myRow(host)).toHaveTextContent('Host');
   });
 
   it('shows the entry as yours to use, and closes it when it is not', async () => {
@@ -183,19 +160,7 @@ describe('knowing whether it is your turn', () => {
 
 /** None of this should have reached the game people play on their own. */
 describe('playing alone', () => {
-  const solo = () => {
-    const container = document.createElement('div');
-    document.body.append(container);
-    render(
-      <RoomProvider value={{ session: null }}>
-        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <ScrabbleTracker />
-        </MemoryRouter>
-      </RoomProvider>,
-      { container },
-    );
-    return container;
-  };
+  const solo = () => mountClient(ScrabbleTracker);
 
   it('still says who is playing, without any talk of turns being yours', async () => {
     const user = userEvent.setup();
@@ -233,9 +198,6 @@ describe('playing alone', () => {
     await user.type(within(client).getByLabelText('Word played'), 'jazz');
     await user.click(within(client).getByRole('button', { name: 'Score turn' }));
 
-    expect(within(client).getAllByRole('listitem')
-      .filter((li) => li.querySelector('.pts'))
-      .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`))
-      .toEqual(['Grace:29', 'Ada:22']); // the board ranks by score
+    expect(scoreboard(client)).toEqual(['Grace:29', 'Ada:22']); // the board ranks by score
   });
 });

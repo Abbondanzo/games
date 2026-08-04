@@ -6,54 +6,39 @@
  * a rooms regression, and it needs no network at all.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import type { ReactNode } from 'react';
 import { CricketTracker } from '../cricket/CricketTracker';
 import { ScrabbleTracker } from '../scrabble/ScrabbleTracker';
-import { RoomProvider } from './RoomProvider';
 import { createTestRoom, type TestRoom } from './testRoom';
 import { PROTOCOL_VERSION } from '@shared/rooms/protocol';
 import type { StoredSession } from './storage';
+import {
+  boardColumns, countingSockets, mountClient, myColumn, scoreboard,
+} from './testClient';
 
 type User = ReturnType<typeof userEvent.setup>;
 
-/** Renders one client into its own container, so the two never collide. */
-function mount(
+const mount = (
   room: TestRoom,
   session: StoredSession,
   label: string,
   options?: { protocol?: number },
-): HTMLElement {
-  const host = document.createElement('div');
-  host.dataset.client = label;
-  document.body.append(host);
-  render(
-    <RoomProvider value={{ transport: room.transport(options), session }}>
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <CricketTracker />
-      </MemoryRouter>
-    </RoomProvider>,
-    { container: host },
-  );
-  return host;
-}
+): HTMLElement =>
+  mountClient(CricketTracker, { room, session, label, protocol: options?.protocol });
 
 const board = (client: HTMLElement) => within(client).getByRole('table');
 
 /** The warning shown before sharing clears a game, not the turn header. */
 const warning = () => screen.queryAllByRole('status').find((el) => el.classList.contains('banner'));
 
+const players = boardColumns;
+
 const marksOn = (client: HTMLElement, target: string, column: number) => {
   const row = within(board(client)).getAllByRole('row')
     .find((r) => r.querySelector('th')?.textContent?.startsWith(target))!;
   return within(row).getAllByRole('cell')[column]?.textContent ?? '';
 };
-
-const players = (client: HTMLElement) =>
-  within(board(client)).getAllByRole('columnheader').slice(1)
-    .map((h) => h.querySelector('.name')?.textContent);
 
 async function addPlayers(user: User, client: HTMLElement, names: string) {
   await user.type(within(client).getByLabelText('Player name'), names);
@@ -334,9 +319,7 @@ describe('controls a cricket guest may not use', () => {
     const guest = mount(room, guestSession, 'guest');
 
     await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace']));
-    const mine = within(board(guest)).getAllByRole('columnheader')
-      .find((h) => h.querySelector('.you'));
-    expect(mine).toHaveTextContent('Grace');
+    expect(myColumn(guest)).toHaveTextContent('Grace');
   });
 
   // Undo is not host-only in cricket: it is yours while the last turn is yours.
@@ -383,25 +366,10 @@ describe('controls a cricket guest may not use', () => {
 });
 
 describe('a Scrabble room', () => {
-  function mountScrabble(room: TestRoom, session: StoredSession, label: string): HTMLElement {
-    const container = document.createElement('div');
-    container.dataset.client = label;
-    document.body.append(container);
-    render(
-      <RoomProvider value={{ transport: room.transport(), session }}>
-        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <ScrabbleTracker />
-        </MemoryRouter>
-      </RoomProvider>,
-      { container },
-    );
-    return container;
-  }
+  const mountScrabble = (room: TestRoom, session: StoredSession, label: string) =>
+    mountClient(ScrabbleTracker, { room, session, label });
 
-  const scores = (client: HTMLElement) =>
-    within(client).getAllByRole('listitem')
-      .filter((li) => li.querySelector('.pts'))
-      .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`);
+  const scores = scoreboard;
 
   it('shows the host a word the guest scored', async () => {
     const user = userEvent.setup();
@@ -469,14 +437,6 @@ describe('a Scrabble room', () => {
 
 /** Sharing starts a fresh game, so it must say what it is about to clear. */
 describe('starting to share', () => {
-  const solo = (children: React.ReactNode) => (
-    <RoomProvider value={{ session: null }}>
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        {children}
-      </MemoryRouter>
-    </RoomProvider>
-  );
-
   it('warns, and names what is on screen, before clearing it', async () => {
     const user = userEvent.setup();
     localStorage.setItem('games.cricket.v1', JSON.stringify({
@@ -486,7 +446,7 @@ describe('starting to share', () => {
       variant: 'standard',
     }));
 
-    render(solo(<CricketTracker />));
+    mountClient(CricketTracker);
     await user.click(screen.getByRole('button', { name: 'Share' }));
 
     expect(warning()).toHaveTextContent('2 players and 1 turn');
@@ -496,7 +456,7 @@ describe('starting to share', () => {
 
   it('says nothing when there is nothing to lose', async () => {
     const user = userEvent.setup();
-    render(solo(<CricketTracker />));
+    mountClient(CricketTracker);
     await user.click(screen.getByRole('button', { name: 'Share' }));
 
     expect(screen.queryByText(/will be cleared/)).not.toBeInTheDocument();
@@ -515,7 +475,7 @@ describe('starting to share', () => {
       turns: [], currentIndex: 0, variant: 'standard',
     }));
 
-    render(solo(<CricketTracker />));
+    mountClient(CricketTracker);
     await user.click(screen.getByRole('button', { name: 'Share' }));
 
     expect(warning()).toHaveTextContent('1 player');
@@ -530,7 +490,7 @@ describe('starting to share', () => {
       players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }], turns: [], currentIndex: 0, variant: 'standard',
     }));
 
-    render(solo(<CricketTracker />));
+    mountClient(CricketTracker);
     await user.click(screen.getByRole('button', { name: 'Share' }));
     await user.click(screen.getByRole('button', { name: 'Close' }));
 
@@ -541,61 +501,38 @@ describe('starting to share', () => {
 });
 
 describe('playing alone', () => {
-  const Solo = ({ children }: { children: ReactNode }) => (
-    <RoomProvider value={{ session: null }}>
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        {children}
-      </MemoryRouter>
-    </RoomProvider>
-  );
-
   // The whole point of the refactor: solo play must be untouched, and must not
   // reach for the network even once.
   it('never constructs a socket and still saves to storage', async () => {
     const user = userEvent.setup();
-    const original = globalThis.WebSocket;
-    let constructed = 0;
-    // @ts-expect-error - replaced for the duration of this test
-    globalThis.WebSocket = class {
-      constructor() {
-        constructed += 1;
-      }
-    };
+    const sockets = countingSockets();
 
-    render(<Solo><CricketTracker /></Solo>);
+    mountClient(CricketTracker);
     await user.type(screen.getByLabelText('Player name'), 'Ada');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
-    expect(constructed).toBe(0);
+    expect(sockets.count()).toBe(0);
     expect(localStorage.getItem('games.cricket.v1')).toContain('Ada');
     expect(screen.queryByText('Who is here')).not.toBeInTheDocument();
 
-    globalThis.WebSocket = original;
+    sockets.restore();
   });
 
   it('scores Scrabble exactly as it always did', async () => {
     const user = userEvent.setup();
-    const original = globalThis.WebSocket;
-    let constructed = 0;
-    // @ts-expect-error - replaced for the duration of this test
-    globalThis.WebSocket = class {
-      constructor() {
-        constructed += 1;
-      }
-    };
+    const sockets = countingSockets();
 
-    render(<Solo><ScrabbleTracker /></Solo>);
+    mountClient(ScrabbleTracker);
     await user.type(screen.getByLabelText('Player name'), 'Ada, Grace');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     await user.type(screen.getByLabelText('Word played'), 'quiz');
     await user.click(screen.getByRole('button', { name: 'Score turn' }));
 
-    expect(screen.getByText('Ada', { selector: '.name' }).closest('li'))
-      .toHaveTextContent('22');
-    expect(constructed).toBe(0);
+    expect(scoreboard()).toEqual(['Ada:22', 'Grace:0']);
+    expect(sockets.count()).toBe(0);
     expect(localStorage.getItem('games.scrabble.v1')).toContain('Ada');
 
-    globalThis.WebSocket = original;
+    sockets.restore();
   });
 });

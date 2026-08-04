@@ -73,6 +73,8 @@ kbd {
   display: flex; flex-direction: column;
 }
 .home h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+/* The deep top padding is there because nothing sits above the home page. */
+.topbar + .home { padding-top: 1.5rem; }
 .home .sub { color: var(--muted); margin: 0 0 1.5rem; }
 .game-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
 .game {

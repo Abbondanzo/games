@@ -8,13 +8,11 @@
  * this time and next time.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import type { ReactNode } from 'react';
 import { CricketTracker } from '../cricket/CricketTracker';
-import { RoomProvider } from './RoomProvider';
 import { createTestRoom } from './testRoom';
+import { mountClient } from './testClient';
 import { writeSession, readSession } from './storage';
 import type { GoneReason } from '@shared/rooms/protocol';
 import type { TransportFactory } from './transport';
@@ -22,12 +20,6 @@ import type { TransportFactory } from './transport';
 const SESSION = { game: 'cricket', code: 'QGZ7', token: 'tok', memberId: 'm1' } as const;
 
 beforeEach(() => localStorage.clear());
-
-const wrap = (node: ReactNode) => (
-  <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-    {node}
-  </MemoryRouter>
-);
 
 /** Counts every socket the app tries to open, however it ends. */
 function countingTransport(): { factory: TransportFactory; opened: () => number } {
@@ -54,7 +46,7 @@ function refusing(reason: GoneReason): { factory: TransportFactory; opened: () =
 describe('opening a game that remembers a room which has ended', () => {
   it('says what happened rather than sitting there not connected', async () => {
     writeSession(SESSION);
-    render(<RoomProvider value={{ transport: refusing('ended').factory }}>{wrap(<CricketTracker />)}</RoomProvider>);
+    mountClient(CricketTracker, { transport: refusing('ended').factory });
 
     await waitFor(() =>
       expect(screen.getByText(/That room has ended/)).toBeInTheDocument());
@@ -62,7 +54,7 @@ describe('opening a game that remembers a room which has ended', () => {
 
   it('forgets the room, so nothing tries it again', async () => {
     writeSession(SESSION);
-    render(<RoomProvider value={{ transport: refusing('ended').factory }}>{wrap(<CricketTracker />)}</RoomProvider>);
+    mountClient(CricketTracker, { transport: refusing('ended').factory });
 
     await waitFor(() => expect(readSession('cricket')).toBeNull());
   });
@@ -71,14 +63,12 @@ describe('opening a game that remembers a room which has ended', () => {
   it('opens no socket at all the next time the game is opened', async () => {
     writeSession(SESSION);
     const first = refusing('ended');
-    const { unmount } = render(
-      <RoomProvider value={{ transport: first.factory }}>{wrap(<CricketTracker />)}</RoomProvider>,
-    );
+    const shown = mountClient(CricketTracker, { transport: first.factory });
     await waitFor(() => expect(readSession('cricket')).toBeNull());
-    unmount();
+    shown.remove();
 
     const second = countingTransport();
-    render(<RoomProvider value={{ transport: second.factory }}>{wrap(<CricketTracker />)}</RoomProvider>);
+    mountClient(CricketTracker, { transport: second.factory });
 
     expect(second.opened()).toBe(0);
     expect(first.opened()).toBe(1);
@@ -86,7 +76,7 @@ describe('opening a game that remembers a room which has ended', () => {
 
   it('puts the room strip away, because there is no room', async () => {
     writeSession(SESSION);
-    render(<RoomProvider value={{ transport: refusing('ended').factory }}>{wrap(<CricketTracker />)}</RoomProvider>);
+    mountClient(CricketTracker, { transport: refusing('ended').factory });
 
     await waitFor(() => expect(screen.getByText(/That room has ended/)).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Who is here/ })).not.toBeInTheDocument();
@@ -102,7 +92,7 @@ describe('opening a game that remembers a room which has ended', () => {
       variant: 'standard',
     }));
 
-    render(<RoomProvider value={{ transport: refusing('ended').factory }}>{wrap(<CricketTracker />)}</RoomProvider>);
+    mountClient(CricketTracker, { transport: refusing('ended').factory });
 
     await waitFor(() =>
       expect(within(screen.getByRole('table')).getByText('Solo Ada')).toBeInTheDocument());
@@ -113,7 +103,7 @@ describe('opening a game that remembers a room which has ended', () => {
   it('can be put away once it has been read', async () => {
     const user = userEvent.setup();
     writeSession(SESSION);
-    render(<RoomProvider value={{ transport: refusing('ended').factory }}>{wrap(<CricketTracker />)}</RoomProvider>);
+    mountClient(CricketTracker, { transport: refusing('ended').factory });
 
     await waitFor(() => expect(screen.getByText(/That room has ended/)).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: 'Hide' }));
@@ -126,7 +116,7 @@ describe('opening a game that remembers a room which has ended', () => {
     ['unauthorised', /did not recognise this device/],
   ] as [GoneReason, RegExp][])('explains being turned away as %s', async (reason, wording) => {
     writeSession(SESSION);
-    render(<RoomProvider value={{ transport: refusing(reason).factory }}>{wrap(<CricketTracker />)}</RoomProvider>);
+    mountClient(CricketTracker, { transport: refusing(reason).factory });
 
     await waitFor(() => expect(screen.getByText(wording)).toBeInTheDocument());
   });
@@ -134,18 +124,8 @@ describe('opening a game that remembers a room which has ended', () => {
 
 /** The same thing, but happening while somebody is looking at the game. */
 describe('a room that ends mid-game', () => {
-  const mount = (room: ReturnType<typeof createTestRoom>, session: typeof SESSION | undefined, label: string) => {
-    const container = document.createElement('div');
-    container.dataset.client = label;
-    document.body.append(container);
-    render(
-      <RoomProvider value={{ transport: room.transport(), session: session ?? room.hostSession }}>
-        {wrap(<CricketTracker />)}
-      </RoomProvider>,
-      { container },
-    );
-    return container;
-  };
+  const mount = (room: ReturnType<typeof createTestRoom>, session: typeof SESSION | undefined, label: string) =>
+    mountClient(CricketTracker, { room, session: session ?? room.hostSession, label });
 
   it('tells a guest when the host closes it', async () => {
     const user = userEvent.setup();

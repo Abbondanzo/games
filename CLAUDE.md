@@ -102,6 +102,10 @@ throw inside the room.
 2. **Reducers** (`use<Game>.test.ts`) - actions in, state out, no rendering.
 3. **Trackers** (`<Game>Tracker.test.tsx`) - Testing Library, driving the real UI.
 
+Room tests build their clients with `src/rooms/testClient.tsx` - `mountClient`, `mountPair`,
+`scoreboard`, `countingSockets` - the other half of `testRoom.ts`. Use it rather than writing
+another render wrapper.
+
 Plus `App.test.tsx` (routing, house-style guards), `pwa.test.ts` (manifest, icons, iOS tags),
 and the rooms tests. Three of those earn their keep: `twoClients.test.tsx` and
 `rummikubRoom.test.tsx` render a host and a guest side by side against a real room in-process,
@@ -109,8 +113,9 @@ and `shared/rooms/games/parity.test.ts` runs the same script through the plain r
 through the room and demands identical results, so the longer road a room action takes cannot
 quietly change the game.
 
-Query by role and accessible name, not test ids - the one exception is a couple of live-total
-readouts. When fixing a bug, add the regression test with a comment naming the failure, and make
+Query by role and accessible name, not test ids. Two exceptions, both deliberate: a couple of
+live-total readouts, and the scoreboard readers in `testClient.tsx`, where a row has no
+accessible structure separating the name from the score. Keep that exception in that file. When fixing a bug, add the regression test with a comment naming the failure, and make
 it fail first.
 
 ## Gotchas

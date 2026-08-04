@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, RotateCcw, Trash2, Trophy } from 'lucide-react';
+import { RotateCcw, Trash2, Trophy } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { CricketBoard } from './components/CricketBoard';
 import { DartEntry } from './components/DartEntry';
 import { computeBoard, dartShorthand, previewTurn, standings, totalMarks } from '@shared/games/cricket/rules';
 import { useCricket } from './lib/useCricket';
 import { RoomStrip } from '../rooms/RoomStrip';
+import { TopBar } from '../shared/TopBar';
 import { allowed, blocked, isHost as amHost, isMyTurn } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
@@ -137,35 +137,29 @@ export function CricketTracker() {
 
   return (
     <>
-      <header className="topbar">
-        <Link className="back" to="/" aria-label="All games">
-          <ArrowLeft size={20} aria-hidden="true" />
-        </Link>
-        <h1>Cricket</h1>
-        <div className="topbar-actions">
-          {!room && <HostRoomButton game="cricket" existing={describeGame(state)} />}
-          {isHost && (
-            <>
-              <button
-                type="button"
-                className="ghost"
-                onClick={newGame}
-                title="Clear the board and keep the players"
-              >
-                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
-              </button>
-              <button
-                type="button"
-                className="ghost danger"
-                onClick={resetAll}
-                title="Clear the board and the players"
-              >
-                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+      <TopBar title="Cricket">
+        {!room && <HostRoomButton game="cricket" existing={describeGame(state)} />}
+        {isHost && (
+          <>
+            <button
+              type="button"
+              className="ghost"
+              onClick={newGame}
+              title="Clear the board and keep the players"
+            >
+              <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
+            </button>
+            <button
+              type="button"
+              className="ghost danger"
+              onClick={resetAll}
+              title="Clear the board and the players"
+            >
+              <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
+            </button>
+          </>
+        )}
+    </TopBar>
 
       <main>
         <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />
