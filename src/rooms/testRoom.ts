@@ -23,7 +23,7 @@ import { writeSession, type StoredSession } from './storage';
 export interface TestRoom {
   code: string;
   /** Adds a member and returns the session the real server would have issued. */
-  addMember: (name: string) => StoredSession;
+  addMember: (name: string, seat?: string | null) => StoredSession;
   /** The host's session, created with the room. */
   hostSession: StoredSession;
   /** Hands a session to this tab, as create or join would. */
@@ -88,10 +88,10 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
     hostSession: { game, code: 'AB2D', token: 'host-token', memberId: hostId },
     state: () => state,
 
-    addMember(name) {
+    addMember(name, seat) {
       const memberId = nextId();
       const token = `token-${memberId}`;
-      const result = join(state, { memberId, name, now: 1_000 }, apply);
+      const result = join(state, { memberId, name, now: 1_000, seat }, apply);
       if (!result.ok) throw new Error(`join refused: ${result.code}`);
       state = result.state;
       deliver(result.effects);

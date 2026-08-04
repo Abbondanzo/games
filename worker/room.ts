@@ -121,13 +121,20 @@ export class Room extends DurableObject {
     const state = await this.load();
     if (!state) return json({ error: 'no-room' }, 404);
 
-    const body = (await request.json()) as { name: string };
+    const body = (await request.json()) as { name: string; seat?: unknown };
     const memberId = uid();
     const token = uid();
 
     const result = join(
       state,
-      { memberId, name: body.name, now: Date.now() },
+      {
+        memberId,
+        name: body.name,
+        now: Date.now(),
+        // The player they were before, if they say. Checked against the room,
+        // so a made-up one falls through to the name.
+        seat: typeof body.seat === 'string' ? body.seat : null,
+      },
       this.applyFor(state.game),
     );
     if (!result.ok) return json({ error: result.code }, 409);

@@ -4,7 +4,7 @@ import { DoorOpen } from 'lucide-react';
 import { CODE_LENGTH, normaliseCode } from '@shared/rooms/codes';
 import { TopBar } from '../shared/TopBar';
 import { ROOM_ERRORS, joinRoom, peekRoom, type RoomError } from './api';
-import { readName, writeName, writeSession } from './storage';
+import { readName, recallSeat, writeName, writeSession } from './storage';
 
 /**
  * Joining, whether the code was typed on the home page or arrived as a link.
@@ -49,7 +49,9 @@ export function JoinRoom() {
       return;
     }
 
-    const joined = await joinRoom(clean, name.trim());
+    // If this device has been in this room before, ask for the same player
+    // back. The room decides; a seat that has gone falls through to the name.
+    const joined = await joinRoom(clean, name.trim(), recallSeat(found.value.game, clean));
     setBusy(false);
     if (!joined.ok) {
       setError(joined.error);

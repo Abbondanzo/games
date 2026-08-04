@@ -33,6 +33,28 @@ export const writeSession = (session: StoredSession): void =>
 
 export const clearSession = (game: Game): void => removeKey(key(game));
 
+/**
+ * Which player this device was, in which room.
+ *
+ * Kept when leaving, so coming back takes the same player rather than making a
+ * new one. It has to outlive the session, which is cleared on the way out, and
+ * it cannot be the name: two people called Peter are "Peter" and "Peter 2", and
+ * the second types "Peter" when they return.
+ */
+const SeatSchema = z.object({ code: z.string(), seatId: z.string() });
+
+const seatKey = (game: Game) => `games.room.${game}.seat.v1`;
+
+export function rememberSeat(game: Game, code: string, seatId: string): void {
+  writeJson(seatKey(game), { code, seatId });
+}
+
+/** The seat held in this room before, or null if it was a different one. */
+export function recallSeat(game: Game, code: string): string | null {
+  const stored = readJson(seatKey(game), SeatSchema);
+  return stored?.code === code ? stored.seatId : null;
+}
+
 /** The name this device last played under, offered as the default next time. */
 const NAME_KEY = 'games.name.v1';
 

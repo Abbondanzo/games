@@ -123,6 +123,26 @@ Seats survive a dropped connection, so a sleeping phone keeps its place, and
 they are re-derived from the game after every change: if the host removes your
 player you become a spectator rather than holding a seat that no longer exists.
 
+**Coming back after leaving.** Leaving gives up the seat but leaves the player
+in the game, so the way back is to take that player again. The device remembers
+which one it was and asks for it by id, because a name cannot identify somebody
+returning: a table with two Peters has a "Peter" and a "Peter 2", and the second
+one types "Peter" when they come back, which is the first one's name. That is
+how the reported bug made a "Peter 3".
+
+A seat is only given back while nobody else holds it, and a name is still the
+fallback for a device that has forgotten - or never knew, which is what lets a
+host type the roster out in advance and have people claim their own row. Name
+matching ignores case and stray spaces, since somebody returning types their
+name from memory rather than copying it off the board.
+
+**Locking stops new players, not people coming back.** A host locks the room
+once everyone is at the table, which is exactly when somebody's phone goes to
+sleep, so a join that takes back an existing player is let through while one
+that would create a player is refused. Kicking is the exception: it locks the
+room for the express purpose of keeping one person out, so it also bars that
+seat, and only unlocking opens it again.
+
 **Rummikub** is the exception. A round records every rack at once, so it cannot
 be seat-scoped. The host opens a round, each player submits their own rack, and
 the host commits. That collection lives in room state, not in the game, so

@@ -61,8 +61,17 @@ export async function createRoom(game: Game, name: string): Promise<Result<Store
   return result.ok ? asSession(result.value) : result;
 }
 
-export async function joinRoom(code: string, name: string): Promise<Result<StoredSession>> {
-  const result = await post(`/rooms/${code}/join`, { name });
+/**
+ * `seat` is the player this device was last time it was in this room, if it
+ * remembers one. The room takes it as a request rather than a fact, and falls
+ * back to the name if the seat has gone or somebody else is in it.
+ */
+export async function joinRoom(
+  code: string,
+  name: string,
+  seat?: string | null,
+): Promise<Result<StoredSession>> {
+  const result = await post(`/rooms/${code}/join`, seat ? { name, seat } : { name });
   return result.ok ? asSession(result.value) : result;
 }
 

@@ -46,6 +46,12 @@ export interface RoomState<S extends Snapshot = Snapshot> {
   snapshot: S;
   members: Record<string, StoredMember>;
   locked: boolean;
+  /**
+   * Seats the host has removed somebody from, which a locked room will not hand
+   * back. Without this, letting people return would quietly undo kicking.
+   * Absent on rooms made before this existed, so always read it with `?? []`.
+   */
+  barred?: string[];
   /** A Rummikub round being collected, if one is open. */
   pending: PendingRound | null;
   lastActiveAt: number;
@@ -112,6 +118,17 @@ const actorOf = (member: StoredMember): Actor => ({
  * person - back after leaving, or typed in by the host in advance - so they
  * take it rather than appearing twice.
  */
+/**
+ * Names as a person means them, rather than as they were typed.
+ *
+ * Someone coming back after leaving by accident types their name again from
+ * memory, and "grace" is the same person as "Grace". Matching exactly gave them
+ * a second player on the scoreboard with none of their score.
+ */
+const nameKey = (name: string): string => name.trim().replace(/\s+/g, ' ').toLowerCase();
+
+const sameName = (a: string, b: string): boolean => nameKey(a) === nameKey(b);
+
 function seatNewcomer<S extends Snapshot>(
   game: Game,
   snapshot: S,
@@ -119,7 +136,10 @@ function seatNewcomer<S extends Snapshot>(
   wanted: string,
   apply: ApplyAction<S>,
 ): { snapshot: S; seatId: string | null; name: string } {
-  const existing = playersIn(snapshot).find((p) => p.name === wanted.trim() && !claimed.has(p.id));
+  // Their old player, if it is still there and nobody else is using it. The
+  // name it already carries wins, so the scoreboard does not change spelling
+  // under everyone else when somebody comes back.
+  const existing = playersIn(snapshot).find((p) => sameName(p.name, wanted) && !claimed.has(p.id));
   if (existing) return { snapshot, seatId: existing.id, name: existing.name };
 
   const name = distinctName(wanted, namesIn(snapshot));
@@ -177,10 +197,11 @@ export type JoinResult<S extends Snapshot> =
  */
 function distinctName(wanted: string, taken: readonly string[]): string {
   const trimmed = wanted.trim() || 'Player';
-  if (!taken.includes(trimmed)) return trimmed;
+  const used = (candidate: string) => taken.some((name) => sameName(name, candidate));
+  if (!used(trimmed)) return trimmed;
   for (let n = 2; n < 100; n++) {
     const candidate = `${trimmed} ${n}`;
-    if (!taken.includes(candidate)) return candidate;
+    if (!used(candidate)) return candidate;
   }
   return trimmed;
 }
@@ -197,15 +218,57 @@ function distinctName(wanted: string, taken: readonly string[]): string {
  */
 export function join<S extends Snapshot>(
   state: RoomState<S>,
-  input: { memberId: string; name: string; now: number },
+  input: { memberId: string; name: string; now: number; seat?: string | null },
   apply: ApplyAction<S>,
 ): JoinResult<S> {
-  if (state.locked) return { ok: false, code: 'room-locked' };
   if (Object.keys(state.members).length >= MAX_MEMBERS) return { ok: false, code: 'room-full' };
 
   const claimed = new Set(Object.values(state.members).map((m) => m.seatId));
-  const seated = seatNewcomer(state.game, state.snapshot, claimed, input.name, apply);
+  const barred = new Set(state.barred ?? []);
+
+  /**
+   * The player this device was last time it was here.
+   *
+   * A name cannot identify somebody coming back: two people called Peter make a
+   * "Peter" and a "Peter 2", and the second one types "Peter" when they return,
+   * which is the first one's name. So the device remembers which player it was
+   * and asks for that, and the name it types is only used if the seat has gone
+   * or somebody else is in it.
+   *
+   * Asking for a seat is no more powerful than asking for it by name: both need
+   * the room code, both only work while nobody holds it, and neither works on a
+   * seat the host has barred.
+   */
+  const returning = input.seat && !claimed.has(input.seat) && !barred.has(input.seat)
+    ? playersIn(state.snapshot).find((p) => p.id === input.seat)
+    : undefined;
+
+  const seated = returning
+    ? { snapshot: state.snapshot, seatId: returning.id, name: returning.name }
+    : seatNewcomer(state.game, state.snapshot, claimed, input.name, apply);
   const added = seated.snapshot !== state.snapshot;
+
+  /**
+   * Locking stops new players, which is not the same as stopping people.
+   *
+   * A host locks the room once everyone is at the table, and that is exactly
+   * when somebody drops their phone in their pocket and comes back to find the
+   * door shut on a player that is sitting there with their score on it. So a
+   * join that takes back an existing player is allowed through; one that would
+   * make a new player is not.
+   *
+   * Except for a seat the host removed somebody from. Kicking locks the room
+   * for the express purpose of keeping that person out, and letting them take
+   * their old player back would undo it. Unlocking is the host deciding to open
+   * the door again, to them along with everybody else.
+   *
+   * Anyone returning still needs the code and the name, which is what they
+   * needed before it was locked, and the host can remove them again.
+   */
+  if (state.locked) {
+    const barred = seated.seatId !== null && (state.barred ?? []).includes(seated.seatId);
+    if (added || barred) return { ok: false, code: 'room-locked' };
+  }
 
   const member: StoredMember = {
     memberId: input.memberId,
@@ -522,11 +585,17 @@ function handleKick<S extends Snapshot>(
   if (targetId === actor.memberId) return fail(state, actor.memberId, null, 'host-only');
   if (!state.members[targetId]) return { state, effects: [] };
 
+  const seatId = state.members[targetId]?.seatId ?? null;
   const members = { ...state.members };
   delete members[targetId];
 
   // Kicking without locking is theatre: they would simply rejoin with a new id.
-  const next: RoomState<S> = { ...state, members, locked: true };
+  // Barring the seat closes the other way back, since a locked room does let
+  // somebody who left of their own accord take their old player back.
+  const barred = seatId && !(state.barred ?? []).includes(seatId)
+    ? [...(state.barred ?? []), seatId]
+    : state.barred;
+  const next: RoomState<S> = { ...state, members, locked: true, ...(barred ? { barred } : {}) };
 
   return {
     state: next,

@@ -162,6 +162,10 @@ it fail first.
   client can be weeks old. Server-to-client additions are safe; a new *client-to-server* message
   is not, because an old room rejects a frame it has never heard of and the button just appears
   broken. Bump `PROTOCOL_VERSION` for either, so the mismatch names itself.
+- **Coming back to a room is by seat, not by name.** The device remembers which player it was
+  and asks for that id; the name is only a fallback. A table with two Peters has a "Peter" and a
+  "Peter 2", so the name someone types on returning is somebody else's. Locking lets a returning
+  player back in but not a new one; kicking bars that seat as well as locking.
 - **Play order is fixed by the first turn.** `movePlayer` is refused once a game has any
   turns, because the roster order is the turn order and moving somebody would hand the turn
   to a different player. The UI hides the buttons then, but the reducer is what enforces it.

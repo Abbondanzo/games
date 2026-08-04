@@ -18,7 +18,7 @@ import {
   ROOMS_URL, webSocketTransport,
   type ConnectionStatus, type Transport, type TransportFactory,
 } from './transport';
-import { clearSession, readSession, type StoredSession } from './storage';
+import { clearSession, readSession, rememberSeat, type StoredSession } from './storage';
 import { writeJson } from '../shared/localStore';
 import { useRoomOverrides } from './RoomProvider';
 
@@ -307,6 +307,9 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       leave: () => {
         // A host has no way out that is not closing the room.
         if (role === 'host') return;
+        // Which player this was, so coming back is coming back rather than
+        // arriving. The room keeps the player; this is how to find it again.
+        if (seatId) rememberSeat(game, session.code, seatId);
         walkingOut.current = true;
         transport.current?.send({ t: 'leave', reqId: nextRequestId() });
         stopFollowing(false);
