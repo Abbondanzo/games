@@ -1,10 +1,22 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface Props {
   players: { id: string; name: string }[];
   onAdd: (names: string) => void;
   onRemove: (id: string) => void;
+  /**
+   * Moving a player to a given place in the order. Left out by a game where
+   * the order carries no meaning, and refused by the reducer once play has
+   * started, so the buttons are hidden then too.
+   */
+  onMove?: (id: string, to: number) => void;
+  /**
+   * Whether the order can still be changed. In the games with turn order it is
+   * fixed by the first turn, since moving somebody would hand the turn to a
+   * different player.
+   */
+  reorderable?: boolean;
   /** Rendered in the card header, e.g. a game-mode toggle. */
   headerExtra?: ReactNode;
   /** The game's own scoreboard, shown under the editor. */
@@ -21,11 +33,14 @@ interface Props {
  * identically throughout; each game supplies its own scoreboard as children.
  */
 export function PlayersCard({
-  players, onAdd, onRemove, headerExtra, children, editable = true,
+  players, onAdd, onRemove, onMove, headerExtra, children,
+  editable = true, reorderable = false,
 }: Props) {
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(true);
   const open = editable && (editing || players.length === 0);
+  // With one player there is no order to speak of.
+  const canMove = Boolean(onMove) && reorderable && players.length > 1;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -62,16 +77,40 @@ export function PlayersCard({
           </form>
 
           <ul className="chips">
-            {players.map((p) => (
+            {players.map((p, i) => (
               <li key={p.id}>
+                <span className="order">{i + 1}</span>
                 {p.name}
+                {canMove && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label={`Move ${p.name} earlier`}
+                      disabled={i === 0}
+                      onClick={() => onMove!(p.id, i - 1)}
+                    >
+                      <ChevronLeft size={14} strokeWidth={2.5} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${p.name} later`}
+                      disabled={i === players.length - 1}
+                      onClick={() => onMove!(p.id, i + 1)}
+                    >
+                      <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" />
+                    </button>
+                  </>
+                )}
                 <button type="button" aria-label={`Remove ${p.name}`} onClick={() => onRemove(p.id)}>
                   <X size={14} strokeWidth={2.5} aria-hidden="true" />
                 </button>
               </li>
             ))}
           </ul>
-          <p className="hint">Tip: paste names separated by commas to add several at once.</p>
+          <p className="hint">
+            Tip: paste names separated by commas to add several at once.
+            {canMove && ' They play in the order shown, which you can change until the first turn.'}
+          </p>
         </div>
       )}
 

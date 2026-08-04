@@ -102,6 +102,7 @@ export function ScrabbleTracker() {
           youId={room?.seatId ?? null}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={(id) => dispatch({ type: 'removePlayer', id })}
+          onMove={(id, to) => dispatch({ type: 'movePlayer', id, to })}
           onSelect={(id) => dispatch({ type: 'setCurrent', id })}
         />
 

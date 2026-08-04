@@ -39,6 +39,32 @@ export const renamedTo = <P extends Named>(
   return players.map((p) => (p.id === id ? { ...p, name: wanted } : p));
 };
 
+/**
+ * A roster with one player moved, or null when there is nothing to do.
+ *
+ * Null rather than the list back, for the same reason `renamedTo` does it: a
+ * reducer signals a no-op by identity, and the room reads that to decide
+ * whether to bump its revision and tell everybody about nothing.
+ */
+export const movedTo = <P extends Identified>(
+  players: readonly P[],
+  id: string,
+  to: number,
+): P[] | null => {
+  const from = players.findIndex((p) => p.id === id);
+  if (from === -1) return null;
+
+  // Moving off either end is a request to go as far as there is; landing back
+  // on your own place is nothing at all.
+  const target = Math.min(Math.max(to, 0), players.length - 1);
+  if (target === from) return null;
+
+  const next = [...players];
+  const [moved] = next.splice(from, 1);
+  next.splice(target, 0, moved!);
+  return next;
+};
+
 /** Whoever is up next, wrapping round, and 0 when there is nobody. */
 export const advance = (index: number, count: number): number =>
   (count ? (index + 1) % count : 0);

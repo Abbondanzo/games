@@ -85,6 +85,8 @@ export function RummikubTracker() {
           editable={isHost}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={removePlayer}
+          onMove={(id, to) => dispatch({ type: 'movePlayer', id, to })}
+          reorderable={state.rounds.length === 0}
         >
           <ol className="scoreboard">
             {rows.map((row, i) => (

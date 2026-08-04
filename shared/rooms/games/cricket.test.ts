@@ -9,6 +9,7 @@ describe('decoding a well-formed action', () => {
   it.each([
     [{ type: 'addPlayers', names: 'Ada, Grace' }],
     [{ type: 'removePlayer', id: 'p1' }],
+    [{ type: 'movePlayer', id: 'p1', to: 0 }],
     [{ type: 'setCurrent', id: 'p1' }],
     [{ type: 'setVariant', variant: 'cutthroat' }],
     [{ type: 'recordTurn', darts: [{ target: 20, multiplier: 3 }] }],
@@ -37,6 +38,10 @@ describe('refusing a hostile payload', () => {
     ['a missing name', { type: 'addPlayers' }],
     ['a null name', { type: 'addPlayers', names: null }],
     ['an id that is not a string', { type: 'removePlayer', id: { evil: true } }],
+    ['a seat that is not a number', { type: 'movePlayer', id: 'p1', to: 'first' }],
+    ['a seat past any real roster', { type: 'movePlayer', id: 'p1', to: 1e9 }],
+    ['a negative seat', { type: 'movePlayer', id: 'p1', to: -1 }],
+    ['a fractional seat', { type: 'movePlayer', id: 'p1', to: 1.5 }],
     ['a missing id', { type: 'setCurrent' }],
     ['an unknown variant', { type: 'setVariant', variant: 'chaos' }],
     ['a missing variant', { type: 'setVariant' }],

@@ -1,5 +1,5 @@
 import { createIdSource, type IdSource } from '../../ids';
-import { advance, indexAfterRemoval, parseNames, renamedTo } from '../players';
+import { advance, indexAfterRemoval, movedTo, parseNames, renamedTo } from '../players';
 import type { GameState, ScoredWord, Turn } from './types';
 import { BINGO_BONUS } from './scoring';
 
@@ -12,6 +12,7 @@ export type Action =
   | { type: 'addPlayers'; names: string }
   | { type: 'removePlayer'; id: string }
   | { type: 'setCurrent'; id: string }
+  | { type: 'movePlayer'; id: string; to: number }
   | { type: 'recordPlay'; words: ScoredWord[]; bingo: boolean }
   | { type: 'pass' }
   | { type: 'adjust'; playerId: string; points: number }
@@ -40,6 +41,19 @@ function apply(state: GameState, action: Action, uid: IdSource): GameState {
         turns: state.turns.filter((t) => t.playerId !== action.id),
         currentIndex: indexAfterRemoval(state.players, state.currentIndex, action.id),
       };
+    }
+
+    case 'movePlayer': {
+      // Turn order is only worth rearranging before it has been used. Moving
+      // somebody mid-game would hand the turn to a different player and
+      // reorder a history that is read as a sequence.
+      if (state.turns.length) return state;
+      const players = movedTo(state.players, action.id, action.to);
+      if (!players) return state;
+      // Whoever is now first plays first. Following the player instead would
+      // mean moving them to the back still left them going first, and before
+      // a turn has been played the order shown is the order of play.
+      return { ...state, players, currentIndex: 0 };
     }
 
     case 'setCurrent': {

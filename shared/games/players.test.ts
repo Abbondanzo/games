@@ -6,7 +6,7 @@
  * cases were covered once or twice rather than three times.
  */
 import { describe, expect, it } from 'vitest';
-import { advance, indexAfterRemoval, parseNames, renamedTo } from './players';
+import { advance, indexAfterRemoval, movedTo, parseNames, renamedTo } from './players';
 
 describe('reading a list of names', () => {
   it.each([
@@ -55,6 +55,51 @@ describe('renaming', () => {
   it('leaves the list it was given alone', () => {
     renamedTo(players, 'a', 'Ada L');
     expect(players[0]?.name).toBe('Ada');
+  });
+});
+
+describe('moving a player in the order', () => {
+  const roster = (...ids: string[]) => ids.map((id) => ({ id }));
+  const ids = (players: { id: string }[] | null) => players?.map((p) => p.id);
+
+  it('moves one earlier', () => {
+    expect(ids(movedTo(roster('a', 'b', 'c'), 'c', 1))).toEqual(['a', 'c', 'b']);
+  });
+
+  it('moves one later', () => {
+    expect(ids(movedTo(roster('a', 'b', 'c'), 'a', 2))).toEqual(['b', 'c', 'a']);
+  });
+
+  it('moves one to the front', () => {
+    expect(ids(movedTo(roster('a', 'b', 'c'), 'c', 0))).toEqual(['c', 'a', 'b']);
+  });
+
+  it('takes everyone else along in order', () => {
+    expect(ids(movedTo(roster('a', 'b', 'c', 'd'), 'b', 3))).toEqual(['a', 'c', 'd', 'b']);
+  });
+
+  it.each([
+    ['past the end', 9, ['b', 'c', 'a']],
+    ['before the start', -4, ['a', 'b', 'c']],
+  ])('goes as far as there is when asked to go %s', (_label, to, expected) => {
+    const moved = movedTo(roster('a', 'b', 'c'), 'a', to);
+    // Landing back where it started is a no-op, hence the null for -4.
+    expect(moved === null ? ['a', 'b', 'c'] : ids(moved)).toEqual(expected);
+  });
+
+  // Null, not the list back, for the reason renamedTo gives.
+  it('declines a move to the place it is already in', () => {
+    expect(movedTo(roster('a', 'b', 'c'), 'b', 1)).toBeNull();
+  });
+
+  it('declines a player who is not there', () => {
+    expect(movedTo(roster('a', 'b'), 'nobody', 0)).toBeNull();
+  });
+
+  it('leaves the list it was given alone', () => {
+    const before = roster('a', 'b', 'c');
+    movedTo(before, 'a', 2);
+    expect(ids(before)).toEqual(['a', 'b', 'c']);
   });
 });
 

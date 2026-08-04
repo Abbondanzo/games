@@ -156,6 +156,13 @@ input[type='text'], input[type='number'], select {
 }
 .chips button { background: none; border: none; color: var(--muted); line-height: 1; padding: .1rem .25rem; font-size: 1rem; }
 .chips button:hover { color: var(--bad); }
+/* Moving a player is not destructive, unlike the remove beside it. */
+.chips button[aria-label^="Move"]:hover { color: var(--accent); }
+.chips button:disabled { opacity: .3; }
+.chips .order {
+  color: var(--muted); font-size: .72rem; font-variant-numeric: tabular-nums;
+  min-width: 1em; text-align: right;
+}
 
 /* ── scoreboard ── */
 .scoreboard { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }

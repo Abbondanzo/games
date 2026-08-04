@@ -10,6 +10,7 @@ interface Props {
   onAdd: (names: string) => void;
   onRemove: (id: string) => void;
   onSelect: (id: string) => void;
+  onMove: (id: string, to: number) => void;
   editable?: boolean;
   /**
    * Whether tapping a row hands them the turn. Only the host may, so for
@@ -21,7 +22,7 @@ interface Props {
 }
 
 export function PlayersCard({
-  players, turns, currentPlayerId, onAdd, onRemove, onSelect,
+  players, turns, currentPlayerId, onAdd, onRemove, onSelect, onMove,
   editable = true, selectable = true, youId = null,
 }: Props) {
   const rows = standings(players, turns);
@@ -31,7 +32,14 @@ export function PlayersCard({
   const anyPlay = turns.length > 0;
 
   return (
-    <SharedPlayersCard players={players} onAdd={onAdd} onRemove={onRemove} editable={editable}>
+    <SharedPlayersCard
+      players={players}
+      onAdd={onAdd}
+      onRemove={onRemove}
+      onMove={onMove}
+      editable={editable}
+      reorderable={turns.length === 0}
+    >
       <ol className="scoreboard">
         {rows.map((row, i) => {
           const isYou = row.player.id === youId;

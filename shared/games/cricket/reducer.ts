@@ -1,5 +1,5 @@
 import { createIdSource, type IdSource } from '../../ids';
-import { advance, indexAfterRemoval, parseNames, renamedTo } from '../players';
+import { advance, indexAfterRemoval, movedTo, parseNames, renamedTo } from '../players';
 import type { CricketState, Dart, Turn, Variant } from './types';
 
 /** Ids are minted per module, so each game numbers its own. */
@@ -16,6 +16,7 @@ export type Action =
   | { type: 'addPlayers'; names: string }
   | { type: 'removePlayer'; id: string }
   | { type: 'setCurrent'; id: string }
+  | { type: 'movePlayer'; id: string; to: number }
   | { type: 'setVariant'; variant: Variant }
   | { type: 'recordTurn'; darts: Dart[] }
   | { type: 'undo' }
@@ -49,6 +50,19 @@ function apply(state: CricketState, action: Action, uid: IdSource): CricketState
         turns: state.turns.filter((t) => t.playerId !== action.id),
         currentIndex: indexAfterRemoval(state.players, state.currentIndex, action.id),
       };
+    }
+
+    case 'movePlayer': {
+      // Turn order is only worth rearranging before it has been used. Moving
+      // somebody mid-game would hand the turn to a different player and
+      // reorder a history that is read as a sequence.
+      if (state.turns.length) return state;
+      const players = movedTo(state.players, action.id, action.to);
+      if (!players) return state;
+      // Whoever is now first plays first. Following the player instead would
+      // mean moving them to the back still left them going first, and before
+      // a turn has been played the order shown is the order of play.
+      return { ...state, players, currentIndex: 0 };
     }
 
     case 'setCurrent': {

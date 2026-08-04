@@ -33,6 +33,8 @@ const AdjustmentSchema = z.number().int().min(-500).max(500);
 export const ScrabbleActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('addPlayers'), names: z.string().max(200) }),
   z.object({ type: z.literal('removePlayer'), id: Id }),
+  // A seat number, so a paste of nonsense cannot ask for index 1e9.
+  z.object({ type: z.literal('movePlayer'), id: Id, to: z.int().min(0).max(64) }),
   z.object({ type: z.literal('setCurrent'), id: Id }),
   z.object({
     type: z.literal('recordPlay'),

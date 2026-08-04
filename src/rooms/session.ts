@@ -53,6 +53,8 @@ export interface RoomHandle {
   can: (actionType: string) => boolean;
   setLocked: (locked: boolean) => void;
   kick: (memberId: string) => void;
+  /** Hand the room over. The giver becomes an ordinary player. Host only. */
+  makeHost: (memberId: string) => void;
   /**
    * Stop following the room. Guests only: a host cannot leave, because the game
    * lives in the room and walking out would strand it with nobody able to
@@ -300,6 +302,8 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       can: (actionType: string) => canDo(game, view, actor, actionType),
       setLocked: (value) => transport.current?.send({ t: 'lock', locked: value }),
       kick: (memberId) => transport.current?.send({ t: 'kick', memberId }),
+      makeHost: (memberId) =>
+        transport.current?.send({ t: 'makeHost', reqId: nextRequestId(), memberId }),
       leave: () => {
         // A host has no way out that is not closing the room.
         if (role === 'host') return;

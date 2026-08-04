@@ -29,9 +29,20 @@ Everyone else enters their own scores and watches the rest.
 
 **Stop new players** closes the door without ending anything, and is what
 prevents both a join and the player it would have created. **Close room** ends
-it for everyone, and keeps the game on the host's device. A host cannot simply
-leave: the game lives in the room, so walking out would strand it with nobody
-able to administer it.
+it for everyone, and keeps the game on the host's device.
+
+A host cannot simply leave: the game lives in the room, so walking out would
+strand it with nobody able to administer it. What they can do is **put somebody
+else in charge**, which is a swap rather than a promotion - there is one host at
+a time, and whoever gives it away becomes an ordinary player who can then leave.
+That is the answer for a host whose battery is going, or who is leaving early.
+It moves no part of the game: the snapshot and the revision are untouched.
+
+**Play order** is the host's too, and only until the first turn. Moving somebody
+after that would hand the turn to a different player and shuffle a history that
+is read as a sequence, so the reducer refuses it and the buttons are not shown.
+Before then, whoever is first in the list plays first - following the player
+instead would mean moving them to the back still left them going first.
 
 ## What the code is
 

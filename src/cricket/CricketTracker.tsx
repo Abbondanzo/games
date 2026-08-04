@@ -176,6 +176,8 @@ export function CricketTracker() {
           editable={isHost}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={removePlayer}
+          onMove={(id, to) => dispatch({ type: 'movePlayer', id, to })}
+          reorderable={state.turns.length === 0}
           headerExtra={isHost && (
             <div className="seg" role="group" aria-label="Game mode">
               {VARIANTS.map((v) => (
