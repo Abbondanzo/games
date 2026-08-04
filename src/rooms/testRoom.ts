@@ -13,25 +13,12 @@
  */
 import {
   connect, createRoom, handle, join,
-  type ApplyAction, type Context, type Effect, type RoomState,
+  type Context, type Effect, type RoomState,
 } from '@shared/rooms/roomCore';
-import { decodeServerMessage, encode, type Game, type Snapshot } from '@shared/rooms/protocol';
-import { cricketApply, cricketInitialState } from '@shared/rooms/games/cricket';
-import { scrabbleApply, scrabbleInitialState } from '@shared/rooms/games/scrabble';
-import { rummikubApply, rummikubInitialState } from '@shared/rooms/games/rummikub';
+import { decodeServerMessage, encode, type Game } from '@shared/rooms/protocol';
+import { GAME_SETUP } from '@shared/rooms/games';
 import type { TransportFactory, TransportHandlers } from './transport';
 import { writeSession, type StoredSession } from './storage';
-
-interface Setup {
-  initial: () => Snapshot;
-  apply: (uid: () => string) => ApplyAction<Snapshot>;
-}
-
-const SETUP: Record<Game, Setup> = {
-  cricket: { initial: cricketInitialState, apply: cricketApply },
-  scrabble: { initial: scrabbleInitialState, apply: scrabbleApply },
-  rummikub: { initial: rummikubInitialState, apply: rummikubApply },
-};
 
 export interface TestRoom {
   code: string;
@@ -50,14 +37,14 @@ export interface TestRoom {
 export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
   let ids = 0;
   const nextId = () => `t${ids++}`;
-  const apply = SETUP[game].apply(nextId);
+  const apply = GAME_SETUP[game].apply(nextId);
 
   const hostId = nextId();
   let state: RoomState = createRoom({
     code: 'AB2D',
     game,
     host: { memberId: hostId, name: hostName },
-    snapshot: SETUP[game].initial(),
+    snapshot: GAME_SETUP[game].initial(),
     now: 1_000,
     apply,
   });

@@ -103,6 +103,17 @@ describe('cricket', () => {
     ]));
   });
 
+  it('rearranges the order the same way', () => {
+    agree(run([
+      { type: 'addPlayers', names: 'Ada, Grace, Alan' },
+      { type: 'movePlayer', id: 'id0', to: 2 },
+      { type: 'movePlayer', id: 'id2', to: 0 },
+      { type: 'recordTurn', darts: [t(20, 3)] },
+      // Declined by both, now that a dart has been thrown.
+      { type: 'movePlayer', id: 'id1', to: 0 },
+    ]));
+  });
+
   it('undoes, renames and starts again the same way', () => {
     agree(run([
       { type: 'addPlayers', names: 'Ada, Grace' },
@@ -144,6 +155,15 @@ describe('scrabble', () => {
     ]);
     agree(runs);
     expect(runs.solo.turns).toHaveLength(4);
+  });
+
+  it('rearranges the order the same way', () => {
+    agree(run([
+      { type: 'addPlayers', names: 'Ada, Grace, Alan' },
+      { type: 'movePlayer', id: 'id2', to: 0 },
+      { type: 'recordPlay', words: [word('QI', 11)], bingo: false },
+      { type: 'movePlayer', id: 'id0', to: 0 },
+    ]));
   });
 
   it('adjusts, undoes and renames the same way', () => {
@@ -191,6 +211,15 @@ describe('rummikub', () => {
     expect(runs.solo.rounds).toHaveLength(3);
   });
 
+  it('rearranges the order the same way', () => {
+    agree(run([
+      { type: 'addPlayers', names: 'Ada, Grace, Alan' },
+      { type: 'movePlayer', id: 'id1', to: 0 },
+      { type: 'recordRound', winnerId: 'id0', penalties: { id1: 24 } },
+      { type: 'movePlayer', id: 'id2', to: 0 },
+    ]));
+  });
+
   it('treats a missing rack the same way', () => {
     agree(run([
       { type: 'addPlayers', names: 'Ada, Grace, Alan' },
@@ -226,7 +255,7 @@ describe('round-tripping a snapshot', () => {
     ]],
     ['scrabble', scrabbleStart, scrabbleApply, [
       { type: 'addPlayers', names: 'Ada, Grace' },
-      { type: 'recordPlay', words: [{ text: 'QI', score: 11 }], bingo: false },
+      { type: 'recordPlay', words: [{ word: 'QI', points: 11 }], bingo: false },
     ]],
     ['rummikub', rummikubStart, rummikubApply, [
       { type: 'addPlayers', names: 'Ada, Grace' },

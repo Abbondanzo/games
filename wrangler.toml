@@ -13,12 +13,16 @@ class_name = "Room"
 tag = "v1"
 new_sqlite_classes = ["Room"]
 
+# Tells the Worker which upload is running, for /health.
+[version_metadata]
+binding = "VERSION"
+
 [vars]
-# Only the two origins that serve the live site. Previews used to be allowed
-# here through a wildcard, but they have a room server of their own now: a
-# branch is free to change the protocol, and a real game should not be the
-# thing that finds out.
-ALLOWED_ORIGINS = "https://games.abbondanzo.com,https://games-ccu.pages.dev"
+# There is one room server, so this list has to admit everything that talks to
+# it: the live site, every Pages preview, and a dev server. Each Pages
+# deployment gets its own subdomain, hence the wildcard - one label under this
+# project only, since *.pages.dev would admit every site on the platform.
+ALLOWED_ORIGINS = "https://games.abbondanzo.com,https://games-ccu.pages.dev,https://*.games-ccu.pages.dev,http://localhost:5173,http://localhost:4173"
 
 # Cloudflare's rate limiter. Joining is the one endpoint worth guarding: it is
 # where a guessed code would be tried.
@@ -26,37 +30,4 @@ ALLOWED_ORIGINS = "https://games.abbondanzo.com,https://games-ccu.pages.dev"
 name = "JOIN_LIMIT"
 type = "ratelimit"
 namespace_id = "1001"
-simple = { limit = 20, period = 60 }
-
-# ─────────────────────────── staging ───────────────────────────
-#
-# Serves every client that is not production: pull request previews, local dev
-# and local `vite preview`. Its storage is its own, so the rooms in it are
-# nobody's real game and a protocol change can land here first.
-#
-# An environment inherits `main` and the compatibility settings but not one
-# single binding, so all of those are repeated rather than shared.
-
-[env.preview]
-name = "games-rooms-preview"
-
-[[env.preview.durable_objects.bindings]]
-name = "ROOMS"
-class_name = "Room"
-
-[[env.preview.migrations]]
-tag = "v1"
-new_sqlite_classes = ["Room"]
-
-[env.preview.vars]
-# Every Pages deployment gets its own subdomain, so previews need the wildcard.
-# One label under this project only: *.pages.dev would admit every site on the
-# platform. The live site is deliberately absent - it never talks to staging.
-ALLOWED_ORIGINS = "https://*.games-ccu.pages.dev,http://localhost:5173,http://localhost:4173"
-
-[[env.preview.unsafe.bindings]]
-name = "JOIN_LIMIT"
-type = "ratelimit"
-# A namespace of its own, so preview traffic cannot spend production's budget.
-namespace_id = "1002"
 simple = { limit = 20, period = 60 }

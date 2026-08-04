@@ -28,8 +28,9 @@ import { z } from 'zod';
  *    close code. Bumped although nothing was added to a frame, because a client
  *    that predates it retries a room that has ended forever, and telling that
  *    client to refresh is the only way to stop it.
+ * 5: added makeHost, and movePlayer as a game action.
  */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 /** Which side is behind, worked out from the version in the welcome. */
 export type VersionGap = 'app' | 'room';
@@ -129,6 +130,7 @@ export const ClientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('setName'), name: Name }),
   z.object({ t: z.literal('lock'), locked: z.boolean() }),
   z.object({ t: z.literal('kick'), memberId: Id }),
+  z.object({ t: z.literal('makeHost'), reqId: Id, memberId: Id }),
   z.object({ t: z.literal('roundOpen'), reqId: Id, winnerId: Id }),
   z.object({ t: z.literal('rackSubmit'), reqId: Id, seatId: Id, total: z.int().min(0).max(1000) }),
   z.object({ t: z.literal('roundCancel'), reqId: Id }),

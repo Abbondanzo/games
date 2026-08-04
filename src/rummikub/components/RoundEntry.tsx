@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Trophy } from 'lucide-react';
 import type { Player } from '@shared/games/rummikub/types';
+import { WinnerPick } from './WinnerPick';
 import { JOKER_PENALTY, potFor } from '@shared/games/rummikub/rules';
 import { TileButtons } from './TileButtons';
 
@@ -65,22 +66,7 @@ export function RoundEntry({ players, roundNumber, onScore }: Props) {
         <p className="muted">Add at least two players to score a round.</p>
       ) : (
         <>
-          <fieldset className="winner-pick">
-            <legend>Who went out?</legend>
-            <div className="seg wrap">
-              {players.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={winnerId === p.id ? 'on' : undefined}
-                  aria-pressed={winnerId === p.id}
-                  onClick={() => setWinnerId(p.id)}
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          </fieldset>
+          <WinnerPick players={players} value={winnerId} onPick={setWinnerId} />
 
           {winnerId && (
             <>

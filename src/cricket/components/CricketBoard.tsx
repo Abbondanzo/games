@@ -1,5 +1,5 @@
 import type { BoardState } from '@shared/games/cricket/rules';
-import { TARGETS, targetLabel } from '@shared/games/cricket/rules';
+import { TARGETS, targetLabel, totalMarks } from '@shared/games/cricket/rules';
 import type { Player, Variant } from '@shared/games/cricket/types';
 import { MarkGlyph } from './MarkGlyph';
 
@@ -9,6 +9,14 @@ interface Props {
   variant: Variant;
   currentPlayerId: string | null;
   onSelect: (id: string) => void;
+  /**
+   * Whether tapping a column hands over the turn. Only the host may, so for
+   * everyone else the headings are plain text: a button that does nothing is
+   * worse than no button.
+   */
+  selectable?: boolean;
+  /** The player this device throws for, marked so it can be picked out. */
+  youId?: string | null;
 }
 
 const FOOTER_LABEL: Record<Variant, string> = {
@@ -17,10 +25,9 @@ const FOOTER_LABEL: Record<Variant, string> = {
   nopoints: 'Marks',
 };
 
-const totalMarks = (board: BoardState, playerId: string): number =>
-  TARGETS.reduce((sum, t) => sum + (board.marks[playerId]?.[t] ?? 0), 0);
-
-export function CricketBoard({ players, board, variant, currentPlayerId, onSelect }: Props) {
+export function CricketBoard({
+  players, board, variant, currentPlayerId, onSelect, selectable = true, youId = null,
+}: Props) {
   if (!players.length) return null;
 
   return (
@@ -32,24 +39,39 @@ export function CricketBoard({ players, board, variant, currentPlayerId, onSelec
         <thead>
           <tr>
             <th scope="col" className="corner">Target</th>
-            {players.map((p) => (
-              <th
-                key={p.id}
-                scope="col"
-                className={p.id === currentPlayerId ? 'active' : undefined}
-              >
-                <button
-                  type="button"
-                  className="player-head"
-                  onClick={() => onSelect(p.id)}
-                  title={`Make it ${p.name}'s turn`}
-                  aria-label={`Make it ${p.name}'s turn`}
-                >
+            {players.map((p) => {
+              const inside = (
+                <>
                   <span className="name">{p.name}</span>
+                  {p.id === youId && <span className="you">you</span>}
                   {board.hasClosedAll[p.id] && <span className="closed-all">closed out</span>}
-                </button>
-              </th>
-            ))}
+                </>
+              );
+              return (
+                <th
+                  key={p.id}
+                  scope="col"
+                  className={[
+                    p.id === currentPlayerId ? 'active' : '',
+                    p.id === youId ? 'mine' : '',
+                  ].filter(Boolean).join(' ') || undefined}
+                >
+                  {selectable ? (
+                    <button
+                      type="button"
+                      className="player-head"
+                      onClick={() => onSelect(p.id)}
+                      title={`Make it ${p.name}'s turn`}
+                      aria-label={`Make it ${p.name}'s turn`}
+                    >
+                      {inside}
+                    </button>
+                  ) : (
+                    <span className="player-head static">{inside}</span>
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
 

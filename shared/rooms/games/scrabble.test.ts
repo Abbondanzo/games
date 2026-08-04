@@ -12,6 +12,7 @@ describe('decoding a well-formed action', () => {
   it.each([
     [{ type: 'addPlayers', names: 'Ada, Grace' }],
     [{ type: 'removePlayer', id: 'p1' }],
+    [{ type: 'movePlayer', id: 'p1', to: 0 }],
     [{ type: 'setCurrent', id: 'p1' }],
     [{ type: 'recordPlay', words: [{ word: 'QUIZ', points: 22 }], bingo: false }],
     [{ type: 'recordPlay', words: [], bingo: true }],
@@ -34,6 +35,11 @@ describe('refusing a hostile payload', () => {
   it.each([
     ['names that are not a string', { type: 'addPlayers', names: ['Ada'] }],
     ['a missing id', { type: 'removePlayer' }],
+    ['a seat that is not a number', { type: 'movePlayer', id: 'p1', to: 'first' }],
+    ['a seat past any real roster', { type: 'movePlayer', id: 'p1', to: 1e9 }],
+    ['a negative seat', { type: 'movePlayer', id: 'p1', to: -1 }],
+    ['a fractional seat', { type: 'movePlayer', id: 'p1', to: 1.5 }],
+    ['a move with no seat at all', { type: 'movePlayer', id: 'p1' }],
     ['words that are not an array', { type: 'recordPlay', words: 'QUIZ', bingo: false }],
     ['a word with no points', { type: 'recordPlay', words: [{ word: 'QUIZ' }], bingo: false }],
     ['fractional points', { type: 'recordPlay', words: [{ word: 'A', points: 1.5 }], bingo: false }],

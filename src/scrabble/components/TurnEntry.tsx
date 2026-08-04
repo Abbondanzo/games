@@ -10,6 +10,7 @@ import {
   tilesFromWord,
   turnTotal,
 } from '@shared/games/scrabble/scoring';
+import { WhoseTurn, turnTone } from '../../rooms/WhoseTurn';
 import { runLookup, type LookupView } from '../lib/lookupView';
 import { TileRow } from './TileRow';
 import { ValidityBar } from './ValidityBar';
@@ -24,16 +25,25 @@ interface Props {
   onOpenDictionary: () => void;
   /** In a room, closed off until it is your turn. */
   disabled?: boolean;
+  /**
+   * Whether the turn on the board is this device's, or null when playing alone
+   * and the question does not arise. Worth saying outright: at a table everyone
+   * is looking at their own phone, and "Now playing: Ada" makes you work out
+   * whether Ada is you.
+   */
+  yourTurn?: boolean | null;
 }
 
 const IDLE: LookupView = { kind: 'idle' };
 
 export function TurnEntry({
   draft, setDraft, currentPlayer, turnNumber, onScore, onPass, onOpenDictionary,
-  disabled = false,
+  disabled = false, yourTurn = null,
 }: Props) {
   const [check, setCheck] = useState<LookupView>(IDLE);
   const word = draftWord(draft);
+
+  const tone = turnTone(currentPlayer?.name ?? null, yourTurn);
 
   const patch = (changes: Partial<Draft>) => setDraft((d) => ({ ...d, ...changes }));
 
@@ -83,14 +93,16 @@ export function TurnEntry({
   }
 
   return (
-    <section className="card">
+    <section className={`card${tone ? ` entry ${tone}` : ''}`}>
       <div className="card-head">
         <h2>Turn <span className="muted">#{turnNumber}</span></h2>
-        <div className="whose-turn">
-          {currentPlayer
-            ? <>Now playing: <b>{currentPlayer.name}</b></>
-            : 'Add a player to start scoring'}
-        </div>
+        <WhoseTurn
+          name={currentPlayer?.name ?? null}
+          yours={yourTurn}
+          nowPlaying="Now playing"
+          yoursLabel="Your turn"
+          empty="Add a player to start scoring"
+        />
       </div>
 
       <form onSubmit={submit}>

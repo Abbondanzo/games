@@ -18,7 +18,8 @@ import {
   ROOMS_URL, webSocketTransport,
   type ConnectionStatus, type Transport, type TransportFactory,
 } from './transport';
-import { clearSession, readSession, writeSession, type StoredSession } from './storage';
+import { clearSession, readSession, type StoredSession } from './storage';
+import { writeJson } from '../shared/localStore';
 import { useRoomOverrides } from './RoomProvider';
 
 /** Applied internally when a room broadcast arrives. Never sent over the wire. */
@@ -52,6 +53,8 @@ export interface RoomHandle {
   can: (actionType: string) => boolean;
   setLocked: (locked: boolean) => void;
   kick: (memberId: string) => void;
+  /** Hand the room over. The giver becomes an ordinary player. Host only. */
+  makeHost: (memberId: string) => void;
   /**
    * Stop following the room. Guests only: a host cannot leave, because the game
    * lives in the room and walking out would strand it with nobody able to
@@ -145,11 +148,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
 
   /** Writes what the room last sent into this device's own save. */
   const keepLocally = useCallback(() => {
-    try {
-      localStorage.setItem(storeKey, JSON.stringify(stateRef.current));
-    } catch {
-      // Storage can be unavailable; nothing more to do.
-    }
+    writeJson(storeKey, stateRef.current);
   }, [storeKey]);
 
   /**
@@ -171,11 +170,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
   /* ── solo: persist exactly as before ── */
   useEffect(() => {
     if (session) return;
-    try {
-      localStorage.setItem(storeKey, JSON.stringify(state));
-    } catch {
-      // Storage can be unavailable (private browsing); the session still works.
-    }
+    writeJson(storeKey, state);
   }, [session, state, storeKey]);
 
   /* ── in a room: stay connected ── */
@@ -307,6 +302,8 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       can: (actionType: string) => canDo(game, view, actor, actionType),
       setLocked: (value) => transport.current?.send({ t: 'lock', locked: value }),
       kick: (memberId) => transport.current?.send({ t: 'kick', memberId }),
+      makeHost: (memberId) =>
+        transport.current?.send({ t: 'makeHost', reqId: nextRequestId(), memberId }),
       leave: () => {
         // A host has no way out that is not closing the room.
         if (role === 'host') return;
@@ -325,9 +322,4 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       lastError, outdated, stopFollowing]);
 
   return { state, dispatch, room, onReject, gone };
-}
-
-/** Called after create or join to attach this tab to a room. */
-export function enterRoom(session: StoredSession): void {
-  writeSession(session);
 }

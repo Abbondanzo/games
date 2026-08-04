@@ -12,6 +12,8 @@ describe('decoding a well-formed action', () => {
   it.each([
     [{ type: 'addPlayers', names: 'Ada, Grace' }],
     [{ type: 'removePlayer', id: 'p1' }],
+    [{ type: 'movePlayer', id: 'p1', to: 0 }],
+    [{ type: 'movePlayer', id: 'p1', to: 0 }],
     [{ type: 'recordRound', winnerId: 'p1', penalties: { p2: 24, p3: 41 } }],
     [{ type: 'recordRound', winnerId: 'p1', penalties: {} }],
     [{ type: 'undo' }],
@@ -25,6 +27,11 @@ describe('decoding a well-formed action', () => {
 describe('refusing a hostile payload', () => {
   it.each([
     ['a missing winner', { type: 'recordRound', penalties: {} }],
+    ['a seat that is not a number', { type: 'movePlayer', id: 'p1', to: 'first' }],
+    ['a seat past any real roster', { type: 'movePlayer', id: 'p1', to: 1e9 }],
+    ['a negative seat', { type: 'movePlayer', id: 'p1', to: -1 }],
+    ['a fractional seat', { type: 'movePlayer', id: 'p1', to: 1.5 }],
+    ['a move with no seat at all', { type: 'movePlayer', id: 'p1' }],
     ['penalties that are not an object', { type: 'recordRound', winnerId: 'p1', penalties: 24 }],
     ['a penalty that is not a number', { type: 'recordRound', winnerId: 'p1', penalties: { p2: 'lots' } }],
     ['a fractional penalty', { type: 'recordRound', winnerId: 'p1', penalties: { p2: 1.5 } }],

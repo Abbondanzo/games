@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { clampIndex, keepValid, readJson } from '../../shared/localStore';
 import { useGameSession } from '../../rooms/session';
 import type { TransportFactory } from '../../rooms/transport';
 import { initialState, reducer } from '@shared/games/scrabble/reducer';
@@ -24,36 +25,16 @@ const StoredSchema = z.object({
 });
 
 export function readStored(): GameState | null {
-  // getItem itself can throw in private browsing, so the read stays guarded.
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(STORE_KEY);
-  } catch {
-    return null;
-  }
-  if (!raw) return null;
+  const stored = readJson(STORE_KEY, StoredSchema);
+  if (!stored) return null;
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-
-  const result = StoredSchema.safeParse(parsed);
-  if (!result.success) return null;
-
-  const { players, currentIndex } = result.data;
+  const { players, currentIndex } = stored;
   const ids = new Set(players.map((p) => p.id));
-  const turns = result.data.turns
-    .map((t) => TurnSchema.safeParse(t))
-    .filter((r) => r.success && ids.has(r.data.playerId))
-    .map((r) => r.data!);
 
   return {
     players,
-    turns,
-    currentIndex: currentIndex < players.length ? currentIndex : 0,
+    turns: keepValid(stored.turns, TurnSchema, (t) => t.playerId, ids),
+    currentIndex: clampIndex(currentIndex, players.length),
   };
 }
 

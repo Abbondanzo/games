@@ -6,6 +6,13 @@ interface Props {
   turns: Turn[];
   onUndo: () => void;
   onAdjust: (playerId: string, points: number) => void;
+  /**
+   * Undo is yours only while the last turn is yours; an adjustment is the
+   * host's alone. Both are hidden rather than disabled when they are not on
+   * offer, because a control that only ever refuses is worse than no control.
+   */
+  canUndo?: boolean;
+  canAdjust?: boolean;
 }
 
 const describe = (turn: Turn): JSX.Element => {
@@ -14,7 +21,9 @@ const describe = (turn: Turn): JSX.Element => {
   return <>{turn.words.join(' + ')}{turn.bingo && ' + bingo'}</>;
 };
 
-export function HistoryCard({ players, turns, onUndo, onAdjust }: Props) {
+export function HistoryCard({
+  players, turns, onUndo, onAdjust, canUndo = true, canAdjust = true,
+}: Props) {
   const [playerId, setPlayerId] = useState('');
   const [points, setPoints] = useState('');
 
@@ -31,7 +40,7 @@ export function HistoryCard({ players, turns, onUndo, onAdjust }: Props) {
     <section className="card">
       <div className="card-head">
         <h2>History</h2>
-        {turns.length > 0 && (
+        {turns.length > 0 && canUndo && (
           <button type="button" className="link" onClick={onUndo}>Undo last</button>
         )}
       </div>
@@ -49,7 +58,7 @@ export function HistoryCard({ players, turns, onUndo, onAdjust }: Props) {
         ))}
       </ol>
 
-      {players.length > 0 && (
+      {players.length > 0 && canAdjust && (
         <div className="adjust">
           <span className="muted">End-of-game adjustment</span>
           <select

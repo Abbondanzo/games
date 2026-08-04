@@ -13,7 +13,9 @@ const PenaltySchema = z.number().int().min(0).max(1000);
 export const RoundSchema = z.object({
   id: z.string(),
   winnerId: z.string(),
-  penalties: z.record(z.string(), z.number().finite()),
+  // The same bounds the wire accepts. A stored game is no more trustworthy than
+  // a frame off a socket, and a negative penalty would pay the loser.
+  penalties: z.record(z.string(), PenaltySchema),
 });
 
 const Id = z.string().min(1).max(64);
@@ -21,6 +23,8 @@ const Id = z.string().min(1).max(64);
 export const RummikubActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('addPlayers'), names: z.string().max(200) }),
   z.object({ type: z.literal('removePlayer'), id: Id }),
+  // A seat number, so a paste of nonsense cannot ask for index 1e9.
+  z.object({ type: z.literal('movePlayer'), id: Id, to: z.int().min(0).max(64) }),
   z.object({
     type: z.literal('recordRound'),
     winnerId: Id,

@@ -76,9 +76,9 @@ export const seatView: Record<Game, (state: Snapshot) => SeatView> = {
  * arbitrary points, the other rescores everybody.
  */
 const HOST_ONLY: Record<Game, readonly string[]> = {
-  scrabble: ['addPlayers', 'removePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll'],
-  cricket: ['addPlayers', 'removePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll'],
-  rummikub: ['addPlayers', 'removePlayer', 'recordRound', 'newGame', 'resetAll', 'undo'],
+  scrabble: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll'],
+  cricket: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll'],
+  rummikub: ['addPlayers', 'removePlayer', 'movePlayer', 'recordRound', 'newGame', 'resetAll', 'undo'],
 };
 
 /** Actions a seated player may take, but only when it is their turn. */

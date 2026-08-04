@@ -1,8 +1,9 @@
-import { Copy, DoorOpen, Lock, LockOpen, Pencil, PowerOff, UserX, Users } from 'lucide-react';
+import { Copy, Crown, DoorOpen, Lock, LockOpen, Pencil, PowerOff, UserX, Users } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { VERSION_MESSAGES } from '@shared/rooms/protocol';
 import type { RoomHandle } from './session';
 import { writeName } from './storage';
+import { isHost as amHost } from './whoAmI';
 
 /**
  * The room, as a strip under the top bar: who is here, what your part is, and
@@ -36,7 +37,13 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
   }
 
   const online = room.members.filter((m) => m.online).length;
-  const isHost = room.role === 'host';
+  const isHost = amHost(room);
+
+  /** One host at a time, so this gives it up as well as handing it over. */
+  function handOver(memberId: string, name: string) {
+    const warning = `Put ${name} in charge of the room? They will be able to change the game and remove people, and you will not.`;
+    if (window.confirm(warning)) room.makeHost(memberId);
+  }
 
   function endRoom() {
     const others = room.members.length - 1;
@@ -125,13 +132,23 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
                 {m.name}
                 {m.role === 'host' && <span className="muted"> host</span>}
                 {isHost && m.memberId !== room.memberId && (
-                  <button
-                    type="button"
-                    aria-label={`Remove ${m.name} from the room`}
-                    onClick={() => room.kick(m.memberId)}
-                  >
-                    <UserX size={13} aria-hidden="true" />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      aria-label={`Put ${m.name} in charge of the room`}
+                      title={`Put ${m.name} in charge`}
+                      onClick={() => handOver(m.memberId, m.name)}
+                    >
+                      <Crown size={13} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${m.name} from the room`}
+                      onClick={() => room.kick(m.memberId)}
+                    >
+                      <UserX size={13} aria-hidden="true" />
+                    </button>
+                  </>
                 )}
               </li>
             ))}
@@ -170,7 +187,8 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
             <p className="hint">
               Share the code or the link. Anyone who joins can pick their name and enter their
               own scores; only you can change the rules. Stopping new players closes the door
-              without ending anything. Closing the room ends it for everyone and keeps the game
+              without ending anything. You can put someone else in charge, which is how to leave
+              without ending the game. Closing the room ends it for everyone and keeps the game
               on this device.
             </p>
           )}

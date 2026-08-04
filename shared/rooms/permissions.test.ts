@@ -55,9 +55,9 @@ describe('reading a game state', () => {
 
 describe('the host', () => {
   const everything: Record<Game, string[]> = {
-    scrabble: ['addPlayers', 'removePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll', 'recordPlay', 'pass', 'undo'],
-    cricket: ['addPlayers', 'removePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll', 'recordTurn', 'undo'],
-    rummikub: ['addPlayers', 'removePlayer', 'recordRound', 'newGame', 'resetAll', 'undo'],
+    scrabble: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll', 'recordPlay', 'pass', 'undo'],
+    cricket: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll', 'recordTurn', 'undo'],
+    rummikub: ['addPlayers', 'removePlayer', 'movePlayer', 'recordRound', 'newGame', 'resetAll', 'undo'],
   };
 
   for (const [game, types] of Object.entries(everything) as [Game, string[]][]) {
@@ -91,8 +91,8 @@ describe('a seated player', () => {
   });
 
   it.each([
-    ['scrabble', ['addPlayers', 'removePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll']],
-    ['cricket', ['addPlayers', 'removePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll']],
+    ['scrabble', ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll']],
+    ['cricket', ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll']],
   ] as const)('is refused every host-only %s action', (game, types) => {
     for (const type of types) {
       expect(check(game, turnGame(), seatedAda, type), type)

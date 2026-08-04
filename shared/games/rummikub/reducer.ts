@@ -1,4 +1,5 @@
 import { createIdSource, type IdSource } from '../../ids';
+import { movedTo, parseNames, renamedTo } from '../players';
 import type { Round, RummikubState } from './types';
 
 /** Ids are minted per module, so each game numbers its own. */
@@ -9,6 +10,7 @@ export const initialState: RummikubState = { players: [], rounds: [] };
 export type Action =
   | { type: 'addPlayers'; names: string }
   | { type: 'removePlayer'; id: string }
+  | { type: 'movePlayer'; id: string; to: number }
   | { type: 'recordRound'; winnerId: string; penalties: Record<string, number> }
   | { type: 'undo' }
   | { type: 'newGame' }
@@ -18,7 +20,7 @@ export type Action =
 function apply(state: RummikubState, action: Action, uid: IdSource): RummikubState {
   switch (action.type) {
     case 'addPlayers': {
-      const names = action.names.split(',').map((n) => n.trim()).filter(Boolean);
+      const names = parseNames(action.names);
       if (!names.length) return state;
       return { ...state, players: [...state.players, ...names.map((name) => ({ id: uid(), name }))] };
     }
@@ -32,6 +34,14 @@ function apply(state: RummikubState, action: Action, uid: IdSource): RummikubSta
       // they merely lost are kept and rescored without their penalty.
       const rounds = state.rounds.filter((r) => r.winnerId !== action.id);
       return { players, rounds };
+    }
+
+    case 'movePlayer': {
+      // No turn order here, but the board is still read in this order, and a
+      // game already under way should not have its rows shuffled.
+      if (state.rounds.length) return state;
+      const players = movedTo(state.players, action.id, action.to);
+      return players ? { ...state, players } : state;
     }
 
     case 'recordRound': {
@@ -49,12 +59,8 @@ function apply(state: RummikubState, action: Action, uid: IdSource): RummikubSta
       return state.rounds.length ? { ...state, rounds: state.rounds.slice(0, -1) } : state;
 
     case 'renamePlayer': {
-      const name = action.name.trim();
-      if (!name) return state;
-      return {
-        ...state,
-        players: state.players.map((p) => (p.id === action.id ? { ...p, name } : p)),
-      };
+      const players = renamedTo(state.players, action.id, action.name);
+      return players ? { ...state, players } : state;
     }
 
     case 'newGame':

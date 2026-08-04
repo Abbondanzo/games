@@ -30,61 +30,88 @@ the site and the room server are two independent artefacts that happen to share 
 Worker carries no UI; the site carries no server. What they do share is `shared/`, imported by
 both so the room runs the same scoring code the app does.
 
-Deploy it by hand with `pnpm worker:deploy`, or connect the repo to it with Cloudflare's Workers
-Builds, which works the same way the Pages integration does:
+It is connected to the repo through Cloudflare's Workers Builds, which works the way the Pages
+integration does:
 
 | Setting | Value |
 | --- | --- |
 | Build command | `pnpm install --frozen-lockfile` |
 | Deploy command | `pnpm worker:deploy` |
 | Root directory | the repo root, where `wrangler.toml` is |
+| Non-production branches | build, and **do not** deploy |
 
 The install step is needed because the Worker bundles zod and the shared library. Connecting it
 keeps API tokens out of the repo, which the GitHub Actions route would not.
 
 **Only deploy from `main`.** The deploy command is a plain `wrangler deploy`, which publishes
-production. If non-production branch deployments are turned on in Workers Builds, every pull
-request would publish over the live room server. Non-production branches should build and stop.
+production. If non-production branch deployments are turned on, every branch would publish over
+the live room server. Non-production branches should build and stop.
 
-## Two room servers
+A branch cannot usefully deploy a room server of its own from here, and two attempts are written
+up in [rooms.md](rooms.md) so they are not tried a third time.
 
-There are two, and which one a build talks to is decided by the origin it is served from:
+## There is one room server, and previews use it
 
-| Origin | Room server |
+Cloudflare Pages gives every pull request a preview, but there is no matching preview of the
+room server. A preview build talks to **production**:
+
+| Client | Room server |
 | --- | --- |
-| `games.abbondanzo.com`, `games-ccu.pages.dev` | `games-rooms` |
-| every preview, local dev, anything else | `games-rooms-preview` |
+| the live site | `games-rooms` |
+| a pull request preview | `games-rooms` |
+| local dev | `games-rooms`, unless `VITE_ROOMS_URL` says otherwise |
 
-That decision lives in `roomsUrlFor` in `src/rooms/transport.ts` and is read from the page at
-runtime, not from a build variable. A variable that has to be set in a dashboard is one that
-will eventually be missing, and the failure would be silent: a preview writing into somebody's
-real game. It is an allowlist, so an origin nobody anticipated gets staging, which is harmless.
+That is a deliberate trade rather than an oversight. A second room server means a second Workers
+Builds project and a second build on every push, which doubles the spend against the free tier
+for a score sheet. Two things follow from it, and both matter:
 
-Staging is the `preview` environment in `wrangler.toml`. It has its own Durable Object storage,
-its own rate limit budget, and an origin list that admits previews and localhost but not the
-live site. Deploy it with:
+**A room made from a preview is a real room.** It lives in the same Durable Object storage as
+everybody's live games, under a code from the same space, and holds real people's names. Nothing
+stops a preview creating, locking or closing rooms. Treat a preview as production with a
+different coat of paint.
+
+**A preview cannot exercise a protocol change at all.** A branch that bumps `PROTOCOL_VERSION`
+produces a preview client that is ahead of the deployed room, so every session shows "This app is
+out of date" or its counterpart and the new message is refused. There is nothing to be learned
+from that preview. Run it locally instead.
+
+## Trying a change without touching real games
 
 ```
-pnpm worker:deploy:staging
+pnpm worker:dev                                   # the room server on :8787
+VITE_ROOMS_URL=http://localhost:8787 pnpm dev     # the app, pointed at it
 ```
 
-It only needs redeploying when the Worker changes in a way a preview depends on - which, for a
-protocol change, is the point of it. `VITE_ROOMS_URL` still overrides everything, for pointing
-at a wrangler running locally.
+That is the isolated setup: a room server with its own local storage, and a client that talks to
+it. It is the only way to try a protocol change honestly, and the way to try anything that writes
+to a room without writing to somebody's game.
 
-**A protocol change now has somewhere to go.** Deploy staging, open the pull request, and the
-preview exercises the new protocol against a room server that speaks it, without touching
-production. Previously a preview could only ever reach the live room server, so a preview of a
-protocol change was guaranteed to show a version mismatch and could not be tested at all.
+Two devices are worth the trouble here. `wrangler dev` binds a port on the machine, so a phone on
+the same network can reach it, which is what the manual checklist in [rooms.md](rooms.md) needs.
 
-**Both auto-deploying means they race**, on `main`. If Pages wins, new clients briefly talk to an old room.
-That is worth knowing but not worth avoiding: the app is precached, so some clients are stale
-whatever the deploy order, which is why the version banner exists. For a breaking protocol
-change, deploy the Worker by hand first and then push.
+**Deploy the Worker before the client** when a protocol changes. The app is precached, so a
+client can be weeks old, and an old room rejects a frame it has never heard of. `pnpm
+worker:deploy` from `main`, then push.
 
-Deploy the Worker first when a client-to-server message is added. The app is precached by a service
-worker, so a client can be running weeks-old code; protocol changes have to stay additive. See
-[rooms.md](rooms.md).
+## Is it up?
+
+```
+curl https://games-rooms.abbondanzo.workers.dev/health
+curl https://games-rooms-preview.abbondanzo.workers.dev/health
+```
+
+```json
+{ "ok": true, "protocol": 5, "games": ["scrabble", "cricket", "rummikub"],
+  "version": "...", "commit": "...", "uploadedAt": "..." }
+```
+
+Every other route needs a room code, so without this an address that was never deployed and one
+that is running answer much the same way. `protocol` is the part worth reading: it says whether
+that room can talk to a given client, so a preview showing "This room needs updating" is answered
+by comparing this against `PROTOCOL_VERSION` in the client. `commit` is the revision the version
+was built from, which Workers Builds sets.
+
+Open to any origin and never cached, so it can be curled from anywhere.
 
 ## Toolchain
 

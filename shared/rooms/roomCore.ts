@@ -342,6 +342,33 @@ export function handle<S extends Snapshot>(
     case 'kick':
       return handleKick(touched, member, message.memberId, ctx);
 
+    /**
+     * Handing the room over. One host at a time, so this is a swap rather than
+     * a promotion: whoever gives it away becomes an ordinary player, and can
+     * then leave, which a host cannot.
+     *
+     * It is the way out of the room outliving its host - somebody whose phone
+     * is dying, or who is going home early, can pass it on rather than close
+     * the game on everyone.
+     */
+    case 'makeHost': {
+      if (member.role !== 'host') return fail(touched, memberId, message.reqId, 'host-only');
+
+      const heir = touched.members[message.memberId];
+      // Handing it to yourself, or to somebody who has gone, is nothing.
+      if (!heir || heir.memberId === memberId) {
+        return fail(touched, memberId, message.reqId, 'unknown-action');
+      }
+
+      const members = {
+        ...touched.members,
+        [memberId]: { ...member, role: 'player' as const },
+        [heir.memberId]: { ...heir, role: 'host' as const },
+      };
+      const next = { ...touched, members };
+      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+    }
+
     case 'roundOpen': {
       if (member.role !== 'host') return fail(touched, memberId, message.reqId, 'host-only');
       const seats = seatView[touched.game](touched.snapshot).playerIds;

@@ -7,35 +7,19 @@
  * protocol, and check the solo path is untouched by it.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { RummikubTracker } from '../rummikub/RummikubTracker';
-import { RoomProvider } from './RoomProvider';
 import { createTestRoom, type TestRoom } from './testRoom';
 import type { StoredSession } from './storage';
+import { countingSockets, mountClient, myRow, scoreboard } from './testClient';
 
 type User = ReturnType<typeof userEvent.setup>;
 
-function mount(room: TestRoom, session: StoredSession, label: string): HTMLElement {
-  const container = document.createElement('div');
-  container.dataset.client = label;
-  document.body.append(container);
-  render(
-    <RoomProvider value={{ transport: room.transport(), session }}>
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <RummikubTracker />
-      </MemoryRouter>
-    </RoomProvider>,
-    { container },
-  );
-  return container;
-}
+const mount = (room: TestRoom, session: StoredSession, label: string) =>
+  mountClient(RummikubTracker, { room, session, label });
 
-const scores = (client: HTMLElement) =>
-  within(client).getAllByRole('listitem')
-    .filter((li) => li.querySelector('.pts'))
-    .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`);
+const scores = scoreboard;
 
 /** Host opens a round naming who went out. */
 async function collect(user: User, host: HTMLElement, winner: string) {
@@ -240,17 +224,62 @@ describe('scoring the round', () => {
   });
 });
 
+/**
+ * Rummikub gives a guest no game actions at all: rounds are collective, so
+ * everything that changes the game is the host's, and a guest takes part by
+ * sending their own rack. So none of the host's controls should be on offer.
+ */
+describe('controls a Rummikub guest may not use', () => {
+  it('does not offer undo, which only the host may do here', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('rummikub');
+    const guestSession = room.addMember('Grace');
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(scores(guest)).toHaveLength(2));
+    await collect(user, host, 'Host');
+    await user.click(within(host).getByRole('button', { name: /Score round/ }));
+
+    await waitFor(() =>
+      expect(within(host).getByRole('button', { name: 'Undo last' })).toBeInTheDocument());
+    expect(within(guest).queryByRole('button', { name: 'Undo last' })).not.toBeInTheDocument();
+  });
+
+  it('does not offer a guest the roster or the game controls', async () => {
+    const room = createTestRoom('rummikub');
+    const guestSession = room.addMember('Grace');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(scores(guest)).toHaveLength(2));
+    expect(within(guest).queryByLabelText('Player name')).not.toBeInTheDocument();
+    expect(within(guest).queryByRole('button', { name: 'New game' })).not.toBeInTheDocument();
+    expect(within(guest).queryByRole('button', { name: 'Reset all' })).not.toBeInTheDocument();
+  });
+
+  it('marks which row on the board is you', async () => {
+    const room = createTestRoom('rummikub');
+    const guestSession = room.addMember('Grace');
+    const guest = mount(room, guestSession, 'guest');
+
+    await waitFor(() => expect(scores(guest)).toHaveLength(2));
+    expect(myRow(guest)).toHaveTextContent('Grace');
+  });
+
+  it('leaves the host every one of them', async () => {
+    const room = createTestRoom('rummikub');
+    room.addMember('Grace');
+    const host = mount(room, room.hostSession, 'host');
+
+    await waitFor(() => expect(scores(host)).toHaveLength(2));
+    expect(within(host).getByLabelText('Player name')).toBeInTheDocument();
+    expect(within(host).getByRole('button', { name: 'New game' })).toBeInTheDocument();
+  });
+});
+
 /** The room path must not have disturbed the game people play on their own. */
 describe('playing Rummikub alone', () => {
-  const solo = () => {
-    render(
-      <RoomProvider value={{ session: null }}>
-        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <RummikubTracker />
-        </MemoryRouter>
-      </RoomProvider>,
-    );
-  };
+  const solo = () => mountClient(RummikubTracker);
 
   it('still scores a round the old way, with no room in sight', async () => {
     const user = userEvent.setup();
@@ -263,26 +292,20 @@ describe('playing Rummikub alone', () => {
     await user.type(screen.getByLabelText('Tiles left for Grace'), '24');
     await user.click(screen.getByRole('button', { name: 'Score round' }));
 
-    expect(screen.getAllByRole('listitem')
-      .filter((li) => li.querySelector('.pts'))
-      .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`))
-      .toEqual(['Ada:24', 'Grace:-24']);
+    expect(scoreboard()).toEqual(['Ada:24', 'Grace:-24']);
   });
 
   it('never constructs a socket', async () => {
     const user = userEvent.setup();
-    const original = globalThis.WebSocket;
-    let constructed = 0;
-    // @ts-expect-error - replaced for the duration of this test
-    globalThis.WebSocket = class { constructor() { constructed += 1; } };
+    const sockets = countingSockets();
 
     solo();
     await user.type(screen.getByLabelText('Player name'), 'Ada');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
-    expect(constructed).toBe(0);
+    expect(sockets.count()).toBe(0);
     expect(localStorage.getItem('games.rummikub.v1')).toContain('Ada');
-    globalThis.WebSocket = original;
+    sockets.restore();
   });
 
   it('shows the tile pad and the winner picker, not the room wording', async () => {

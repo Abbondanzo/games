@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { RummikubTracker } from './RummikubTracker';
+import { scoreboard } from '../rooms/testClient';
 
 const Router = ({ children }: { children: ReactNode }) => (
   <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -24,10 +25,7 @@ async function addPlayers(user: User, names: string) {
   await user.click(screen.getByRole('button', { name: 'Add' }));
 }
 
-const board = () =>
-  screen.getAllByRole('listitem')
-    .filter((li) => li.querySelector('.pts'))
-    .map((li) => `${li.querySelector('.name')?.textContent}:${li.querySelector('.pts')?.textContent}`);
+const board = () => scoreboard();
 
 const pot = () => screen.getByTestId('round-pot').textContent;
 

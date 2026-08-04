@@ -1,13 +1,13 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Crown, RotateCcw, Trash2 } from 'lucide-react';
+import { Crown, RotateCcw, Trash2 } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { RoundEntry } from './components/RoundEntry';
 import { RackCollection } from './components/RackCollection';
 import { OpenRound } from './components/OpenRound';
 import { roundScores, standings } from '@shared/games/rummikub/rules';
 import { useRummikub } from './lib/useRummikub';
-import { RoomBar } from '../rooms/RoomBar';
-import { RoomNotices } from '../rooms/RoomNotices';
+import { RoomStrip } from '../rooms/RoomStrip';
+import { TopBar } from '../shared/TopBar';
+import { allowed, isHost as amHost, mySeat } from '../rooms/whoAmI';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 
@@ -16,10 +16,11 @@ const describeGame = (s: { players: unknown[]; rounds: unknown[] }) =>
 
 export function RummikubTracker() {
   const { state, dispatch, room, gone } = useRummikub();
-  const isHost = !room || room.role === 'host';
+  const isHost = amHost(room);
   const rows = standings(state.players, state.rounds);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
   const name = (id: string) => state.players.find((p) => p.id === id)?.name ?? '-';
+  const you = mySeat(room, state.players);
 
   function removePlayer(id: string) {
     const player = state.players.find((p) => p.id === id);
@@ -52,60 +53,48 @@ export function RummikubTracker() {
 
   return (
     <>
-      <header className="topbar">
-        <Link className="back" to="/" aria-label="All games">
-          <ArrowLeft size={20} aria-hidden="true" />
-        </Link>
-        <h1>Rummikub</h1>
-        <div className="topbar-actions">
-          {!room && <HostRoomButton game="rummikub" existing={describeGame(state)} />}
-          {isHost && (
-            <>
-              <button
-                type="button"
-                className="ghost"
-                onClick={newGame}
-                title="Clear the rounds and keep the players"
-              >
-                <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
-              </button>
-              <button
-                type="button"
-                className="ghost danger"
-                onClick={resetAll}
-                title="Clear the rounds and the players"
-              >
-                <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+      <TopBar title="Rummikub">
+        {!room && <HostRoomButton game="rummikub" existing={describeGame(state)} />}
+        {isHost && (
+          <>
+            <button
+              type="button"
+              className="ghost"
+              onClick={newGame}
+              title="Clear the rounds and keep the players"
+            >
+              <RotateCcw size={15} aria-hidden="true" /> <span className="btn-label">New game</span>
+            </button>
+            <button
+              type="button"
+              className="ghost danger"
+              onClick={resetAll}
+              title="Clear the rounds and the players"
+            >
+              <Trash2 size={15} aria-hidden="true" /> <span className="btn-label">Reset all</span>
+            </button>
+          </>
+        )}
+    </TopBar>
 
       <main>
-        {room && (
-          <RoomBar
-            room={room}
-            onLeave={room.leave}
-            myName={state.players.find((p) => p.id === room.seatId)?.name ?? null}
-            onRename={(name) =>
-              room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
-          />
-        )}
-        <RoomNotices lastError={room?.lastError} gone={gone} />
+        <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />
 
         <PlayersCard
           players={state.players}
           editable={isHost}
           onAdd={(names) => dispatch({ type: 'addPlayers', names })}
           onRemove={removePlayer}
+          onMove={(id, to) => dispatch({ type: 'movePlayer', id, to })}
+          reorderable={state.rounds.length === 0}
         >
           <ol className="scoreboard">
             {rows.map((row, i) => (
-              <li key={row.player.id}>
+              <li key={row.player.id} className={row.player.id === you?.id ? 'mine' : undefined}>
                 <div className="scoreboard-row static">
                   <span className="rank">{i + 1}.</span>
                   <span className="name">{row.player.name}</span>
+                  {row.player.id === you?.id && <span className="you">you</span>}
                   {state.rounds.length > 0 && row.score === best && (
                     <span className="leader">
                       <Crown size={13} aria-hidden="true" /> leading
@@ -146,7 +135,7 @@ export function RummikubTracker() {
         <section className="card">
           <div className="card-head">
             <h2>History</h2>
-            {state.rounds.length > 0 && (
+            {state.rounds.length > 0 && allowed(room, 'undo') && (
               <button type="button" className="link" onClick={() => dispatch({ type: 'undo' })}>
                 Undo last
               </button>

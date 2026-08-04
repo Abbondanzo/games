@@ -20,13 +20,30 @@ Three top-level directories, split by what can run where:
 ```
 shared/     pure domain, imported by both the app and the Worker. No React, no DOM.
   ids.ts
-  games/<game>/   types.ts, rules, reducer.ts, schema.ts
-  rooms/          protocol.ts, permissions.ts, roomCore.ts, codes.ts, games/<game>.ts
+  games/players.ts  roster rules every game shares
+  games/<game>/     types.ts, rules, reducer.ts, schema.ts
+  rooms/            protocol.ts, permissions.ts, roomCore.ts, codes.ts
+  rooms/games/      adapter.ts (the one adapter), index.ts (the registry), <game>.ts
 src/        the React app
   <game>/   <Game>Tracker.tsx, components/, lib/use<Game>.ts (hook + storage)
-  shared/   Home.tsx, PlayersCard.tsx
+  rooms/    whoAmI.ts, RoomStrip.tsx, WhoseTurn.tsx, session.ts, transport.ts
+  shared/   Home.tsx, PlayersCard.tsx, localStore.ts
 worker/     the room server: a Cloudflare Worker with a Durable Object per room
 ```
+
+**Ask the shared helpers rather than working it out again.** Three trackers each
+deriving the same thing is how they drift, and the drift is always in the case nobody
+thought about:
+
+- `src/rooms/whoAmI.ts` - am I the host, is it my turn, which player am I, is this
+  control closed off (`blocked`) or not on offer at all (`allowed`). Every one has to
+  answer for a solo game where there is no room, which is the part that was going wrong.
+- `src/shared/localStore.ts` - guarded `localStorage`. It throws rather than returning
+  null when a browser has storage off, and nothing in a test run ever throws.
+- `shared/games/players.ts` - name parsing, renaming, and where the turn pointer goes
+  when a player leaves.
+- `shared/rooms/games/index.ts` - the one registry of games the room can run, imported
+  by the Worker and the test room. Adding a game means adding it here, once.
 
 Import shared code as `@shared/...`; the alias is declared in `tsconfig.app.json` and
 `vite.config.ts`. **Anything needed by both sides lives in `shared/` and is imported, never
@@ -60,6 +77,10 @@ an opponent for darts thrown before they existed.
   so a schema and its type cannot drift.
 - **Accessible names must be distinct.** Two buttons reading "Ada" is a bug; a UI test caught
   exactly that in Rummikub, hence `aria-label="Enter tiles for Ada"`.
+- **Hide what a person may never do; disable what they may not do yet.** A control whose only
+  answer is "only the host can do that" should not be on screen. One that will work when it is
+  their turn should be disabled and say so. `allowed` and `blocked` in `whoAmI.ts` are the two
+  halves of that.
 - **Player-facing copy carries no jargon** - no status codes, no networking terms. Enforced by a
   guard in `dictionary.test.ts`.
 
@@ -81,6 +102,10 @@ throw inside the room.
 2. **Reducers** (`use<Game>.test.ts`) - actions in, state out, no rendering.
 3. **Trackers** (`<Game>Tracker.test.tsx`) - Testing Library, driving the real UI.
 
+Room tests build their clients with `src/rooms/testClient.tsx` - `mountClient`, `mountPair`,
+`scoreboard`, `countingSockets` - the other half of `testRoom.ts`. Use it rather than writing
+another render wrapper.
+
 Plus `App.test.tsx` (routing, house-style guards), `pwa.test.ts` (manifest, icons, iOS tags),
 and the rooms tests. Three of those earn their keep: `twoClients.test.tsx` and
 `rummikubRoom.test.tsx` render a host and a guest side by side against a real room in-process,
@@ -88,8 +113,9 @@ and `shared/rooms/games/parity.test.ts` runs the same script through the plain r
 through the room and demands identical results, so the longer road a room action takes cannot
 quietly change the game.
 
-Query by role and accessible name, not test ids - the one exception is a couple of live-total
-readouts. When fixing a bug, add the regression test with a comment naming the failure, and make
+Query by role and accessible name, not test ids. Two exceptions, both deliberate: a couple of
+live-total readouts, and the scoreboard readers in `testClient.tsx`, where a row has no
+accessible structure separating the name from the score. Keep that exception in that file. When fixing a bug, add the regression test with a comment naming the failure, and make
 it fail first.
 
 ## Gotchas
@@ -110,11 +136,16 @@ it fail first.
   rasterises at build time.
 - **CI does not gate deployment.** Cloudflare Pages builds from the repo independently, so a red
   CI run still ships. See `docs/deployment.md`.
-- **There are two room servers, chosen by origin.** Only `games.abbondanzo.com` and
-  `games-ccu.pages.dev` reach production; previews and local dev reach `games-rooms-preview`.
-  `roomsUrlFor` decides it at runtime from the page's own origin, so there is no build variable
-  to forget. Deploy staging with `pnpm worker:deploy:staging` before opening a pull request that
-  changes the protocol, or its preview has nothing that speaks it.
+- **There is one room server, and a pull request preview talks to it.** A room made from a
+  preview is a real room, in the same storage as everybody's live games. There is no staging
+  copy: a second one costs a second Workers Builds project and a second build per push. To try
+  anything that writes to a room, run the server - `pnpm worker:dev`, then
+  `VITE_ROOMS_URL=http://localhost:8787 pnpm dev`.
+- **A preview cannot exercise a protocol change.** The preview client is ahead of the deployed
+  room, so it can only ever show the version banner. Run it locally, or deploy the Worker first.
+  Two attempts at a per-branch room server are written up in `docs/rooms.md`; do not try a third.
+- **`GET /health` says whether a room server is up and what it speaks.** Every other route needs
+  a room code, so it is the only way to tell a live address from one that was never deployed.
 - **The room is the authority, not the host.** Clients send requests and render
   what comes back; only the room runs a reducer. A guest gets no optimistic update, because it
   cannot mint the same ids.
@@ -131,6 +162,9 @@ it fail first.
   client can be weeks old. Server-to-client additions are safe; a new *client-to-server* message
   is not, because an old room rejects a frame it has never heard of and the button just appears
   broken. Bump `PROTOCOL_VERSION` for either, so the mismatch names itself.
+- **Play order is fixed by the first turn.** `movePlayer` is refused once a game has any
+  turns, because the roster order is the turn order and moving somebody would hand the turn
+  to a different player. The UI hides the buttons then, but the reducer is what enforces it.
 - **Storage keys are `games.<game>.v1`.** Changing one discards saved games, so version them
   rather than renaming.
 
