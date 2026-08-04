@@ -110,6 +110,11 @@ it fail first.
   rasterises at build time.
 - **CI does not gate deployment.** Cloudflare Pages builds from the repo independently, so a red
   CI run still ships. See `docs/deployment.md`.
+- **There are two room servers, chosen by origin.** Only `games.abbondanzo.com` and
+  `games-ccu.pages.dev` reach production; previews and local dev reach `games-rooms-preview`.
+  `roomsUrlFor` decides it at runtime from the page's own origin, so there is no build variable
+  to forget. Deploy staging with `pnpm worker:deploy:staging` before opening a pull request that
+  changes the protocol, or its preview has nothing that speaks it.
 - **The room is the authority, not the host.** Clients send requests and render
   what comes back; only the room runs a reducer. A guest gets no optimistic update, because it
   cannot mint the same ids.

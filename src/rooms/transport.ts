@@ -139,6 +139,35 @@ export const webSocketTransport: TransportFactory = ({ baseUrl, code, token, han
   };
 };
 
-/** Where the room server lives. Overridable so dev can point at wrangler. */
+/* ─────────────────────────── which room server ─────────────────────────── */
+
+export const PRODUCTION_ROOMS = 'https://games-rooms.abbondanzo.workers.dev';
+export const STAGING_ROOMS = 'https://games-rooms-preview.abbondanzo.workers.dev';
+
+/**
+ * The origins that serve the live site. Everything else - pull request
+ * previews, local dev, anything unrecognised - is not production.
+ */
+export const PRODUCTION_ORIGINS = [
+  'https://games.abbondanzo.com',
+  'https://games-ccu.pages.dev',
+];
+
+/**
+ * Which room server this build should talk to.
+ *
+ * Decided from the origin rather than from a build variable set somewhere else,
+ * because a variable that has to be remembered is a variable that will one day
+ * be missing - and the failure would be silent, with a preview quietly writing
+ * into somebody's real game. Reading it from the page means it cannot drift
+ * from where the page is actually being served.
+ *
+ * Written as an allowlist for the same reason: an origin nobody thought of gets
+ * staging, which is the harmless answer.
+ */
+export const roomsUrlFor = (origin: string): string =>
+  (PRODUCTION_ORIGINS.includes(origin) ? PRODUCTION_ROOMS : STAGING_ROOMS);
+
+/** Overridable, so dev can point at a wrangler running locally. */
 export const ROOMS_URL: string =
-  import.meta.env.VITE_ROOMS_URL ?? 'https://games-rooms.abbondanzo.workers.dev';
+  import.meta.env.VITE_ROOMS_URL ?? roomsUrlFor(window.location.origin);
