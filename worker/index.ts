@@ -164,10 +164,14 @@ export default {
 async function createRoom(request: Request, env: Env, cors: Record<string, string>) {
   if (!(await withinLimit(request, env))) return json({ error: 'rate-limited' }, 429, cors);
 
-  const body = (await request.json().catch(() => null)) as { game?: string; name?: string } | null;
+  const body = (await request.json().catch(() => null)) as {
+    game?: string; name?: string; device?: unknown;
+  } | null;
   if (!isGame(body?.game ?? null)) return json({ error: 'bad-game' }, 400, cors);
   const game = body!.game as Game;
   const name = typeof body?.name === 'string' ? body.name.slice(0, 24) : 'Host';
+  // Passed straight through; the room is what makes anything of it.
+  const device = typeof body?.device === 'string' ? body.device.slice(0, 256) : undefined;
 
   // A room exists at a code or it does not, and the room itself is the only
   // thing that knows, so there is no separate registry to fall out of step.
@@ -176,7 +180,7 @@ async function createRoom(request: Request, env: Env, cors: Record<string, strin
     const response = await roomStub(env, code).fetch(
       new Request(`https://room/?do=create`, {
         method: 'POST',
-        body: JSON.stringify({ code, game, name }),
+        body: JSON.stringify({ code, game, name, device }),
       }),
     );
     if (response.status !== 409) return withCors(response, cors);

@@ -56,22 +56,27 @@ const asSession = (value: unknown): Result<StoredSession> => {
     : { ok: false, error: 'unreachable' };
 };
 
-export async function createRoom(game: Game, name: string): Promise<Result<StoredSession>> {
-  const result = await post('/rooms', { game, name });
+export async function createRoom(
+  game: Game,
+  name: string,
+  device: string,
+): Promise<Result<StoredSession>> {
+  const result = await post('/rooms', { game, name, device });
   return result.ok ? asSession(result.value) : result;
 }
 
 /**
- * `seat` is the player this device was last time it was in this room, if it
- * remembers one. The room takes it as a request rather than a fact, and falls
- * back to the name if the seat has gone or somebody else is in it.
+ * `device` is a secret this browser keeps for this room, and is how the room
+ * knows somebody coming back from somebody new. It is sent here and nowhere
+ * else. The room treats it as a request: a player that has gone, or that
+ * somebody else is now using, means an ordinary new one instead.
  */
 export async function joinRoom(
   code: string,
   name: string,
-  seat?: string | null,
+  device: string,
 ): Promise<Result<StoredSession>> {
-  const result = await post(`/rooms/${code}/join`, seat ? { name, seat } : { name });
+  const result = await post(`/rooms/${code}/join`, { name, device });
   return result.ok ? asSession(result.value) : result;
 }
 

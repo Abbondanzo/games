@@ -34,26 +34,50 @@ export const writeSession = (session: StoredSession): void =>
 export const clearSession = (game: Game): void => removeKey(key(game));
 
 /**
- * Which player this device was, in which room.
+ * A secret this device holds for one room.
  *
- * Kept when leaving, so coming back takes the same player rather than making a
- * new one. It has to outlive the session, which is cleared on the way out, and
- * it cannot be the name: two people called Peter are "Peter" and "Peter 2", and
- * the second types "Peter" when they return.
+ * It is how the room recognises somebody coming back after they leave, and it
+ * exists because a name cannot do that job: names are visible, typeable by
+ * anyone, changeable by their owner, and two people can want the same one.
+ *
+ * Rules it lives by:
+ * - Never shown, never editable, and never sent over the socket. It goes in the
+ *   body of the join request, over HTTPS, and nowhere else.
+ * - One per room code, so nothing links a device across two rooms.
+ * - It outlives the session, which is cleared on the way out. That is the whole
+ *   point: leaving is what it is for.
  */
-const SeatSchema = z.object({ code: z.string(), seatId: z.string() });
+const DeviceSchema = z.object({ code: z.string(), secret: z.string() });
 
-const seatKey = (game: Game) => `games.room.${game}.seat.v1`;
+const deviceKey = (game: Game) => `games.room.${game}.device.v1`;
 
-export function rememberSeat(game: Game, code: string, seatId: string): void {
-  writeJson(seatKey(game), { code, seatId });
+const mintSecret = (): string => {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, '');
+};
+
+/**
+ * The secret for this room, minting one the first time. Stable across leaving
+ * and coming back; a different room gets a different secret.
+ */
+export function deviceFor(game: Game, code: string): string {
+  const stored = readJson(deviceKey(game), DeviceSchema);
+  if (stored?.code === code) return stored.secret;
+
+  const secret = mintSecret();
+  writeJson(deviceKey(game), { code, secret });
+  return secret;
 }
 
-/** The seat held in this room before, or null if it was a different one. */
-export function recallSeat(game: Game, code: string): string | null {
-  const stored = readJson(seatKey(game), SeatSchema);
-  return stored?.code === code ? stored.seatId : null;
-}
+/**
+ * Hosting has to mint the secret before the room exists, since the code comes
+ * back with it. Keep it once the code is known.
+ */
+export const newDevice = (): string => mintSecret();
+
+export const rememberDevice = (game: Game, code: string, secret: string): void =>
+  writeJson(deviceKey(game), { code, secret });
 
 /** The name this device last played under, offered as the default next time. */
 const NAME_KEY = 'games.name.v1';

@@ -17,7 +17,7 @@ describe('creating a room', () => {
     mockFetch(async () => respond(200, {
       code: 'AB2D', token: 't', memberId: 'm', game: 'cricket',
     }));
-    await expect(createRoom('cricket', 'Ada')).resolves.toEqual({
+    await expect(createRoom('cricket', 'Ada', 'secret')).resolves.toEqual({
       ok: true,
       value: { code: 'AB2D', token: 't', memberId: 'm', game: 'cricket' },
     });
@@ -26,7 +26,7 @@ describe('creating a room', () => {
   // A response we cannot make sense of is a failure, not a half-built session.
   it('refuses a reply that is missing fields', async () => {
     mockFetch(async () => respond(200, { code: 'AB2D' }));
-    await expect(createRoom('cricket', 'Ada')).resolves.toEqual({
+    await expect(createRoom('cricket', 'Ada', 'secret')).resolves.toEqual({
       ok: false, error: 'unreachable',
     });
   });
@@ -35,7 +35,7 @@ describe('creating a room', () => {
     mockFetch(async () => respond(200, {
       code: 'AB2D', token: 't', memberId: 'm', game: 'chess',
     }));
-    await expect(createRoom('cricket', 'Ada')).resolves.toMatchObject({ ok: false });
+    await expect(createRoom('cricket', 'Ada', 'secret')).resolves.toMatchObject({ ok: false });
   });
 });
 
@@ -48,23 +48,23 @@ describe('what can go wrong', () => {
     [503, 'unreachable'],
   ] as const)('maps %i to %s', async (status, error) => {
     mockFetch(async () => respond(status));
-    await expect(joinRoom('AB2D', 'Grace')).resolves.toEqual({ ok: false, error });
+    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({ ok: false, error });
   });
 
   // 409 covers two different refusals, so the body decides which.
   it('tells a locked room from a full one', async () => {
     mockFetch(async () => respond(409, { error: 'room-full' }));
-    await expect(joinRoom('AB2D', 'Grace')).resolves.toEqual({ ok: false, error: 'room-full' });
+    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({ ok: false, error: 'room-full' });
 
     mockFetch(async () => respond(409, { error: 'room-locked' }));
-    await expect(joinRoom('AB2D', 'Grace')).resolves.toEqual({ ok: false, error: 'room-locked' });
+    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({ ok: false, error: 'room-locked' });
   });
 
   it('treats a dead network as unreachable rather than throwing', async () => {
     mockFetch(async () => {
       throw new TypeError('Failed to fetch');
     });
-    await expect(joinRoom('AB2D', 'Grace')).resolves.toEqual({ ok: false, error: 'unreachable' });
+    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({ ok: false, error: 'unreachable' });
   });
 
   it('survives a body that is not JSON', async () => {

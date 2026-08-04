@@ -107,8 +107,13 @@ describe('creating and joining', () => {
     expect(room.rev).toBe(2);
   });
 
-  // Leaving and coming back, or a host who typed the roster out in advance.
-  it('gives a returning name its old player back rather than a second one', () => {
+  /**
+   * A name buys nothing. The room used to hand back an unclaimed player of the
+   * same name, which meant anyone could take anyone's by typing it, and which
+   * did not work for the case it was there for: two people called Peter.
+   * Recognising somebody is the device, and only the device.
+   */
+  it('gives a name it has seen before a new player, not the old one', () => {
     const apply = cricketApply();
     let room = withGuest(newRoom(apply), 'm1', 'Grace', apply);
     const seat = room.members.m1!.seatId;
@@ -116,8 +121,21 @@ describe('creating and joining', () => {
     room = act(room, 'm1', { t: 'leave', reqId: 'l1' }, apply).state;
     room = withGuest(room, 'm2', 'Grace', apply);
 
-    expect(asCricket(room.snapshot).players.map((p) => p.name)).toEqual(['Host', 'Grace']);
-    expect(room.members.m2?.seatId).toBe(seat);
+    expect(asCricket(room.snapshot).players.map((p) => p.name)).toEqual(['Host', 'Grace', 'Grace 2']);
+    expect(room.members.m2?.seatId).not.toBe(seat);
+  });
+
+  // A host typing the roster out in advance no longer has people claim those
+  // rows: they arrive as themselves, and the host can remove the spares.
+  it('does not let a joiner take a player the host typed for them', () => {
+    const apply = cricketApply();
+    let room = newRoom(apply);
+    room = act(room, HOST.memberId, {
+      t: 'action', reqId: 'r1', rev: room.rev, action: { type: 'addPlayers', names: 'Grace' },
+    }, apply).state;
+
+    room = withGuest(room, 'm1', 'Grace', apply);
+    expect(asCricket(room.snapshot).players.map((p) => p.name)).toEqual(['Host', 'Grace', 'Grace 2']);
   });
 
   it('tells everyone already here that a player arrived', () => {
@@ -534,26 +552,40 @@ describe('activity', () => {
 });
 
 /**
- * Asking for the player you were last time.
+ * Recognising a device.
  *
- * A name cannot identify somebody coming back. Reported from a real table: the
- * host was Peter, Peter joined from a second device as "Peter 2", left, and
- * typed "Peter" to return - which is the host's name, so they became "Peter 3".
- * The device remembers its seat and asks for that instead.
+ * Reported from a real table: the host was Peter, Peter joined from a second
+ * device and became "Peter 2", left, typed "Peter" to come back - which is the
+ * host's name - and became "Peter 3".
+ *
+ * A name cannot identify anybody. Everyone can see it, anyone can type it, and
+ * people rename themselves mid-game. So the room recognises a secret the device
+ * holds and nothing else.
  */
-describe('rejoining by seat', () => {
+describe('coming back to a room', () => {
   const players = (state: RoomState<Snapshot>) => asCricket(state.snapshot).players.map((p) => p.name);
 
   const leaves = (state: RoomState<Snapshot>, memberId: string) =>
     act(state, memberId, { t: 'leave', reqId: 'r1' }).state;
 
-  /** The reported table: two people, or one person twice, both called Peter. */
+  const arrive = (
+    state: RoomState<Snapshot>,
+    memberId: string,
+    name: string,
+    deviceKey?: string | null,
+  ) => join(state, { memberId, name, now: 1, deviceKey }, cricketApply());
+
+  /** The reported table: the host and a second device, both called Peter. */
   const twoPeters = () => {
     const state = createRoom({
-      code: 'AB2D', game: 'cricket', host: { memberId: 'm-host', name: 'Peter' },
-      snapshot: cricketInitialState(), now: 1_000, apply: cricketApply(),
+      code: 'AB2D',
+      game: 'cricket',
+      host: { memberId: 'm-host', name: 'Peter', deviceKey: 'host-device' },
+      snapshot: cricketInitialState(),
+      now: 1_000,
+      apply: cricketApply(),
     });
-    const second = join(state, { memberId: 'm1', name: 'Peter', now: 1 }, cricketApply());
+    const second = arrive(state, 'm1', 'Peter', 'phone');
     if (!second.ok) throw new Error(second.code);
     return { state: second.state, seat: second.member.seatId! };
   };
@@ -562,220 +594,185 @@ describe('rejoining by seat', () => {
     expect(players(twoPeters().state)).toEqual(['Peter', 'Peter 2']);
   });
 
-  it('gives the seat back however they spell their name', () => {
+  it('gives the same player back to the same device', () => {
     const { state, seat } = twoPeters();
-    const back = join(leaves(state, 'm1'), { memberId: 'm2', name: 'Peter', now: 1, seat }, cricketApply());
+    const back = arrive(leaves(state, 'm1'), 'm2', 'Peter', 'phone');
 
     expect(back.ok && back.member.seatId).toBe(seat);
     expect(back.ok && back.member.name).toBe('Peter 2');
     expect(back.ok && players(back.state)).toEqual(['Peter', 'Peter 2']);
   });
 
-  it('makes no new player, so the revision does not move', () => {
+  it('does so whatever name they type, because the name is not the point', () => {
     const { state, seat } = twoPeters();
     const left = leaves(state, 'm1');
-    const back = join(left, { memberId: 'm2', name: 'Peter', now: 1, seat }, cricketApply());
+    for (const typed of ['Peter', 'peter', 'Somebody Else', '']) {
+      const back = arrive(left, 'm2', typed, 'phone');
+      expect(back.ok && back.member.seatId, typed).toBe(seat);
+    }
+  });
+
+  it('makes no new player, so the revision does not move', () => {
+    const { state } = twoPeters();
+    const left = leaves(state, 'm1');
+    const back = arrive(left, 'm2', 'Peter', 'phone');
 
     expect(back.ok && back.state.rev).toBe(left.rev);
   });
 
-  // Without the seat this is the bug as reported.
-  it('is a third Peter without it', () => {
+  // This is the bug as reported: a device the room does not recognise.
+  it('is a third Peter from a device it has not met', () => {
     const { state } = twoPeters();
-    const back = join(leaves(state, 'm1'), { memberId: 'm2', name: 'Peter', now: 1 }, cricketApply());
+    const back = arrive(leaves(state, 'm1'), 'm2', 'Peter', 'another-phone');
 
     expect(back.ok && players(back.state)).toEqual(['Peter', 'Peter 2', 'Peter 3']);
   });
 
-  it('will not hand over a seat somebody is sitting in', () => {
-    const { state, seat } = twoPeters();
-    // Nobody left, so the seat is still theirs.
-    const other = join(state, { memberId: 'm2', name: 'Alan', now: 1, seat }, cricketApply());
+  it('is a new player for a device that says nothing at all', () => {
+    const { state } = twoPeters();
+    const back = arrive(leaves(state, 'm1'), 'm2', 'Peter');
 
-    expect(other.ok && other.member.seatId).not.toBe(seat);
-    expect(other.ok && players(other.state)).toEqual(['Peter', 'Peter 2', 'Alan']);
+    expect(back.ok && players(back.state)).toEqual(['Peter', 'Peter 2', 'Peter 3']);
   });
 
-  it('falls back to the name when the seat is not a player any more', () => {
+  /**
+   * The security property. A name is public, a player id is in every snapshot,
+   * and neither is worth anything here.
+   */
+  it('cannot be talked into it by name or by player id', () => {
     const { state, seat } = twoPeters();
     const left = leaves(state, 'm1');
-    // The host clears the roster while they are away.
+
+    for (const guess of ['Peter 2', seat, 'sha256:phone']) {
+      const back = arrive(left, 'm2', 'Peter 2', guess);
+      expect(back.ok && back.member.seatId, guess).not.toBe(seat);
+    }
+  });
+
+  it('will not hand over a player somebody is still using', () => {
+    const { state, seat } = twoPeters();
+    // Nobody left, so the same device arriving again is a second person.
+    const other = arrive(state, 'm2', 'Peter', 'phone');
+
+    expect(other.ok && other.member.seatId).not.toBe(seat);
+    expect(other.ok && players(other.state)).toEqual(['Peter', 'Peter 2', 'Peter 3']);
+  });
+
+  it('makes a new player when theirs has been taken off the board', () => {
+    const { state, seat } = twoPeters();
+    const left = leaves(state, 'm1');
     const emptied = act(left, HOST.memberId, {
       t: 'action', reqId: 'r2', rev: left.rev, action: { type: 'removePlayer', id: seat },
     }).state;
 
-    const back = join(emptied, { memberId: 'm2', name: 'Peter', now: 1, seat }, cricketApply());
+    const back = arrive(emptied, 'm2', 'Peter', 'phone');
     expect(back.ok && players(back.state)).toEqual(['Peter', 'Peter 2']);
   });
 
-  it('shrugs at a seat that was never real', () => {
+  it('remembers the host too, so a room can outlive the one who made it', () => {
     const { state } = twoPeters();
-    const back = join(leaves(state, 'm1'), {
-      memberId: 'm2', name: 'Alan', now: 1, seat: 'made-up',
-    }, cricketApply());
+    // The host hands over and leaves, which is the only way a host gets out.
+    const handed = act(state, HOST.memberId, { t: 'makeHost', reqId: 'r3', memberId: 'm1' }).state;
+    const hostSeat = handed.members[HOST.memberId]?.seatId;
+    const gone = leaves(handed, HOST.memberId);
 
-    expect(back.ok && players(back.state)).toEqual(['Peter', 'Peter 2', 'Alan']);
+    const back = arrive(gone, 'm3', 'Peter', 'host-device');
+    expect(back.ok && back.member.seatId).toBe(hostSeat);
   });
 
-  it('will not give back a seat the host removed somebody from', () => {
-    const { state, seat } = twoPeters();
-    const kicked = act(state, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
+  // Nothing a client can read carries one.
+  it('keeps device keys out of what the room hands out', () => {
+    const { state } = twoPeters();
+    const view = JSON.stringify(roomView(state, ctx(['m1'])));
 
-    const back = join(kicked, { memberId: 'm2', name: 'Peter', now: 1, seat }, cricketApply());
-    expect(back.ok).toBe(false);
-    expect(!back.ok && back.code).toBe('room-locked');
-  });
-
-  it('gets back into a locked room, since it is not a new player', () => {
-    const { state, seat } = twoPeters();
-    const locked = act(state, HOST.memberId, { t: 'lock', locked: true }).state;
-    const back = join(leaves(locked, 'm1'), { memberId: 'm2', name: 'Peter', now: 1, seat }, cricketApply());
-
-    expect(back.ok && back.member.seatId).toBe(seat);
+    expect(view).not.toContain('phone');
+    expect(view).not.toContain('host-device');
+    expect(view).not.toContain('device');
   });
 });
 
 /**
- * The name is still the fallback: it is what a fresh device has, and what the
- * host typing a roster in advance leaves behind for people to claim.
+ * Locking stops new players, which is not the same as stopping people. A host
+ * locks the room once everyone is at the table, and that is exactly when
+ * somebody's phone goes to sleep.
  */
-describe('rejoining by name', () => {
+describe('coming back to a locked room', () => {
   const players = (state: RoomState<Snapshot>) => asCricket(state.snapshot).players.map((p) => p.name);
 
-  /** Leaves of their own accord, as the Leave button does. */
-  const leaves = (state: RoomState<Snapshot>, memberId: string) =>
-    act(state, memberId, { t: 'leave', reqId: 'r1' }).state;
-
-  const rejoin = (state: RoomState<Snapshot>, name: string) =>
-    join(state, { memberId: 'back-again', name, now: 1 }, cricketApply());
-
-  it('takes back the player they left behind', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const seat = room.members.m1?.seatId;
-    const after = rejoin(leaves(room, 'm1'), 'Grace');
-
-    expect(after.ok && after.member.seatId).toBe(seat);
-    expect(after.ok && players(after.state)).toEqual(['Host', 'Grace']);
-  });
-
-  // The reported cause: somebody retyping their name from memory.
-  it.each([
-    ['a different case', 'grace'],
-    ['shouting', 'GRACE'],
-    ['stray spaces', '  Grace  '],
-  ])('takes it back despite %s', (_label, typed) => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const after = rejoin(leaves(room, 'm1'), typed);
-
-    expect(after.ok && after.member.seatId).toBe(room.members.m1?.seatId);
-    expect(after.ok && players(after.state)).toEqual(['Host', 'Grace']);
-  });
-
-  // A one-word name cannot show this, so it gets a test of its own.
-  it('takes it back despite a doubled space in the middle', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace H');
-    const after = rejoin(leaves(room, 'm1'), 'Grace  H');
-
-    expect(after.ok && after.member.seatId).toBe(room.members.m1?.seatId);
-    expect(after.ok && players(after.state)).toEqual(['Host', 'Grace H']);
-  });
-
-  // The name on the board is the one everyone else has been reading.
-  it('keeps the spelling the scoreboard already had', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const after = rejoin(leaves(room, 'm1'), 'GRACE');
-    expect(after.ok && after.member.name).toBe('Grace');
-  });
-
-  it('is still a new player for somebody who was never here', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const after = rejoin(leaves(room, 'm1'), 'Alan');
-
-    expect(after.ok && players(after.state)).toEqual(['Host', 'Grace', 'Alan']);
-  });
-
-  // Their seat is taken, so they are somebody else however they spell it.
-  it('does not hand over a player who is still in the room', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const after = rejoin(room, 'grace');
-
-    expect(after.ok && after.member.seatId).not.toBe(room.members.m1?.seatId);
-    expect(after.ok && players(after.state)).toEqual(['Host', 'Grace', 'grace 2']);
-  });
-});
-
-/**
- * The other half of the report: a host locks the room once everyone is at the
- * table, which is exactly when somebody's phone goes to sleep.
- */
-describe('rejoining a locked room', () => {
   const lock = (state: RoomState<Snapshot>) =>
     act(state, HOST.memberId, { t: 'lock', locked: true }).state;
 
   const leaves = (state: RoomState<Snapshot>, memberId: string) =>
     act(state, memberId, { t: 'leave', reqId: 'r1' }).state;
 
-  it('lets somebody take back the player they left behind', () => {
-    const room = lock(withGuest(newRoom(), 'm1', 'Grace'));
-    const after = join(leaves(room, 'm1'), { memberId: 'm2', name: 'Grace', now: 1 }, cricketApply());
+  const arrive = (
+    state: RoomState<Snapshot>,
+    memberId: string,
+    name: string,
+    deviceKey?: string | null,
+  ) => join(state, { memberId, name, now: 1, deviceKey }, cricketApply());
 
-    expect(after.ok).toBe(true);
-    expect(after.ok && after.member.seatId).toBe(room.members.m1?.seatId);
+  const withGrace = () => {
+    const room = newRoom();
+    const joined = arrive(room, 'm1', 'Grace', 'phone');
+    if (!joined.ok) throw new Error(joined.code);
+    return { state: joined.state, seat: joined.member.seatId! };
+  };
+
+  it('lets a device it knows take its player back', () => {
+    const { state, seat } = withGrace();
+    const back = arrive(leaves(lock(state), 'm1'), 'm2', 'Grace', 'phone');
+
+    expect(back.ok).toBe(true);
+    expect(back.ok && back.member.seatId).toBe(seat);
   });
 
-  // Which is the whole point of locking: no new players.
-  it('still turns away somebody who was never here', () => {
-    const room = lock(withGuest(newRoom(), 'm1', 'Grace'));
-    const after = join(room, { memberId: 'm2', name: 'Alan', now: 1 }, cricketApply());
+  it('still turns away a device it does not know', () => {
+    const { state } = withGrace();
+    const back = arrive(lock(state), 'm2', 'Alan', 'another-phone');
 
-    expect(after.ok).toBe(false);
-    expect(!after.ok && after.code).toBe('room-locked');
+    expect(back.ok).toBe(false);
+    expect(!back.ok && back.code).toBe('room-locked');
   });
 
-  it('turns away somebody whose name matches a player already in the room', () => {
-    const room = lock(withGuest(newRoom(), 'm1', 'Grace'));
-    // Grace is still here, so this is a second person, and a locked room has no
-    // room for one however they spell it.
-    const after = join(room, { memberId: 'm2', name: 'Grace', now: 1 }, cricketApply());
-
-    expect(after.ok).toBe(false);
+  it('turns away a device with no secret at all', () => {
+    const { state } = withGrace();
+    expect(arrive(lock(state), 'm2', 'Alan').ok).toBe(false);
   });
 
   /**
    * Kicking locks the room for the express purpose of keeping one person out,
    * so letting people back in must not quietly undo it.
    */
-  it('does not let somebody the host removed take their player back', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const kicked = act(room, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
+  it('does not let a device the host removed come back', () => {
+    const { state } = withGrace();
+    const kicked = act(state, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
 
-    const after = join(kicked, { memberId: 'm2', name: 'Grace', now: 1 }, cricketApply());
-    expect(after.ok).toBe(false);
-    expect(!after.ok && after.code).toBe('room-locked');
+    const back = arrive(kicked, 'm2', 'Grace', 'phone');
+    expect(back.ok).toBe(false);
+    expect(!back.ok && back.code).toBe('room-locked');
   });
 
-  it('does not let them back under a different spelling either', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const kicked = act(room, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
-
-    expect(join(kicked, { memberId: 'm2', name: 'GRACE', now: 1 }, cricketApply()).ok).toBe(false);
-  });
-
-  // Unlocking is the host opening the door, to them along with everyone else.
-  it('lets a removed player back once the host unlocks', () => {
-    const room = withGuest(newRoom(), 'm1', 'Grace');
-    const kicked = act(room, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
+  // Unlocking is the host opening the door, and it does not restore the seat.
+  it('gives a removed device a new player once the host unlocks', () => {
+    const { state, seat } = withGrace();
+    const kicked = act(state, HOST.memberId, { t: 'kick', memberId: 'm1' }).state;
     const opened = act(kicked, HOST.memberId, { t: 'lock', locked: false }).state;
 
-    expect(join(opened, { memberId: 'm2', name: 'Grace', now: 1 }, cricketApply()).ok).toBe(true);
+    const back = arrive(opened, 'm2', 'Grace', 'phone');
+    expect(back.ok && back.member.seatId).not.toBe(seat);
+    expect(back.ok && players(back.state)).toEqual(['Host', 'Grace', 'Grace 2']);
   });
 
-  // Rooms made before barring existed have no such list, and must still work.
-  it('copes with a room that predates any of this', () => {
-    const room = lock(withGuest(newRoom(), 'm1', 'Grace'));
-    const old = { ...leaves(room, 'm1') };
-    delete (old as { barred?: string[] }).barred;
+  // Rooms made before any of this have neither list, and must still work.
+  it('copes with a room that predates all of it', () => {
+    const { state } = withGrace();
+    const old = { ...leaves(lock(state), 'm1') } as Partial<RoomState<Snapshot>>;
+    delete old.barred;
+    delete old.devices;
 
-    expect(join(old, { memberId: 'm2', name: 'Grace', now: 1 }, cricketApply()).ok).toBe(true);
+    const back = arrive(old as RoomState<Snapshot>, 'm2', 'Grace', 'phone');
+    expect(back.ok).toBe(false);
+    expect(!back.ok && back.code).toBe('room-locked');
   });
 });

@@ -162,10 +162,15 @@ it fail first.
   client can be weeks old. Server-to-client additions are safe; a new *client-to-server* message
   is not, because an old room rejects a frame it has never heard of and the button just appears
   broken. Bump `PROTOCOL_VERSION` for either, so the mismatch names itself.
-- **Coming back to a room is by seat, not by name.** The device remembers which player it was
-  and asks for that id; the name is only a fallback. A table with two Peters has a "Peter" and a
-  "Peter 2", so the name someone types on returning is somebody else's. Locking lets a returning
-  player back in but not a new one; kicking bars that seat as well as locking.
+- **A room recognises a device, never a name.** Names are public, typeable by anyone, and
+  changeable by their owner, so nothing may key off them. Each device keeps a secret per room
+  code; the room stores `sha256(secret) -> seatId` in `RoomState.devices` and hands the player
+  back to whoever presents it. It goes in the join body over HTTPS and nowhere else - never over
+  the socket, never in `roomView`, and the closed message schemas mean a leak would be stripped
+  by the client's own decode. Do not reintroduce name matching; it was there, it was spoofable,
+  and it did not even work for two people called Peter.
+- **Locking lets a returning device back in but not a new one.** Kicking bars the seat and
+  forgets the device, so unlocking gives that person a new player rather than their old one.
 - **Play order is fixed by the first turn.** `movePlayer` is refused once a game has any
   turns, because the roster order is the turn order and moving somebody would hand the turn
   to a different player. The UI hides the buttons then, but the reducer is what enforces it.

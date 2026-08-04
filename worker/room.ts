@@ -32,6 +32,19 @@ interface Attachment {
 
 const uid = () => crypto.randomUUID();
 
+/**
+ * A device's secret, as the room stores it.
+ *
+ * Hashed so the stored room holds nothing that could be replayed if the storage
+ * were ever read. The digest is only ever compared with another digest, and
+ * never leaves the room in any form.
+ */
+async function deviceKeyOf(secret: unknown): Promise<string | null> {
+  if (typeof secret !== 'string' || !secret) return null;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export class Room extends DurableObject {
   /**
    * Held only for the life of one request. Hibernation wipes memory, so the
@@ -99,14 +112,16 @@ export class Room extends DurableObject {
     // A room already at this code means the mint collided; the caller retries.
     if (await this.load()) return json({ error: 'taken' }, 409);
 
-    const body = (await request.json()) as { code: string; game: Game; name: string };
+    const body = (await request.json()) as {
+      code: string; game: Game; name: string; device?: unknown;
+    };
     const memberId = uid();
     const token = uid();
 
     const state = createRoom({
       code: body.code,
       game: body.game,
-      host: { memberId, name: body.name },
+      host: { memberId, name: body.name, deviceKey: await deviceKeyOf(body.device) ?? undefined },
       snapshot: GAME_SETUP[body.game].initial(),
       now: Date.now(),
       apply: this.applyFor(body.game),
@@ -121,7 +136,7 @@ export class Room extends DurableObject {
     const state = await this.load();
     if (!state) return json({ error: 'no-room' }, 404);
 
-    const body = (await request.json()) as { name: string; seat?: unknown };
+    const body = (await request.json()) as { name: string; device?: unknown };
     const memberId = uid();
     const token = uid();
 
@@ -131,9 +146,9 @@ export class Room extends DurableObject {
         memberId,
         name: body.name,
         now: Date.now(),
-        // The player they were before, if they say. Checked against the room,
-        // so a made-up one falls through to the name.
-        seat: typeof body.seat === 'string' ? body.seat : null,
+        // Who this device already is, if the room has met it. Unguessable, so
+        // an absent or invented one simply means a new player.
+        deviceKey: await deviceKeyOf(body.device),
       },
       this.applyFor(state.game),
     );

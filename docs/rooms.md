@@ -124,24 +124,49 @@ they are re-derived from the game after every change: if the host removes your
 player you become a spectator rather than holding a seat that no longer exists.
 
 **Coming back after leaving.** Leaving gives up the seat but leaves the player
-in the game, so the way back is to take that player again. The device remembers
-which one it was and asks for it by id, because a name cannot identify somebody
-returning: a table with two Peters has a "Peter" and a "Peter 2", and the second
-one types "Peter" when they come back, which is the first one's name. That is
-how the reported bug made a "Peter 3".
+in the game, so the way back is to take that player again. The room recognises
+the device, never the name.
 
-A seat is only given back while nobody else holds it, and a name is still the
-fallback for a device that has forgotten - or never knew, which is what lets a
-host type the roster out in advance and have people claim their own row. Name
-matching ignores case and stray spaces, since somebody returning types their
-name from memory rather than copying it off the board.
+A name cannot do this job. It is public - everyone can see it and anyone can
+type it. It is not stable - people rename themselves mid-game. And it is not
+unique: a table with two Peters has a "Peter" and a "Peter 2", so the name the
+second one types on returning is the first one's. That is exactly how the
+reported bug produced a "Peter 3".
+
+So each device keeps a secret, one per room code, minted the first time it
+joins. It is never shown, never editable, and goes in the body of the join
+request over HTTPS and nowhere else - in particular, never over the socket. The
+room stores only a SHA-256 digest of it, against the player it holds:
+
+```
+join { name, device }  ->  room: devices[sha256(device)] = seatId
+```
+
+Coming back is presenting the same secret. The room treats it as a request
+rather than a fact: the player has to still exist, be free, and not be one the
+host has barred. Everything else is a new player, including a device the room
+has not met and one that says nothing at all.
+
+The digest never leaves the room. `roomView` builds what clients see field by
+field and none of it is in there, and the message schemas are closed, so a field
+added by accident would be stripped by the client's own decode before any code
+saw it. There is nothing for a client to read, and so nothing it can do
+differently on the strength of.
+
+Names are still made distinct - a second Grace becomes "Grace 2", compared
+without regard to case so the board does not carry a "Grace" and a "grace" - but
+that is about telling rows apart, not people.
+
+**A host typing the roster in advance** no longer has those people claim their
+own rows, since claiming would have to go by name. They join as themselves and
+the host removes the spares.
 
 **Locking stops new players, not people coming back.** A host locks the room
 once everyone is at the table, which is exactly when somebody's phone goes to
-sleep, so a join that takes back an existing player is let through while one
-that would create a player is refused. Kicking is the exception: it locks the
-room for the express purpose of keeping one person out, so it also bars that
-seat, and only unlocking opens it again.
+sleep, so a join the room recognises is let through while one that would create
+a player is refused. Kicking is the exception: it locks the room for the express
+purpose of keeping one person out, so it bars that seat and forgets the device,
+and unlocking gives them a new player rather than their old one.
 
 **Rummikub** is the exception. A round records every rack at once, so it cannot
 be seat-scoped. The host opens a round, each player submits their own rack, and

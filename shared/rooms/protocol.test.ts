@@ -198,3 +198,48 @@ describe('close codes', () => {
     }
   });
 });
+
+/**
+ * Nothing a client receives can carry a device key, whatever the room does.
+ *
+ * The room keys returning players on a digest of a secret only that device
+ * holds. It is deliberately not in any message here, and the decode is what
+ * makes that structural rather than a promise: zod strips what is not declared,
+ * so a field added by accident on the server never reaches client code at all.
+ */
+describe('what a client is allowed to read', () => {
+  it('drops anything the room did not declare', () => {
+    const frame = JSON.stringify({
+      t: 'room',
+      room: { members: [], locked: false, pending: null },
+      devices: { 'sha256:secret': 'p1' },
+    });
+
+    const decoded = decodeServerMessage(frame);
+    expect(decoded).toEqual({ t: 'room', room: { members: [], locked: false, pending: null } });
+    expect(JSON.stringify(decoded)).not.toContain('secret');
+  });
+
+  it('drops one smuggled into a member', () => {
+    const frame = JSON.stringify({
+      t: 'room',
+      room: {
+        members: [{
+          memberId: 'm1', name: 'Ada', role: 'player', seatId: 'p1', online: true,
+          deviceKey: 'sha256:secret',
+        }],
+        locked: false,
+        pending: null,
+      },
+    });
+
+    expect(JSON.stringify(decodeServerMessage(frame))).not.toContain('secret');
+  });
+
+  // The other direction: a client cannot send one either, so nothing it says
+  // can be taken as proof of who it is. Identity rides on the socket's token.
+  it('drops one a client tries to send', () => {
+    const frame = JSON.stringify({ t: 'lock', locked: true, deviceKey: 'sha256:secret' });
+    expect(decodeClientMessage(frame)).toEqual({ t: 'lock', locked: true });
+  });
+});

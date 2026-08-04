@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { clearSession, readSession, writeSession } from './storage';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  clearSession, deviceFor, newDevice, readSession, rememberDevice, writeSession,
+} from './storage';
+
+beforeEach(() => localStorage.clear());
 
 const SESSION = { game: 'cricket', code: 'AB2D', token: 't', memberId: 'm' } as const;
 
@@ -62,5 +66,66 @@ describe('a stored session that makes no sense', () => {
       JSON.stringify({ game: 'scrabble', code: 'AB2D', token: 't', memberId: 'm' }),
     );
     expect(readSession('cricket')).toBeNull();
+  });
+});
+
+/**
+ * The secret that lets a device come back as itself.
+ *
+ * It carries the whole of identity in a room, so what matters is that it is
+ * unguessable, that it survives leaving, and that it never turns up anywhere a
+ * person or another device could read it.
+ */
+describe('the secret a device keeps for a room', () => {
+  it('is the same one every time for the same room', () => {
+    const first = deviceFor('cricket', 'AB23');
+    expect(deviceFor('cricket', 'AB23')).toBe(first);
+  });
+
+  it('is a different one for a different room', () => {
+    // Nothing should link a device across two rooms.
+    expect(deviceFor('cricket', 'AB23')).not.toBe(deviceFor('cricket', 'CD45'));
+  });
+
+  it('is a different one for a different game', () => {
+    expect(deviceFor('cricket', 'AB23')).not.toBe(deviceFor('scrabble', 'AB23'));
+  });
+
+  it('is long enough not to be guessed', () => {
+    expect(deviceFor('cricket', 'AB23').length).toBeGreaterThanOrEqual(24);
+  });
+
+  it('is not the same twice running', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 50; i += 1) {
+      localStorage.clear();
+      seen.add(deviceFor('cricket', 'AB23'));
+    }
+    expect(seen.size).toBe(50);
+  });
+
+  // Leaving is exactly when it has to survive, so it is kept apart from the
+  // session, which is cleared on the way out.
+  it('outlives the session', () => {
+    const secret = deviceFor('cricket', 'AB23');
+    writeSession({ game: 'cricket', code: 'AB23', token: 't', memberId: 'm' });
+    clearSession('cricket');
+
+    expect(deviceFor('cricket', 'AB23')).toBe(secret);
+    expect(readSession('cricket')).toBeNull();
+  });
+
+  it('is minted for hosting before the code is known, then kept', () => {
+    const secret = newDevice();
+    rememberDevice('cricket', 'AB23', secret);
+    expect(deviceFor('cricket', 'AB23')).toBe(secret);
+  });
+
+  it('does not throw when storage is unavailable', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('private browsing');
+    });
+    expect(() => deviceFor('cricket', 'AB23')).not.toThrow();
+    vi.restoreAllMocks();
   });
 });

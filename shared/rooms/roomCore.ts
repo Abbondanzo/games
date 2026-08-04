@@ -52,6 +52,18 @@ export interface RoomState<S extends Snapshot = Snapshot> {
    * Absent on rooms made before this existed, so always read it with `?? []`.
    */
   barred?: string[];
+  /**
+   * Which player a device is, keyed by an opaque digest of a secret only that
+   * device holds. This is how somebody who leaves gets their player back.
+   *
+   * It never leaves the room: `roomView` builds what clients see field by
+   * field, and none of this is in it. Nothing over the socket carries a device
+   * key, and no client behaviour depends on one - a device says who it is once,
+   * over HTTPS, when it joins.
+   *
+   * Absent on rooms made before this existed, so always read it with `?? {}`.
+   */
+  devices?: Record<string, string>;
   /** A Rummikub round being collected, if one is open. */
   pending: PendingRound | null;
   lastActiveAt: number;
@@ -119,29 +131,28 @@ const actorOf = (member: StoredMember): Actor => ({
  * take it rather than appearing twice.
  */
 /**
- * Names as a person means them, rather than as they were typed.
+ * Whether two names would read as the same on a scoreboard.
  *
- * Someone coming back after leaving by accident types their name again from
- * memory, and "grace" is the same person as "Grace". Matching exactly gave them
- * a second player on the scoreboard with none of their score.
+ * This is about telling rows apart, not about telling people apart. Nothing in
+ * this file recognises anybody by name: identity is `devices`, and only that.
  */
 const nameKey = (name: string): string => name.trim().replace(/\s+/g, ' ').toLowerCase();
 
 const sameName = (a: string, b: string): boolean => nameKey(a) === nameKey(b);
 
+/**
+ * A new player, for a device the room has not seen before.
+ *
+ * Deliberately never matches on name. A name is not an identity here: people
+ * rename themselves, two of them can want the same one, and anybody can type
+ * anybody's. Recognising somebody is `devices` above, and only that.
+ */
 function seatNewcomer<S extends Snapshot>(
   game: Game,
   snapshot: S,
-  claimed: ReadonlySet<string | null>,
   wanted: string,
   apply: ApplyAction<S>,
 ): { snapshot: S; seatId: string | null; name: string } {
-  // Their old player, if it is still there and nobody else is using it. The
-  // name it already carries wins, so the scoreboard does not change spelling
-  // under everyone else when somebody comes back.
-  const existing = playersIn(snapshot).find((p) => sameName(p.name, wanted) && !claimed.has(p.id));
-  if (existing) return { snapshot, seatId: existing.id, name: existing.name };
-
   const name = distinctName(wanted, namesIn(snapshot));
   const before = seatView[game](snapshot).playerIds;
   const next = apply(snapshot, { type: 'addPlayers', names: name });
@@ -156,15 +167,13 @@ function seatNewcomer<S extends Snapshot>(
 export function createRoom<S extends Snapshot>(input: {
   code: string;
   game: Game;
-  host: { memberId: string; name: string };
+  host: { memberId: string; name: string; deviceKey?: string };
   snapshot: S;
   now: number;
   apply: ApplyAction<S>;
 }): RoomState<S> {
   // The host is a player like anyone else, unless they chose not to be named.
-  const seated = seatNewcomer(
-    input.game, input.snapshot, new Set(), input.host.name, input.apply,
-  );
+  const seated = seatNewcomer(input.game, input.snapshot, input.host.name, input.apply);
 
   return {
     code: input.code,
@@ -181,6 +190,11 @@ export function createRoom<S extends Snapshot>(input: {
       },
     },
     locked: false,
+    // So a host who hands the room over and leaves can come back to their own
+    // player, exactly as anybody else does.
+    devices: input.host.deviceKey && seated.seatId
+      ? { [input.host.deviceKey]: seated.seatId }
+      : {},
     pending: null,
     lastActiveAt: input.now,
   };
@@ -218,34 +232,37 @@ function distinctName(wanted: string, taken: readonly string[]): string {
  */
 export function join<S extends Snapshot>(
   state: RoomState<S>,
-  input: { memberId: string; name: string; now: number; seat?: string | null },
+  input: { memberId: string; name: string; now: number; deviceKey?: string | null },
   apply: ApplyAction<S>,
 ): JoinResult<S> {
   if (Object.keys(state.members).length >= MAX_MEMBERS) return { ok: false, code: 'room-full' };
 
   const claimed = new Set(Object.values(state.members).map((m) => m.seatId));
   const barred = new Set(state.barred ?? []);
+  const devices = state.devices ?? {};
 
   /**
-   * The player this device was last time it was here.
+   * The player this device already is.
    *
-   * A name cannot identify somebody coming back: two people called Peter make a
-   * "Peter" and a "Peter 2", and the second one types "Peter" when they return,
-   * which is the first one's name. So the device remembers which player it was
-   * and asks for that, and the name it types is only used if the seat has gone
-   * or somebody else is in it.
+   * The room recognises a device, never a name. A name cannot identify somebody
+   * coming back: a table with two Peters has a "Peter" and a "Peter 2", so the
+   * name the second one types on returning is the first one's. And a name is
+   * not theirs to prove - everybody can see it, everybody can type it, and
+   * people rename themselves mid-game.
    *
-   * Asking for a seat is no more powerful than asking for it by name: both need
-   * the room code, both only work while nobody holds it, and neither works on a
-   * seat the host has barred.
+   * The key is a digest of a secret only that device holds, so it cannot be
+   * guessed from anything the room hands out. Even then it is a request rather
+   * than a fact: the seat has to still exist, be free, and not be one the host
+   * has barred.
    */
-  const returning = input.seat && !claimed.has(input.seat) && !barred.has(input.seat)
-    ? playersIn(state.snapshot).find((p) => p.id === input.seat)
+  const held = input.deviceKey ? devices[input.deviceKey] : undefined;
+  const returning = held && !claimed.has(held) && !barred.has(held)
+    ? playersIn(state.snapshot).find((p) => p.id === held)
     : undefined;
 
   const seated = returning
     ? { snapshot: state.snapshot, seatId: returning.id, name: returning.name }
-    : seatNewcomer(state.game, state.snapshot, claimed, input.name, apply);
+    : seatNewcomer(state.game, state.snapshot, input.name, apply);
   const added = seated.snapshot !== state.snapshot;
 
   /**
@@ -283,6 +300,11 @@ export function join<S extends Snapshot>(
     snapshot: seated.snapshot,
     rev: added ? state.rev + 1 : state.rev,
     members: { ...state.members, [input.memberId]: member },
+    // Remembered whichever way they were seated, so the next time they arrive
+    // is a return rather than another new player.
+    devices: input.deviceKey && seated.seatId
+      ? { ...devices, [input.deviceKey]: seated.seatId }
+      : devices,
     lastActiveAt: input.now,
   };
 
@@ -595,7 +617,16 @@ function handleKick<S extends Snapshot>(
   const barred = seatId && !(state.barred ?? []).includes(seatId)
     ? [...(state.barred ?? []), seatId]
     : state.barred;
-  const next: RoomState<S> = { ...state, members, locked: true, ...(barred ? { barred } : {}) };
+
+  // And forgotten, so unlocking later does not quietly hand the seat straight
+  // back to the device the host removed.
+  const devices = Object.fromEntries(
+    Object.entries(state.devices ?? {}).filter(([, seat]) => seat !== seatId),
+  );
+
+  const next: RoomState<S> = {
+    ...state, members, locked: true, devices, ...(barred ? { barred } : {}),
+  };
 
   return {
     state: next,
