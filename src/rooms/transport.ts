@@ -139,35 +139,24 @@ export const webSocketTransport: TransportFactory = ({ baseUrl, code, token, han
   };
 };
 
-/* ─────────────────────────── which room server ─────────────────────────── */
-
+/**
+ * Where the room server lives.
+ *
+ * There is one, and it is production. A Pages preview talks to it, which means
+ * a room made from a preview is a real room, in the same storage as everybody
+ * else's game. That is a deliberate trade: a second room server would double
+ * the builds on every push, and this is a score sheet.
+ *
+ * The way to try a change without touching real games is to run the server:
+ *
+ *   pnpm worker:dev
+ *   VITE_ROOMS_URL=http://localhost:8787 pnpm dev
+ *
+ * That matters most for a protocol change, which a preview cannot exercise at
+ * all: the preview client would be ahead of the deployed room and would only
+ * ever show the version banner.
+ */
 export const PRODUCTION_ROOMS = 'https://games-rooms.abbondanzo.workers.dev';
-export const STAGING_ROOMS = 'https://games-rooms-preview.abbondanzo.workers.dev';
 
-/**
- * The origins that serve the live site. Everything else - pull request
- * previews, local dev, anything unrecognised - is not production.
- */
-export const PRODUCTION_ORIGINS = [
-  'https://games.abbondanzo.com',
-  'https://games-ccu.pages.dev',
-];
-
-/**
- * Which room server this build should talk to.
- *
- * Decided from the origin rather than from a build variable set somewhere else,
- * because a variable that has to be remembered is a variable that will one day
- * be missing - and the failure would be silent, with a preview quietly writing
- * into somebody's real game. Reading it from the page means it cannot drift
- * from where the page is actually being served.
- *
- * Written as an allowlist for the same reason: an origin nobody thought of gets
- * staging, which is the harmless answer.
- */
-export const roomsUrlFor = (origin: string): string =>
-  (PRODUCTION_ORIGINS.includes(origin) ? PRODUCTION_ROOMS : STAGING_ROOMS);
-
-/** Overridable, so dev can point at a wrangler running locally. */
-export const ROOMS_URL: string =
-  import.meta.env.VITE_ROOMS_URL ?? roomsUrlFor(window.location.origin);
+/** Overridable, which is the whole of the local story. */
+export const ROOMS_URL: string = import.meta.env.VITE_ROOMS_URL ?? PRODUCTION_ROOMS;

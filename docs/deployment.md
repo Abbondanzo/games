@@ -43,64 +43,55 @@ integration does:
 The install step is needed because the Worker bundles zod and the shared library. Connecting it
 keeps API tokens out of the repo, which the GitHub Actions route would not.
 
-**A Workers Builds project deploys one Worker, and it is the one it is connected to.** So a
-non-production branch cannot publish a differently named Worker from here. Two attempts at making
-it, both reverted, both worth not repeating:
+**Only deploy from `main`.** The deploy command is a plain `wrangler deploy`, which publishes
+production. If non-production branch deployments are turned on, every branch would publish over
+the live room server. Non-production branches should build and stop.
 
-- Pointing the non-production command at `wrangler deploy --env preview` does not publish
-  `games-rooms-preview`. The name is overridden rather than refused, and the branch goes to
-  **production** wearing staging's variables - including an origin list with no
-  `games.abbondanzo.com` in it, which stops the live site opening a room at all. Recover with
-  `pnpm worker:deploy` from a checkout of `main`.
-- `wrangler versions upload --preview-alias staging` looks like the answer, and would be, except
-  that [Cloudflare does not generate preview URLs for a Worker that implements a Durable
-  Object](https://developers.cloudflare.com/workers/versions-and-deployments/preview-urls/#limitations).
-  This Worker is nothing but a Durable Object. The upload succeeds, the alias is recorded, and
-  `staging-games-rooms.<subdomain>.workers.dev` resolves to nothing. It fails quietly, which is
-  what makes it worth writing down.
+A branch cannot usefully deploy a room server of its own from here, and two attempts are written
+up in [rooms.md](rooms.md) so they are not tried a third time.
 
-So staging is a Worker of its own, deployed separately: by hand with `pnpm worker:deploy:staging`,
-or by connecting `games-rooms-preview` as its own Workers Builds project, which is the only way a
-build can publish it.
+## There is one room server, and previews use it
 
-## Two room servers
+Cloudflare Pages gives every pull request a preview, but there is no matching preview of the
+room server. A preview build talks to **production**:
 
-There are two, and which one a build talks to is decided by the origin it is served from:
-
-| Origin | Room server |
+| Client | Room server |
 | --- | --- |
-| `games.abbondanzo.com`, `games-ccu.pages.dev` | `games-rooms` |
-| every preview, local dev, anything else | `games-rooms-preview` |
+| the live site | `games-rooms` |
+| a pull request preview | `games-rooms` |
+| local dev | `games-rooms`, unless `VITE_ROOMS_URL` says otherwise |
 
-That decision lives in `roomsUrlFor` in `src/rooms/transport.ts` and is read from the page at
-runtime, not from a build variable. A variable that has to be set in a dashboard is one that
-will eventually be missing, and the failure would be silent: a preview writing into somebody's
-real game. It is an allowlist, so an origin nobody anticipated gets staging, which is harmless.
+That is a deliberate trade rather than an oversight. A second room server means a second Workers
+Builds project and a second build on every push, which doubles the spend against the free tier
+for a score sheet. Two things follow from it, and both matter:
 
-Staging is the `preview` environment in `wrangler.toml`, and a Worker of its own called
-`games-rooms-preview`. It has its own Durable Object storage, its own rate limit budget, and an
-origin list that admits previews and localhost but not the live site. Deploy it with:
+**A room made from a preview is a real room.** It lives in the same Durable Object storage as
+everybody's live games, under a code from the same space, and holds real people's names. Nothing
+stops a preview creating, locking or closing rooms. Treat a preview as production with a
+different coat of paint.
+
+**A preview cannot exercise a protocol change at all.** A branch that bumps `PROTOCOL_VERSION`
+produces a preview client that is ahead of the deployed room, so every session shows "This app is
+out of date" or its counterpart and the new message is refused. There is nothing to be learned
+from that preview. Run it locally instead.
+
+## Trying a change without touching real games
 
 ```
-pnpm worker:deploy:staging
+pnpm worker:dev                                   # the room server on :8787
+VITE_ROOMS_URL=http://localhost:8787 pnpm dev     # the app, pointed at it
 ```
 
-`VITE_ROOMS_URL` still overrides everything, for pointing at a wrangler running locally.
+That is the isolated setup: a room server with its own local storage, and a client that talks to
+it. It is the only way to try a protocol change honestly, and the way to try anything that writes
+to a room without writing to somebody's game.
 
-**A protocol change has somewhere to go.** Deploy staging, open the pull request, and the preview
-exercises the new protocol against a room server that speaks it, without touching production.
-Before staging existed a preview could only reach the live room server, so a preview of a
-protocol change was guaranteed to show a version mismatch and could not be tested at all.
+Two devices are worth the trouble here. `wrangler dev` binds a port on the machine, so a phone on
+the same network can reach it, which is what the manual checklist in [rooms.md](rooms.md) needs.
 
-To have that happen without remembering, connect `games-rooms-preview` to this repo as a second
-Workers Builds project - deploy command `pnpm worker:deploy:staging`, non-production branch
-deploys turned on - so every branch push refreshes it. It has to be a second project rather than
-a second command on the first, for the reason above.
-
-**Staging is shared, and holds whatever was pushed last.** With one pull request in flight that
-is invisible; with two, the second takes staging away from the first. Per-branch room servers
-would need the Pages preview to discover its own branch's Worker URL at build time, which it has
-no way to do.
+**Deploy the Worker before the client** when a protocol changes. The app is precached, so a
+client can be weeks old, and an old room rejects a frame it has never heard of. `pnpm
+worker:deploy` from `main`, then push.
 
 ## Is it up?
 

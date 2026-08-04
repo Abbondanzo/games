@@ -159,15 +159,32 @@ pnpm worker:dev          # the room server on :8787
 VITE_ROOMS_URL=http://localhost:8787 pnpm dev
 ```
 
-`pnpm worker:dev` runs the staging configuration, which is what allows a
-localhost origin through. Without `VITE_ROOMS_URL` the app talks to the deployed
-staging room server rather than to production: only the two origins that serve
-the live site get the live rooms. `curl .../health` says whether a room server
-is up and which protocol it speaks. See [deployment.md](deployment.md).
+**Without `VITE_ROOMS_URL` the app talks to the live room server**, from a dev
+server as much as from a pull request preview. There is one room server and no
+staging copy of it, so a room made while trying something out is a real room in
+real storage. Setting `VITE_ROOMS_URL` as above is what makes a session
+isolated, and it is the only way to try a protocol change: a preview client that
+has bumped `PROTOCOL_VERSION` is ahead of the deployed room and can only show
+the version banner.
 
-Deploy the Worker by hand with `pnpm worker:deploy`, or staging with
-`pnpm worker:deploy:staging`. CI deliberately holds no secrets and does not
-deploy.
+Two attempts at a room server per branch, both reverted, both worth not
+repeating:
+
+- A non-production deploy command of `wrangler deploy --env preview` does not
+  publish a differently named Worker. A Workers Builds project deploys the
+  Worker it is connected to, so the name is overridden and the branch goes to
+  production instead.
+- `wrangler versions upload --preview-alias staging` is accepted and then
+  unreachable: Cloudflare does not generate preview URLs for a Worker that
+  implements a Durable Object, and this Worker is nothing but one.
+
+A separate Worker does work, and is what was removed - it needs a second Workers
+Builds project and so a second build on every push, which is not worth the free
+tier for a score sheet.
+
+`curl .../health` says whether the room server is up and which protocol it
+speaks. Deploy it by hand with `pnpm worker:deploy`. CI deliberately holds no
+secrets and does not deploy.
 
 **Deploy the Worker before the client.** The two deploy independently and the
 app is precached by a service worker, so a client can be weeks old.

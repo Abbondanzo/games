@@ -9,10 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLOSE, encode } from '@shared/rooms/protocol';
-import {
-  PRODUCTION_ORIGINS, PRODUCTION_ROOMS, STAGING_ROOMS, roomsUrlFor, webSocketTransport,
-  type ConnectionStatus,
-} from './transport';
+import { webSocketTransport, type ConnectionStatus } from './transport';
 import type { GoneReason, ServerMessage } from '@shared/rooms/protocol';
 
 /** Every socket the transport opens, so a test can drive the last one. */
@@ -299,43 +296,5 @@ describe('sending', () => {
     latest().hangUp(1006);
     expect(() => conn.send(lock)).not.toThrow();
     expect(latest().sent).toEqual([]);
-  });
-});
-
-/**
- * Which room server a build talks to.
- *
- * This is the guard against a preview writing into somebody's real game. It is
- * an allowlist on purpose: only the origins that serve the live site get the
- * live rooms, and anything unrecognised gets staging, which holds nothing that
- * matters.
- */
-describe('choosing a room server', () => {
-  it.each(PRODUCTION_ORIGINS)('gives %s the live rooms', (origin) => {
-    expect(roomsUrlFor(origin)).toBe(PRODUCTION_ROOMS);
-  });
-
-  it.each([
-    ['a pull request preview', 'https://0fc473c3.games-ccu.pages.dev'],
-    ['a branch preview', 'https://stale-rooms.games-ccu.pages.dev'],
-    ['local dev', 'http://localhost:5173'],
-    ['a local production build', 'http://localhost:4173'],
-    ['nothing recognisable', 'https://somewhere.example'],
-    ['no origin at all', ''],
-  ])('keeps %s away from them', (_label, origin) => {
-    expect(roomsUrlFor(origin)).toBe(STAGING_ROOMS);
-  });
-
-  // A lookalike is the case an endsWith check would have got wrong.
-  it.each([
-    'https://games.abbondanzo.com.evil.example',
-    'https://evil.example/https://games.abbondanzo.com',
-    'http://games.abbondanzo.com',
-  ])('is not fooled by %s', (origin) => {
-    expect(roomsUrlFor(origin)).toBe(STAGING_ROOMS);
-  });
-
-  it('keeps the two apart', () => {
-    expect(PRODUCTION_ROOMS).not.toBe(STAGING_ROOMS);
   });
 });
