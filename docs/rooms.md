@@ -43,6 +43,37 @@ into a stranger's room.
 
 Codes are freed when a room expires, four hours after its last activity.
 
+## When a room ends
+
+A room ends when the host closes it, or four hours after anyone last did
+anything. Either way it stops existing, and every device that remembered it has
+to be told.
+
+This is harder than it sounds, because **a browser is never told why a socket
+failed to open**. A refused upgrade and a train tunnel look identical from the
+client, so a room that answers "no room here" with a plain 404 leaves the client
+no choice but to keep trying. That was a real bug: a device holding a session
+for a long-dead room retried it forever, flickering between getting back to the
+room and not being connected.
+
+So the room accepts the socket purely in order to close it with a code:
+
+| Code | Meaning | What the device does |
+| --- | --- | --- |
+| 4001 | The token is not one this room knows | Forgets the room |
+| 4002 | Closed by the host, or expired | Forgets the room |
+| 4003 | Removed by the host | Forgets the room |
+| anything else | Unexplained | Retries, with backoff |
+
+Forgetting means clearing the stored session, so the *next* visit opens no
+socket at all. The host keeps the game that was in the room, since it was theirs
+before they shared it; everyone else gets their own saved game back.
+
+Retrying also gives up after about a minute. Not every refusal can be explained
+- a room deployed before these codes existed still turns the upgrade away with
+nothing readable on it - so the loop needs an end of its own. Returning to the
+tab, or the network coming back, starts it again.
+
 ## How it works
 
 The room server is a Cloudflare Worker with one Durable Object per room. **The
@@ -117,8 +148,14 @@ pnpm worker:dev          # the room server on :8787
 VITE_ROOMS_URL=http://localhost:8787 pnpm dev
 ```
 
-Deploy the Worker by hand with `pnpm worker:deploy`. CI deliberately holds no
-secrets and does not deploy.
+`pnpm worker:dev` runs the staging configuration, which is what allows a
+localhost origin through. Without `VITE_ROOMS_URL` the app talks to the deployed
+staging room server rather than to production: only the two origins that serve
+the live site get the live rooms. See [deployment.md](deployment.md).
+
+Deploy the Worker by hand with `pnpm worker:deploy`, or staging with
+`pnpm worker:deploy:staging`. CI deliberately holds no secrets and does not
+deploy.
 
 **Deploy the Worker before the client.** The two deploy independently and the
 app is precached by a service worker, so a client can be weeks old.
@@ -154,5 +191,7 @@ Not covered by tests, so worth a manual pass after changing the Worker:
 4. Kick the phone and confirm it cannot get back in.
 5. Background the host phone for two minutes and confirm it resyncs.
 6. Turn off Wi-Fi mid-game and confirm it reconnects.
+7. Close a room, then open that game again on a device that was in it. It should
+   say the room has ended, once, and open no socket.
 7. Stop the Worker entirely and confirm solo play on all three games is
    completely unaffected.

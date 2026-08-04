@@ -24,8 +24,12 @@ import { z } from 'zod';
  *
  * 2: added closeRoom, roundOpen, rackSubmit, roundCancel.
  * 3: added leave.
+ * 4: a room that will not have a device back now says why, in the socket's
+ *    close code. Bumped although nothing was added to a frame, because a client
+ *    that predates it retries a room that has ended forever, and telling that
+ *    client to refresh is the only way to stop it.
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** Which side is behind, worked out from the version in the welcome. */
 export type VersionGap = 'app' | 'room';
@@ -221,3 +225,41 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
 };
 
 export const describeError = (code: ErrorCode): string => ERROR_MESSAGES[code];
+
+/* ─────────────────────────── the end of a room ─────────────────────────── */
+
+/**
+ * Why a room will not have this device back.
+ *
+ * These ride on the socket's close code because that is the only channel there
+ * is: a browser is never told why an upgrade failed, only that it did, and a
+ * failure it cannot explain is indistinguishable from a tunnel. Without this a
+ * client retries a room that ended hours ago, forever.
+ *
+ * 4000-4999 is the range reserved for the application.
+ */
+export const CLOSE = {
+  /** The token is not one this room knows. */
+  unauthorised: 4001,
+  /** Closed by the host, or expired through disuse. Nothing to come back to. */
+  ended: 4002,
+  /** The host removed this member. */
+  removed: 4003,
+} as const;
+
+export type GoneReason = keyof typeof CLOSE;
+
+/** Terminal close codes, by number, for the client that has to read them. */
+export const GONE_BY_CODE: Record<number, GoneReason> = Object.fromEntries(
+  Object.entries(CLOSE).map(([reason, code]) => [code, reason as GoneReason]),
+);
+
+/**
+ * Said as the person on the other end would hear it. They did not close
+ * anything, so each of these explains what happened to the game they can see.
+ */
+export const GONE_MESSAGES: Record<GoneReason, string> = {
+  ended: 'That room has ended. You are back to playing on your own.',
+  removed: 'The host removed you from that room. You are back to playing on your own.',
+  unauthorised: 'That room did not recognise this device. You are back to playing on your own.',
+};

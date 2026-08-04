@@ -25,14 +25,12 @@ interface RateLimit {
 }
 
 /**
- * Every Cloudflare Pages deployment gets its own subdomain, so previews need a
- * wildcard or they cannot reach the room server at all. One label under this
- * project only - `*.pages.dev` would admit every site on the platform.
+ * Only used when `ALLOWED_ORIGINS` is missing, which should never happen: both
+ * environments set it in `wrangler.toml`. It admits nothing but a machine
+ * talking to itself, deliberately - a deploy that lost its configuration should
+ * fail loudly rather than quietly let the whole web in.
  */
 const DEFAULT_ORIGINS = [
-  'https://games.abbondanzo.com',
-  'https://games-ccu.pages.dev',
-  'https://*.games-ccu.pages.dev',
   'http://localhost:5173',
   'http://localhost:4173',
 ];

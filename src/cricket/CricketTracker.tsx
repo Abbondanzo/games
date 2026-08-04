@@ -5,9 +5,9 @@ import { PlayersCard } from '../shared/PlayersCard';
 import { CricketBoard } from './components/CricketBoard';
 import { DartEntry } from './components/DartEntry';
 import { TARGETS, computeBoard, dartShorthand, previewTurn, standings } from '@shared/games/cricket/rules';
-import { describeError } from '@shared/rooms/protocol';
 import { useCricket } from './lib/useCricket';
 import { RoomBar } from '../rooms/RoomBar';
+import { RoomNotices } from '../rooms/RoomNotices';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 import type { Dart, Variant } from '@shared/games/cricket/types';
@@ -28,7 +28,7 @@ const describeGame = (s: { players: unknown[]; turns: unknown[] }) =>
   summarise([[s.players.length, 'player'], [s.turns.length, 'turn']]);
 
 export function CricketTracker() {
-  const { state, dispatch, room, onReject } = useCricket();
+  const { state, dispatch, room, onReject, gone } = useCricket();
   const [darts, setDarts] = useState<Dart[]>([]);
 
   // A refused throw would otherwise vanish along with what was typed.
@@ -176,9 +176,7 @@ export function CricketTracker() {
               room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
           />
         )}
-        {room?.lastError && (
-          <div className="banner warn" role="status">{describeError(room.lastError)}</div>
-        )}
+        <RoomNotices lastError={room?.lastError} gone={gone} />
 
         {winner && (
           <div className="banner win" role="status">

@@ -42,7 +42,42 @@ Builds, which works the same way the Pages integration does:
 The install step is needed because the Worker bundles zod and the shared library. Connecting it
 keeps API tokens out of the repo, which the GitHub Actions route would not.
 
-**Both auto-deploying means they race.** If Pages wins, new clients briefly talk to an old room.
+**Only deploy from `main`.** The deploy command is a plain `wrangler deploy`, which publishes
+production. If non-production branch deployments are turned on in Workers Builds, every pull
+request would publish over the live room server. Non-production branches should build and stop.
+
+## Two room servers
+
+There are two, and which one a build talks to is decided by the origin it is served from:
+
+| Origin | Room server |
+| --- | --- |
+| `games.abbondanzo.com`, `games-ccu.pages.dev` | `games-rooms` |
+| every preview, local dev, anything else | `games-rooms-preview` |
+
+That decision lives in `roomsUrlFor` in `src/rooms/transport.ts` and is read from the page at
+runtime, not from a build variable. A variable that has to be set in a dashboard is one that
+will eventually be missing, and the failure would be silent: a preview writing into somebody's
+real game. It is an allowlist, so an origin nobody anticipated gets staging, which is harmless.
+
+Staging is the `preview` environment in `wrangler.toml`. It has its own Durable Object storage,
+its own rate limit budget, and an origin list that admits previews and localhost but not the
+live site. Deploy it with:
+
+```
+pnpm worker:deploy:staging
+```
+
+It only needs redeploying when the Worker changes in a way a preview depends on - which, for a
+protocol change, is the point of it. `VITE_ROOMS_URL` still overrides everything, for pointing
+at a wrangler running locally.
+
+**A protocol change now has somewhere to go.** Deploy staging, open the pull request, and the
+preview exercises the new protocol against a room server that speaks it, without touching
+production. Previously a preview could only ever reach the live room server, so a preview of a
+protocol change was guaranteed to show a version mismatch and could not be tested at all.
+
+**Both auto-deploying means they race**, on `main`. If Pages wins, new clients briefly talk to an old room.
 That is worth knowing but not worth avoiding: the app is precached, so some clients are stale
 whatever the deploy order, which is why the version banner exists. For a breaking protocol
 change, deploy the Worker by hand first and then push.

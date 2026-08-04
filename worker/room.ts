@@ -11,7 +11,7 @@ import {
   connect, createRoom, disconnect, handle, join,
   type Effect, type RoomState,
 } from '../shared/rooms/roomCore';
-import { decodeClientMessage, encode, type Game } from '../shared/rooms/protocol';
+import { CLOSE, decodeClientMessage, encode, type Game } from '../shared/rooms/protocol';
 import { cricketApply, cricketInitialState } from '../shared/rooms/games/cricket';
 import { scrabbleApply, scrabbleInitialState } from '../shared/rooms/games/scrabble';
 import { rummikubApply, rummikubInitialState } from '../shared/rooms/games/rummikub';
@@ -89,9 +89,9 @@ export class Room extends DurableObject {
         const payload = encode(effect.message);
         for (const ws of byMember.get(effect.memberId) ?? []) trySend(ws, payload);
       } else if (effect.to === 'close') {
-        for (const ws of byMember.get(effect.memberId) ?? []) ws.close(4003, 'removed');
+        for (const ws of byMember.get(effect.memberId) ?? []) ws.close(CLOSE.removed, 'removed');
       } else {
-        for (const ws of sockets) ws.close(4002, 'room closed');
+        for (const ws of sockets) ws.close(CLOSE.ended, 'room closed');
       }
     }
   }
@@ -163,13 +163,13 @@ export class Room extends DurableObject {
 
   private async handleSocket(url: URL): Promise<Response> {
     const state = await this.load();
-    if (!state) return json({ error: 'no-room' }, 404);
+    if (!state) return refuse(CLOSE.ended);
 
     const token = url.searchParams.get('t') ?? '';
     const tokens = (await this.ctx.storage.get<Record<string, string>>('tokens')) ?? {};
     const memberId = tokens[token];
     // A kicked member's entry is gone from the room even though the token remains.
-    if (!memberId || !state.members[memberId]) return json({ error: 'unauthorised' }, 401);
+    if (!memberId || !state.members[memberId]) return refuse(CLOSE.removed);
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
@@ -192,7 +192,7 @@ export class Room extends DurableObject {
     if (typeof raw !== 'string') return;
 
     const attachment = ws.deserializeAttachment() as Attachment | null;
-    if (!attachment) return ws.close(4001, 'unauthorised');
+    if (!attachment) return ws.close(CLOSE.unauthorised, 'unauthorised');
 
     if (!this.withinBudget(ws, attachment)) {
       return trySend(ws, encode({ t: 'error', reqId: null, code: 'rate-limited' }));
@@ -204,7 +204,7 @@ export class Room extends DurableObject {
     }
 
     const state = await this.load();
-    if (!state) return ws.close(4002, 'room gone');
+    if (!state) return ws.close(CLOSE.ended, 'room gone');
 
     const outcome = handle(
       state,
@@ -269,9 +269,25 @@ export class Room extends DurableObject {
       await this.ctx.storage.setAlarm(state.lastActiveAt + IDLE_MS);
       return;
     }
-    for (const ws of this.ctx.getWebSockets()) ws.close(4002, 'room expired');
+    for (const ws of this.ctx.getWebSockets()) ws.close(CLOSE.ended, 'room expired');
     await this.ctx.storage.deleteAll();
   }
+}
+
+/**
+ * Turns a socket away with a reason.
+ *
+ * Refusing the upgrade outright would be simpler, but a browser does not pass
+ * the status on: the client sees only that the socket failed, which is what a
+ * lost connection looks like too, so it retries a room that no longer exists
+ * forever. Accepting the socket purely to close it with a code is the only way
+ * to say why.
+ */
+function refuse(code: number): Response {
+  const pair = new WebSocketPair();
+  pair[1].accept();
+  pair[1].close(code);
+  return new Response(null, { status: 101, webSocket: pair[0] });
 }
 
 /** A closing socket throws on send; that is not worth failing the whole broadcast for. */

@@ -7,9 +7,9 @@ import { HistoryCard } from './components/HistoryCard';
 import { DictionaryDrawer } from './components/DictionaryDrawer';
 import { useGame } from './lib/useGame';
 import { RoomBar } from '../rooms/RoomBar';
+import { RoomNotices } from '../rooms/RoomNotices';
 import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
-import { describeError } from '@shared/rooms/protocol';
 import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/scoring';
 import type { Draft } from '@shared/games/scrabble/types';
 
@@ -17,7 +17,7 @@ const describeGame = (s: { players: unknown[]; turns: unknown[] }) =>
   summarise([[s.players.length, 'player'], [s.turns.length, 'turn']]);
 
 export function ScrabbleTracker() {
-  const { state, dispatch, room, onReject } = useGame();
+  const { state, dispatch, room, onReject, gone } = useGame();
 
   // A refused play would otherwise take the typed word with it.
   onReject((action) => {
@@ -104,9 +104,7 @@ export function ScrabbleTracker() {
               room.seatId && dispatch({ type: 'renamePlayer', id: room.seatId, name })}
           />
         )}
-        {room?.lastError && (
-          <div className="banner warn" role="status">{describeError(room.lastError)}</div>
-        )}
+        <RoomNotices lastError={room?.lastError} gone={gone} />
 
         <PlayersCard
           players={state.players}

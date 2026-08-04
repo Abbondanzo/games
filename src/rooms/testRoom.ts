@@ -69,12 +69,19 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
 
   function deliver(effects: Effect[]): void {
     for (const effect of effects) {
+      // Dropping a socket carries a reason in production, because a browser is
+      // told nothing else about why one closed. Modelled here so the client's
+      // handling of it is exercised rather than assumed.
       if (effect.to === 'shutdown') {
+        const everyone = [...sockets.values()].flat();
         sockets.clear();
+        for (const handlers of everyone) handlers.onGone('ended');
         continue;
       }
       if (effect.to === 'close') {
+        const dropped = sockets.get(effect.memberId) ?? [];
         sockets.delete(effect.memberId);
+        for (const handlers of dropped) handlers.onGone('removed');
         continue;
       }
       const targets = effect.to === 'all'
