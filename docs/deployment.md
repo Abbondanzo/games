@@ -37,29 +37,31 @@ integration does:
 | --- | --- |
 | Build command | `pnpm install --frozen-lockfile` |
 | Deploy command | `pnpm worker:deploy` |
-| Non-production branch command | `pnpm worker:upload:staging` |
 | Root directory | the repo root, where `wrangler.toml` is |
+| Non-production branches | build, and **do not** deploy |
 
 The install step is needed because the Worker bundles zod and the shared library. Connecting it
 keeps API tokens out of the repo, which the GitHub Actions route would not.
 
 **A Workers Builds project deploys one Worker, and it is the one it is connected to.** So a
-non-production branch cannot publish a *differently named* Worker from here. Pointing the
-non-production command at `wrangler deploy --env preview` does not publish a Worker of that other
-name: the name is overridden rather than refused, and the branch is published to **production**.
-Tried, and reverted. If it happens again, recover with `pnpm worker:deploy` from a checkout of
-`main`.
+non-production branch cannot publish a differently named Worker from here. Two attempts at making
+it, both reverted, both worth not repeating:
 
-What works instead is a **preview version** of the same Worker:
+- Pointing the non-production command at `wrangler deploy --env preview` does not publish
+  `games-rooms-preview`. The name is overridden rather than refused, and the branch goes to
+  **production** wearing staging's variables - including an origin list with no
+  `games.abbondanzo.com` in it, which stops the live site opening a room at all. Recover with
+  `pnpm worker:deploy` from a checkout of `main`.
+- `wrangler versions upload --preview-alias staging` looks like the answer, and would be, except
+  that [Cloudflare does not generate preview URLs for a Worker that implements a Durable
+  Object](https://developers.cloudflare.com/workers/versions-and-deployments/preview-urls/#limitations).
+  This Worker is nothing but a Durable Object. The upload succeeds, the alias is recorded, and
+  `staging-games-rooms.<subdomain>.workers.dev` resolves to nothing. It fails quietly, which is
+  what makes it worth writing down.
 
-```
-wrangler versions upload --preview-alias staging
-```
-
-A version is uploaded but takes no traffic, so production carries on serving what it was
-serving. The alias gives it a fixed address - `staging-games-rooms.abbondanzo.workers.dev` -
-which is what makes it usable as a target the client can name, since an unaliased version URL
-changes on every upload.
+So staging is a Worker of its own, deployed separately: by hand with `pnpm worker:deploy:staging`,
+or by connecting `games-rooms-preview` as its own Workers Builds project, which is the only way a
+build can publish it.
 
 ## Two room servers
 
@@ -68,56 +70,43 @@ There are two, and which one a build talks to is decided by the origin it is ser
 | Origin | Room server |
 | --- | --- |
 | `games.abbondanzo.com`, `games-ccu.pages.dev` | `games-rooms` |
-| every preview, local dev, anything else | `staging-games-rooms`, the staging alias |
+| every preview, local dev, anything else | `games-rooms-preview` |
 
 That decision lives in `roomsUrlFor` in `src/rooms/transport.ts` and is read from the page at
 runtime, not from a build variable. A variable that has to be set in a dashboard is one that
 will eventually be missing, and the failure would be silent: a preview writing into somebody's
 real game. It is an allowlist, so an origin nobody anticipated gets staging, which is harmless.
 
-Staging is the `staging` preview alias of `games-rooms`, refreshed by every branch push.
+Staging is the `preview` environment in `wrangler.toml`, and a Worker of its own called
+`games-rooms-preview`. It has its own Durable Object storage, its own rate limit budget, and an
+origin list that admits previews and localhost but not the live site. Deploy it with:
+
+```
+pnpm worker:deploy:staging
+```
+
 `VITE_ROOMS_URL` still overrides everything, for pointing at a wrangler running locally.
 
-**A protocol change has somewhere to go.** Push the branch: the Pages preview and the staging
-version go up together, and the preview exercises the new protocol against a room server that
-speaks it, while production carries on unchanged. Before staging existed a preview could only
-reach the live room server, so a preview of a protocol change was guaranteed to show a version
-mismatch and could not be tested at all.
+**A protocol change has somewhere to go.** Deploy staging, open the pull request, and the preview
+exercises the new protocol against a room server that speaks it, without touching production.
+Before staging existed a preview could only reach the live room server, so a preview of a
+protocol change was guaranteed to show a version mismatch and could not be tested at all.
 
-**Staging is a version of production, not a copy of it.** That is the price of the alias, and it
-is worth knowing exactly:
+To have that happen without remembering, connect `games-rooms-preview` to this repo as a second
+Workers Builds project - deploy command `pnpm worker:deploy:staging`, non-production branch
+deploys turned on - so every branch push refreshes it. It has to be a second project rather than
+a second command on the first, for the reason above.
 
-- **The rooms are the same rooms.** Durable Objects belong to the Worker, and a version is the
-  same Worker, so a room made from a preview lives in the same storage as a real game and runs
-  the branch's Durable Object code. Codes are random and rooms expire after four hours, so a
-  collision is unlikely rather than impossible - but a branch that changes the shape of a
-  snapshot is writing into storage the live site reads.
-- **The variables are the same variables**, which is why `ALLOWED_ORIGINS` above has to admit
-  previews as well as the live site. Narrowing it to the live site would leave the preview unable
-  to reach its own staging alias.
-- **The rate limit budget is the same budget.**
-
-If that isolation is ever wanted back, it means a second Worker with its own name, deployed by a
-Workers Builds project of its own, since a build only publishes the Worker it is connected to.
-There was one, and it was removed once the alias made it redundant.
-
-**Staging holds whatever was pushed last.** With one pull request in flight that is invisible;
-with two, the second takes staging away from the first.
-
-**Both auto-deploying means they race**, on `main`. If Pages wins, new clients briefly talk to an old room.
-That is worth knowing but not worth avoiding: the app is precached, so some clients are stale
-whatever the deploy order, which is why the version banner exists. For a breaking protocol
-change, deploy the Worker by hand first and then push.
-
-Deploy the Worker first when a client-to-server message is added. The app is precached by a service
-worker, so a client can be running weeks-old code; protocol changes have to stay additive. See
-[rooms.md](rooms.md).
+**Staging is shared, and holds whatever was pushed last.** With one pull request in flight that
+is invisible; with two, the second takes staging away from the first. Per-branch room servers
+would need the Pages preview to discover its own branch's Worker URL at build time, which it has
+no way to do.
 
 ## Is it up?
 
 ```
 curl https://games-rooms.abbondanzo.workers.dev/health
-curl https://staging-games-rooms.abbondanzo.workers.dev/health
+curl https://games-rooms-preview.abbondanzo.workers.dev/health
 ```
 
 ```json

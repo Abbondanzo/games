@@ -137,18 +137,18 @@ it fail first.
 - **CI does not gate deployment.** Cloudflare Pages builds from the repo independently, so a red
   CI run still ships. See `docs/deployment.md`.
 - **There are two room servers, chosen by origin.** Only `games.abbondanzo.com` and
-  `games-ccu.pages.dev` reach production; previews and local dev reach the `staging` alias.
+  `games-ccu.pages.dev` reach production; previews and local dev reach `games-rooms-preview`.
   `roomsUrlFor` decides it at runtime from the page's own origin, so there is no build variable
-  to forget. Staging is the `staging` preview alias of `games-rooms`, put up by every branch
-  push, so a protocol change has a room that speaks it.
-- **Staging shares production's rooms.** A preview alias is a version of the same Worker, so the
-  Durable Objects, the variables and the rate limit are production's. Fine for trying a change;
-  not a sandbox. A branch that changes the shape of a snapshot is writing into storage the live
-  site reads.
+  to forget. Deploy staging with `pnpm worker:deploy:staging` before opening a pull request that
+  changes the protocol, or its preview has nothing that speaks it.
+- **Staging cannot be a preview URL of production.** Cloudflare does not generate preview URLs,
+  aliased or not, for a Worker that implements a Durable Object, and this Worker is nothing but
+  one. `versions upload --preview-alias` is accepted and then unreachable. Staging has to be its
+  own Worker. Tried and reverted; see `docs/deployment.md`.
 - **A Workers Builds project deploys the Worker it is connected to.** `wrangler deploy --env
-  preview` from the `games-rooms` project does not publish a Worker of that other name; it
-  overrides the name and publishes the branch to production. Tried and reverted; a preview
-  *version* with an alias is what works. See `docs/deployment.md`.
+  preview` from the `games-rooms` project does not publish `games-rooms-preview`; it overrides
+  the name and publishes the branch to production with staging's variables, which stops the live
+  site reaching its own rooms. Also tried and reverted.
 - **`GET /health` says whether a room server is up and what it speaks.** Every other route needs
   a room code, so it is the only way to tell a live address from one that was never deployed.
 - **The room is the authority, not the host.** Clients send requests and render

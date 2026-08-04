@@ -159,13 +159,15 @@ pnpm worker:dev          # the room server on :8787
 VITE_ROOMS_URL=http://localhost:8787 pnpm dev
 ```
 
-Without `VITE_ROOMS_URL` the app talks to the deployed staging room server
-rather than to production: only the two origins that serve the live site get the
-live rooms. `curl .../health` says whether a room server is up and which
-protocol it speaks. See [deployment.md](deployment.md).
+`pnpm worker:dev` runs the staging configuration, which is what allows a
+localhost origin through. Without `VITE_ROOMS_URL` the app talks to the deployed
+staging room server rather than to production: only the two origins that serve
+the live site get the live rooms. `curl .../health` says whether a room server
+is up and which protocol it speaks. See [deployment.md](deployment.md).
 
-Deploy the Worker by hand with `pnpm worker:deploy`. CI deliberately holds no
-secrets and does not deploy.
+Deploy the Worker by hand with `pnpm worker:deploy`, or staging with
+`pnpm worker:deploy:staging`. CI deliberately holds no secrets and does not
+deploy.
 
 **Deploy the Worker before the client.** The two deploy independently and the
 app is precached by a service worker, so a client can be weeks old.

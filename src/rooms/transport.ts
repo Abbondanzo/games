@@ -142,7 +142,7 @@ export const webSocketTransport: TransportFactory = ({ baseUrl, code, token, han
 /* ─────────────────────────── which room server ─────────────────────────── */
 
 export const PRODUCTION_ROOMS = 'https://games-rooms.abbondanzo.workers.dev';
-export const STAGING_ROOMS = 'https://staging-games-rooms.abbondanzo.workers.dev';
+export const STAGING_ROOMS = 'https://games-rooms-preview.abbondanzo.workers.dev';
 
 /**
  * The origins that serve the live site. Everything else - pull request
