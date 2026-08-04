@@ -8,7 +8,7 @@
  */
 import { mintCode, normaliseCode } from '../shared/rooms/codes';
 import { isAllowedOrigin, parseOrigins } from '../shared/rooms/origins';
-import { GAMES, type Game } from '../shared/rooms/protocol';
+import { GAMES, PROTOCOL_VERSION, type Game } from '../shared/rooms/protocol';
 
 export { Room } from './room';
 
@@ -18,6 +18,14 @@ export interface Env {
   JOIN_LIMIT?: RateLimit;
   /** Comma-separated origins allowed to talk to this Worker. */
   ALLOWED_ORIGINS?: string;
+  /** Which upload is running. Bound by Cloudflare; absent in local dev. */
+  VERSION?: VersionMetadata;
+}
+
+interface VersionMetadata {
+  id: string;
+  tag?: string;
+  timestamp?: string;
 }
 
 interface RateLimit {
@@ -86,6 +94,27 @@ export default {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
+    /**
+     * Is this thing on, and which one is it?
+     *
+     * Every other route needs a room code, so without this the only way to tell
+     * a Worker that is up from one that was never deployed is a 404 that looks
+     * the same either way. `protocol` is the useful part: it says whether this
+     * room can talk to a given client. Open to any origin, because a diagnostic
+     * nobody can curl is not much of one.
+     */
+    if (url.pathname === '/health') {
+      return json({
+        ok: true,
+        protocol: PROTOCOL_VERSION,
+        games: GAMES,
+        version: env.VERSION?.id ?? null,
+        // Workers Builds tags a version with the commit it was built from.
+        commit: env.VERSION?.tag ?? null,
+        uploadedAt: env.VERSION?.timestamp ?? null,
+      }, 200, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
+    }
+
     // WebSocket upgrades are not subject to CORS, so the origin is checked here
     // rather than relying on the browser. Without this any site could open a
     // socket to a room using a token it had somehow seen.
@@ -95,7 +124,6 @@ export default {
     }
 
     const parts = url.pathname.split('/').filter(Boolean);
-
     if (parts[0] !== 'rooms') return json({ error: 'not-found' }, 404, cors);
 
     // POST /rooms - create

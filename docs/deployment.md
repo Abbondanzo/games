@@ -45,11 +45,10 @@ keeps API tokens out of the repo, which the GitHub Actions route would not.
 
 **A Workers Builds project deploys one Worker, and it is the one it is connected to.** So a
 non-production branch cannot publish a *differently named* Worker from here. Pointing the
-non-production command at `wrangler deploy --env preview` does not publish `games-rooms-preview`:
-the name is overridden rather than refused, and the branch is published to **production** wearing
-staging's variables - including an origin list with no `games.abbondanzo.com` in it, which stops
-the live site opening a room at all. Tried, and reverted. If it happens again, recover with
-`pnpm worker:deploy` from a checkout of `main`.
+non-production command at `wrangler deploy --env preview` does not publish a Worker of that other
+name: the name is overridden rather than refused, and the branch is published to **production**.
+Tried, and reverted. If it happens again, recover with `pnpm worker:deploy` from a checkout of
+`main`.
 
 What works instead is a **preview version** of the same Worker:
 
@@ -69,7 +68,7 @@ There are two, and which one a build talks to is decided by the origin it is ser
 | Origin | Room server |
 | --- | --- |
 | `games.abbondanzo.com`, `games-ccu.pages.dev` | `games-rooms` |
-| every preview, local dev, anything else | `games-rooms-preview` |
+| every preview, local dev, anything else | `staging-games-rooms`, the staging alias |
 
 That decision lives in `roomsUrlFor` in `src/rooms/transport.ts` and is read from the page at
 runtime, not from a build variable. A variable that has to be set in a dashboard is one that
@@ -98,11 +97,9 @@ is worth knowing exactly:
   to reach its own staging alias.
 - **The rate limit budget is the same budget.**
 
-The `preview` environment in `wrangler.toml` still exists and is genuinely separate on all three
-counts. `pnpm worker:deploy:staging` publishes it, and `pnpm worker:dev` runs it locally, which
-is what admits a localhost origin. Connecting `games-rooms-preview` as its own Workers Builds
-project is the way to get that isolation automatically, at the cost of a second project and a
-second build on every push.
+If that isolation is ever wanted back, it means a second Worker with its own name, deployed by a
+Workers Builds project of its own, since a build only publishes the Worker it is connected to.
+There was one, and it was removed once the alias made it redundant.
 
 **Staging holds whatever was pushed last.** With one pull request in flight that is invisible;
 with two, the second takes staging away from the first.
@@ -115,6 +112,26 @@ change, deploy the Worker by hand first and then push.
 Deploy the Worker first when a client-to-server message is added. The app is precached by a service
 worker, so a client can be running weeks-old code; protocol changes have to stay additive. See
 [rooms.md](rooms.md).
+
+## Is it up?
+
+```
+curl https://games-rooms.abbondanzo.workers.dev/health
+curl https://staging-games-rooms.abbondanzo.workers.dev/health
+```
+
+```json
+{ "ok": true, "protocol": 5, "games": ["scrabble", "cricket", "rummikub"],
+  "version": "...", "commit": "...", "uploadedAt": "..." }
+```
+
+Every other route needs a room code, so without this an address that was never deployed and one
+that is running answer much the same way. `protocol` is the part worth reading: it says whether
+that room can talk to a given client, so a preview showing "This room needs updating" is answered
+by comparing this against `PROTOCOL_VERSION` in the client. `commit` is the revision the version
+was built from, which Workers Builds sets.
+
+Open to any origin and never cached, so it can be curled from anywhere.
 
 ## Toolchain
 

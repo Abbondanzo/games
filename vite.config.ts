@@ -46,6 +46,10 @@ export default defineConfig({
       'virtual:pwa-register/react': fileURLToPath(
         new URL('./src/test/pwaRegisterStub.ts', import.meta.url),
       ),
+      // Only exists inside the Workers runtime; lets the router be tested.
+      'cloudflare:workers': fileURLToPath(
+        new URL('./src/test/cloudflareWorkersStub.ts', import.meta.url),
+      ),
     },
   },
 });

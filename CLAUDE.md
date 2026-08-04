@@ -137,7 +137,7 @@ it fail first.
 - **CI does not gate deployment.** Cloudflare Pages builds from the repo independently, so a red
   CI run still ships. See `docs/deployment.md`.
 - **There are two room servers, chosen by origin.** Only `games.abbondanzo.com` and
-  `games-ccu.pages.dev` reach production; previews and local dev reach `games-rooms-preview`.
+  `games-ccu.pages.dev` reach production; previews and local dev reach the `staging` alias.
   `roomsUrlFor` decides it at runtime from the page's own origin, so there is no build variable
   to forget. Staging is the `staging` preview alias of `games-rooms`, put up by every branch
   push, so a protocol change has a room that speaks it.
@@ -146,9 +146,11 @@ it fail first.
   not a sandbox. A branch that changes the shape of a snapshot is writing into storage the live
   site reads.
 - **A Workers Builds project deploys the Worker it is connected to.** `wrangler deploy --env
-  preview` from the `games-rooms` project does not publish `games-rooms-preview`; it overrides
-  the name and publishes the branch to production with staging's variables, which stops the live
-  site reaching its own rooms. Tried and reverted; see `docs/deployment.md`.
+  preview` from the `games-rooms` project does not publish a Worker of that other name; it
+  overrides the name and publishes the branch to production. Tried and reverted; a preview
+  *version* with an alias is what works. See `docs/deployment.md`.
+- **`GET /health` says whether a room server is up and what it speaks.** Every other route needs
+  a room code, so it is the only way to tell a live address from one that was never deployed.
 - **The room is the authority, not the host.** Clients send requests and render
   what comes back; only the room runs a reducer. A guest gets no optimistic update, because it
   cannot mint the same ids.
