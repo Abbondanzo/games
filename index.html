@@ -1,86 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-    <title>Games</title>
-    <meta name="description" content="Score trackers for Scrabble, cricket darts and Rummikub. Works offline." />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-    <!-- The Cloudflare Pages subdomain serves the same build, so point search
+  <title>Games</title>
+  <meta name="description" content="Score trackers for Scrabble, cricket darts and Rummikub. Works offline." />
+
+  <!-- The Cloudflare Pages subdomain serves the same build, so point search
          engines at the one canonical host. -->
-    <link rel="canonical" href="https://games.abbondanzo.com/" />
+  <link rel="canonical" href="https://games.abbondanzo.com/" />
 
-    <!-- Tab icon. SVG where supported, PNG for everything else. -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+  <!-- Tab icon. SVG where supported, PNG for everything else. -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
 
-    <!-- Installed app. iOS reads apple-touch-icon rather than the manifest. -->
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+  <!-- Installed app. iOS reads apple-touch-icon rather than the manifest. -->
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
 
-    <!-- Tints the status bar area when launched from the home screen. -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fa" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10131a" />
+  <!-- Tints the status bar area when launched from the home screen. -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fa" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10131a" />
 
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Games" />
-  </head>
-  <body>
-    <div id="root"></div>
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Games" />
+</head>
 
-    <!--
-      Recovering from a stale page.
+<body>
+  <div id="root"></div>
 
-      A browser holding an index.html from an earlier deploy asks for a hashed
-      file that deploy shipped. The new deployment does not have it, the host
-      answers with an HTML page, and the browser refuses to run it as a module:
-      "Expected a JavaScript-or-Wasm module script". Nothing loads, and the page
-      is blank with no way out but a hard refresh somebody has to know to do.
+  <!-- Recovering from a stale page. -->
+  <script>
+    (function () {
+      var TRIED = 'games.reload.v1';
 
-      So if the app fails to load at all, clear what this device is holding and
-      try once more. Once, and only with a connection: offline, a failure means
-      something else, and throwing the caches away would take the installed app
-      with it.
-    -->
-    <script>
-      (function () {
-        var TRIED = 'games.reload.v1';
+      window.addEventListener('error', function (event) {
+        var el = event.target;
+        if (!el || (el.tagName !== 'SCRIPT' && el.tagName !== 'LINK')) return;
+        if (!navigator.onLine) return;
+        try {
+          if (sessionStorage.getItem(TRIED)) return;
+          sessionStorage.setItem(TRIED, '1');
+        } catch (e) {
+          return; // No storage means no way to stop a reload loop.
+        }
 
-        window.addEventListener('error', function (event) {
-          var el = event.target;
-          if (!el || (el.tagName !== 'SCRIPT' && el.tagName !== 'LINK')) return;
-          if (!navigator.onLine) return;
-          try {
-            if (sessionStorage.getItem(TRIED)) return;
-            sessionStorage.setItem(TRIED, '1');
-          } catch (e) {
-            return; // No storage means no way to stop a reload loop.
-          }
+        var done = function () { window.location.reload(); };
+        var caches_ = window.caches;
+        Promise.resolve()
+          .then(function () {
+            return caches_ ? caches_.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches_.delete(k); }));
+            }) : null;
+          })
+          .then(function () {
+            return navigator.serviceWorker
+              ? navigator.serviceWorker.getRegistrations().then(function (regs) {
+                return Promise.all(regs.map(function (r) { return r.unregister(); }));
+              })
+              : null;
+          })
+          .then(done, done);
+      }, true);
+    })();
+  </script>
 
-          var done = function () { window.location.reload(); };
-          var caches_ = window.caches;
-          Promise.resolve()
-            .then(function () {
-              return caches_ ? caches_.keys().then(function (keys) {
-                return Promise.all(keys.map(function (k) { return caches_.delete(k); }));
-              }) : null;
-            })
-            .then(function () {
-              return navigator.serviceWorker
-                ? navigator.serviceWorker.getRegistrations().then(function (regs) {
-                  return Promise.all(regs.map(function (r) { return r.unregister(); }));
-                })
-                : null;
-            })
-            .then(done, done);
-        }, true);
-      })();
-    </script>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
 
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
 </html>
