@@ -6,7 +6,7 @@
  * a rooms regression, and it needs no network at all.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CricketTracker } from '../cricket/CricketTracker';
 import { ScrabbleTracker } from '../scrabble/ScrabbleTracker';
@@ -164,16 +164,25 @@ describe('a host and a guest in one room', () => {
     const guestSession = room.addMember('Grace');
 
     const host = mount(room, room.hostSession, 'host');
-    mount(room, guestSession, 'guest');
+    const guest = mount(room, guestSession, 'guest');
 
     await user.click(within(host).getByRole('button', { name: 'Who is here' }));
     await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
 
     await waitFor(() => expect(room.state().members[guestSession.memberId]).toBeUndefined());
+    // The one who was removed is told so, rather than left staring at a room
+    // that has quietly stopped answering.
+    expect(within(guest).getByText(/removed you from that room/)).toBeInTheDocument();
+
     // Removing one person is not a decision about everybody else, so the door
     // is left as the host set it. Their device is what is kept out.
     expect(room.state().locked).toBe(false);
-    expect(() => room.addMember('Grace', 'her-phone')).not.toThrow();
+    // A bare join delivers its broadcast straight into the mounted host, so it
+    // has to go through act the way a click on the page would.
+    act(() => {
+      room.addMember('Grace', 'her-phone');
+    });
+    expect(players(host)).toContain('Grace 2');
   });
 
   it('keeps a removed device out for the rest of the game', async () => {
