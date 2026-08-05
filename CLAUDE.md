@@ -67,6 +67,10 @@ an opponent for darts thrown before they existed.
 
 ## Conventions
 
+- **No manual line wrapping in prose Claude writes** - PR descriptions, commit bodies, and
+  markdown files. Write paragraphs as unwrapped lines and let the rendering platform (GitHub)
+  soft-wrap them; a hard-wrapped line looks awkward once GitHub's own wrap width differs from
+  the one chosen when it was written. Code blocks, tables, and lists are unaffected.
 - **Plain hyphens.** No em or en dashes anywhere. Enforced by a test in `App.test.tsx` that
   scans the source.
 - **No emoji.** Same test. Icons come from `lucide-react`, or are purpose-drawn SVG.
