@@ -24,12 +24,7 @@ const PeekSchema = z.object({
 export type Peek = z.infer<typeof PeekSchema>;
 
 export type RoomError =
-  | 'no-room'
-  | 'room-locked'
-  | 'room-full'
-  | 'kicked-out'
-  | 'rate-limited'
-  | 'unreachable';
+  'no-room' | 'room-locked' | 'room-full' | 'kicked-out' | 'rate-limited' | 'unreachable';
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: RoomError };
 
@@ -59,9 +54,7 @@ async function post(path: string, body: unknown): Promise<Result<unknown>> {
 
 const asSession = (value: unknown): Result<StoredSession> => {
   const parsed = MembershipSchema.safeParse(value);
-  return parsed.success
-    ? { ok: true, value: parsed.data }
-    : { ok: false, error: 'unreachable' };
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false, error: 'unreachable' };
 };
 
 export async function createRoom(

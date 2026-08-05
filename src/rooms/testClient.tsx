@@ -45,8 +45,11 @@ export function mountClient(Tracker: ComponentType, options: MountOptions = {}):
   document.body.append(container);
 
   const value: RoomOverrides = {};
-  const transport = options.transport
-    ?? options.room?.transport(options.protocol === undefined ? undefined : { protocol: options.protocol });
+  const transport =
+    options.transport ??
+    options.room?.transport(
+      options.protocol === undefined ? undefined : { protocol: options.protocol },
+    );
   if (transport) value.transport = transport;
 
   if ('session' in options) value.session = options.session;
@@ -88,7 +91,9 @@ export function mountPair(
  * rather than by habit.
  */
 const rows = (client: HTMLElement = document.body): HTMLElement[] =>
-  within(client).getAllByRole('listitem').filter((li) => li.querySelector('.pts'));
+  within(client)
+    .getAllByRole('listitem')
+    .filter((li) => li.querySelector('.pts'));
 
 const text = (row: HTMLElement, selector: string): string =>
   row.querySelector(selector)?.textContent ?? '';
@@ -107,13 +112,15 @@ export const myRow = (client?: HTMLElement): HTMLElement | undefined =>
 
 /** Cricket puts its players across the top instead of down the side. */
 export const boardColumns = (client: HTMLElement): string[] =>
-  within(within(client).getByRole('table')).getAllByRole('columnheader')
+  within(within(client).getByRole('table'))
+    .getAllByRole('columnheader')
     .slice(1)
     .map((h) => h.querySelector('.name')?.textContent ?? '');
 
 /** The cricket column marked as this device's own. */
 export const myColumn = (client: HTMLElement): HTMLElement | undefined =>
-  within(within(client).getByRole('table')).getAllByRole('columnheader')
+  within(within(client).getByRole('table'))
+    .getAllByRole('columnheader')
     .find((h) => h.querySelector('.you'));
 
 /* ─────────────────────────── watching for sockets ─────────────────────────── */

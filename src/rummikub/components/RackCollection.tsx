@@ -33,7 +33,9 @@ export function RackCollection({ players, roundNumber, room, onScore }: Props) {
   return (
     <section className="card">
       <div className="card-head">
-        <h2>Round <span className="muted">#{roundNumber}</span></h2>
+        <h2>
+          Round <span className="muted">#{roundNumber}</span>
+        </h2>
         <div className="whose-turn">
           <Trophy size={14} aria-hidden="true" /> {winner?.name ?? 'Someone'} went out
         </div>
@@ -66,9 +68,7 @@ export function RackCollection({ players, roundNumber, room, onScore }: Props) {
         <>
           {missing.length > 0 && (
             <>
-              <p className="hint">
-                Anyone without a phone can be entered here.
-              </p>
+              <p className="hint">Anyone without a phone can be entered here.</p>
               {missing.map((p) => (
                 <MyRack
                   key={p.id}
@@ -98,9 +98,7 @@ export function RackCollection({ players, roundNumber, room, onScore }: Props) {
             </div>
           </div>
           {missing.length > 0 && (
-            <p className="hint">
-              Anyone still missing counts as nothing if you score it now.
-            </p>
+            <p className="hint">Anyone still missing counts as nothing if you score it now.</p>
           )}
         </>
       )}
@@ -110,7 +108,9 @@ export function RackCollection({ players, roundNumber, room, onScore }: Props) {
 
 /** One person's own rack, submittable and correctable until the round is scored. */
 function MyRack({
-  submitted, label, onSubmit,
+  submitted,
+  label,
+  onSubmit,
 }: {
   submitted?: number;
   label?: string;
@@ -160,8 +160,12 @@ function MyRack({
         onClick={() => onSubmit(total)}
         aria-label={
           submitted === undefined
-            ? (label ? `Send ${label}'s tiles` : 'Send your tiles')
-            : (label ? `Update ${label}'s tiles` : 'Update your tiles')
+            ? label
+              ? `Send ${label}'s tiles`
+              : 'Send your tiles'
+            : label
+              ? `Update ${label}'s tiles`
+              : 'Update your tiles'
         }
       >
         {submitted === undefined ? 'Send' : 'Update'}

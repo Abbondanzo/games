@@ -16,7 +16,11 @@ type User = ReturnType<typeof userEvent.setup>;
 
 function setup() {
   const user = userEvent.setup();
-  render(<Router><RummikubTracker /></Router>);
+  render(
+    <Router>
+      <RummikubTracker />
+    </Router>,
+  );
   return user;
 }
 
@@ -237,22 +241,39 @@ describe('persistence', () => {
     await playRound(user, 'Ada', { Grace: 24 });
 
     cleanup();
-    render(<Router><RummikubTracker /></Router>);
+    render(
+      <Router>
+        <RummikubTracker />
+      </Router>,
+    );
     expect(board()).toEqual(['Ada:24', 'Grace:-24']);
   });
 
   it('starts clean when the stored game is malformed', () => {
     localStorage.setItem('games.rummikub.v1', JSON.stringify({ players: [null], rounds: [] }));
-    expect(() => render(<Router><RummikubTracker /></Router>)).not.toThrow();
+    expect(() =>
+      render(
+        <Router>
+          <RummikubTracker />
+        </Router>,
+      ),
+    ).not.toThrow();
     expect(board()).toEqual([]);
   });
 
   it('drops a stored round whose winner is gone', () => {
-    localStorage.setItem('games.rummikub.v1', JSON.stringify({
-      players: [{ id: 'a', name: 'Ada' }],
-      rounds: [{ id: 'r', winnerId: 'ghost', penalties: { a: 10 } }],
-    }));
-    render(<Router><RummikubTracker /></Router>);
+    localStorage.setItem(
+      'games.rummikub.v1',
+      JSON.stringify({
+        players: [{ id: 'a', name: 'Ada' }],
+        rounds: [{ id: 'r', winnerId: 'ghost', penalties: { a: 10 } }],
+      }),
+    );
+    render(
+      <Router>
+        <RummikubTracker />
+      </Router>,
+    );
     expect(screen.getByText('No rounds played yet.')).toBeInTheDocument();
   });
 });

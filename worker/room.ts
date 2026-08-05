@@ -8,8 +8,13 @@
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
-  connect, createRoom, disconnect, handle, join,
-  type Effect, type RoomState,
+  connect,
+  createRoom,
+  disconnect,
+  handle,
+  join,
+  type Effect,
+  type RoomState,
 } from '../shared/rooms/roomCore';
 import { CLOSE, decodeClientMessage, encode, type Game } from '../shared/rooms/protocol';
 import { GAME_SETUP } from '../shared/rooms/games';
@@ -62,7 +67,8 @@ export class Room extends DurableObject {
 
   /** Live member ids, derived from the sockets rather than stored. */
   private online(): string[] {
-    return this.ctx.getWebSockets()
+    return this.ctx
+      .getWebSockets()
       .map((ws) => (ws.deserializeAttachment() as Attachment | null)?.memberId)
       .filter((id): id is string => typeof id === 'string');
   }
@@ -114,7 +120,10 @@ export class Room extends DurableObject {
     if (await this.load()) return json({ error: 'taken' }, 409);
 
     const body = (await request.json()) as {
-      code: string; game: Game; name: string; device?: unknown;
+      code: string;
+      game: Game;
+      name: string;
+      device?: unknown;
     };
     const memberId = uid();
     const token = uid();
@@ -122,7 +131,7 @@ export class Room extends DurableObject {
     const state = createRoom({
       code: body.code,
       game: body.game,
-      host: { memberId, name: body.name, deviceKey: await deviceKeyOf(body.device) ?? undefined },
+      host: { memberId, name: body.name, deviceKey: (await deviceKeyOf(body.device)) ?? undefined },
       snapshot: GAME_SETUP[body.game].initial(),
       now: Date.now(),
       apply: this.applyFor(body.game),
@@ -139,7 +148,9 @@ export class Room extends DurableObject {
     // between - which drops a member whose token has already been filed, and
     // tells them they were removed by a host who did nothing of the kind.
     const body = (await request.json()) as {
-      name: string; device?: unknown; claim?: unknown;
+      name: string;
+      device?: unknown;
+      claim?: unknown;
     };
     const deviceKey = await deviceKeyOf(body.device);
 
@@ -262,8 +273,9 @@ export class Room extends DurableObject {
     if (!state || !attachment) return;
 
     // The socket is still listed until this handler returns, so exclude it.
-    const online = this.online().filter((id, i, all) =>
-      id !== attachment.memberId || all.indexOf(id) !== i);
+    const online = this.online().filter(
+      (id, i, all) => id !== attachment.memberId || all.indexOf(id) !== i,
+    );
     this.dispatch(disconnect(state, attachment.memberId, { online, now: Date.now() }).effects);
   }
 

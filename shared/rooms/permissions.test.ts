@@ -12,7 +12,10 @@ const watching: Actor = { role: 'player', memberId: 'm3', seatId: null };
 
 /** Ada is up; Grace played the previous turn. */
 const turnGame = (currentIndex = 0): Snapshot => ({
-  players: [{ id: ada, name: 'Ada' }, { id: grace, name: 'Grace' }],
+  players: [
+    { id: ada, name: 'Ada' },
+    { id: grace, name: 'Grace' },
+  ],
   currentIndex,
   turns: [{ id: 't1', playerId: grace }],
 });
@@ -55,9 +58,38 @@ describe('reading a game state', () => {
 
 describe('the host', () => {
   const everything: Record<Game, string[]> = {
-    scrabble: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll', 'recordPlay', 'pass', 'undo'],
-    cricket: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll', 'recordTurn', 'undo'],
-    rummikub: ['addPlayers', 'removePlayer', 'movePlayer', 'recordRound', 'newGame', 'resetAll', 'undo'],
+    scrabble: [
+      'addPlayers',
+      'removePlayer',
+      'movePlayer',
+      'setCurrent',
+      'adjust',
+      'newGame',
+      'resetAll',
+      'recordPlay',
+      'pass',
+      'undo',
+    ],
+    cricket: [
+      'addPlayers',
+      'removePlayer',
+      'movePlayer',
+      'setCurrent',
+      'setVariant',
+      'newGame',
+      'resetAll',
+      'recordTurn',
+      'undo',
+    ],
+    rummikub: [
+      'addPlayers',
+      'removePlayer',
+      'movePlayer',
+      'recordRound',
+      'newGame',
+      'resetAll',
+      'undo',
+    ],
   };
 
   for (const [game, types] of Object.entries(everything) as [Game, string[]][]) {
@@ -68,8 +100,10 @@ describe('the host', () => {
 
   // Even the host cannot dispatch something no reducer would recognise.
   it('is still refused an action that does not exist', () => {
-    expect(check('cricket', turnGame(), host, 'deleteEverything'))
-      .toEqual({ ok: false, code: 'unknown-action' });
+    expect(check('cricket', turnGame(), host, 'deleteEverything')).toEqual({
+      ok: false,
+      code: 'unknown-action',
+    });
   });
 });
 
@@ -85,18 +119,36 @@ describe('a seated player', () => {
   it.each([
     ['cricket', 'recordTurn'],
     ['scrabble', 'recordPlay'],
-  ] as const)('may not %s %s on another player\'s turn', (game, type) => {
-    expect(check(game, turnGame(0), seatedGrace, type))
-      .toEqual({ ok: false, code: 'not-your-turn' });
+  ] as const)("may not %s %s on another player's turn", (game, type) => {
+    expect(check(game, turnGame(0), seatedGrace, type)).toEqual({
+      ok: false,
+      code: 'not-your-turn',
+    });
   });
 
   it.each([
-    ['scrabble', ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll']],
-    ['cricket', ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll']],
+    [
+      'scrabble',
+      ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll'],
+    ],
+    [
+      'cricket',
+      [
+        'addPlayers',
+        'removePlayer',
+        'movePlayer',
+        'setCurrent',
+        'setVariant',
+        'newGame',
+        'resetAll',
+      ],
+    ],
   ] as const)('is refused every host-only %s action', (game, types) => {
     for (const type of types) {
-      expect(check(game, turnGame(), seatedAda, type), type)
-        .toEqual({ ok: false, code: 'host-only' });
+      expect(check(game, turnGame(), seatedAda, type), type).toEqual({
+        ok: false,
+        code: 'host-only',
+      });
     }
   });
 });
@@ -108,33 +160,40 @@ describe('undoing your own turn', () => {
   });
 
   it('is refused to anyone else', () => {
-    expect(check('cricket', turnGame(), seatedAda, 'undo'))
-      .toEqual({ ok: false, code: 'not-your-turn' });
+    expect(check('cricket', turnGame(), seatedAda, 'undo')).toEqual({
+      ok: false,
+      code: 'not-your-turn',
+    });
   });
 
   it('is refused when no turn has been played', () => {
     const empty: Snapshot = { players: [{ id: ada }], currentIndex: 0, turns: [] };
-    expect(check('cricket', empty, seatedAda, 'undo'))
-      .toEqual({ ok: false, code: 'not-your-turn' });
+    expect(check('cricket', empty, seatedAda, 'undo')).toEqual({
+      ok: false,
+      code: 'not-your-turn',
+    });
   });
 
   // Rummikub rounds are collective, so there is no "your" round to take back.
   it('is host-only in Rummikub', () => {
     const state: Snapshot = { players: [{ id: ada }], rounds: [] };
-    expect(check('rummikub', state, seatedAda, 'undo'))
-      .toEqual({ ok: false, code: 'host-only' });
+    expect(check('rummikub', state, seatedAda, 'undo')).toEqual({ ok: false, code: 'host-only' });
   });
 });
 
 describe('someone just watching', () => {
   it.each(['recordTurn', 'undo'])('may not %s', (type) => {
-    expect(check('cricket', turnGame(), watching, type))
-      .toEqual({ ok: false, code: 'not-your-seat' });
+    expect(check('cricket', turnGame(), watching, type)).toEqual({
+      ok: false,
+      code: 'not-your-seat',
+    });
   });
 
   it('may not touch host controls either', () => {
-    expect(check('cricket', turnGame(), watching, 'newGame'))
-      .toEqual({ ok: false, code: 'host-only' });
+    expect(check('cricket', turnGame(), watching, 'newGame')).toEqual({
+      ok: false,
+      code: 'host-only',
+    });
   });
 });
 
@@ -144,8 +203,10 @@ describe('Rummikub guests', () => {
   // Rounds record everyone's rack at once, so they belong to the host. Guests
   // take part by submitting their own rack, which is room state, not an action.
   it('cannot record a round even when seated', () => {
-    expect(check('rummikub', state, seatedAda, 'recordRound'))
-      .toEqual({ ok: false, code: 'host-only' });
+    expect(check('rummikub', state, seatedAda, 'recordRound')).toEqual({
+      ok: false,
+      code: 'host-only',
+    });
   });
 });
 

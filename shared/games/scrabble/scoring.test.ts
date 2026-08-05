@@ -28,8 +28,16 @@ describe('scoreTiles', () => {
   const cases: [string, number, number][] = [
     ['QUIZ, no bonuses', scoreTiles(tiles('QUIZ'), 1), 22],
     ['CAT on a double word', scoreTiles(tiles('CAT'), 2), 10],
-    ['ZEBRA with Z on a triple letter, double word', scoreTiles(tiles('ZEBRA', { 0: { lm: 3 } }), 2), 72],
-    ['JAZZY, J on double letter, two double words', scoreTiles(tiles('JAZZY', { 0: { lm: 2 } }), 4), 164],
+    [
+      'ZEBRA with Z on a triple letter, double word',
+      scoreTiles(tiles('ZEBRA', { 0: { lm: 3 } }), 2),
+      72,
+    ],
+    [
+      'JAZZY, J on double letter, two double words',
+      scoreTiles(tiles('JAZZY', { 0: { lm: 2 } }), 4),
+      164,
+    ],
   ];
 
   it.each(cases)('%s = %i', (_name, got, want) => {
@@ -126,9 +134,17 @@ describe('cycleTile', () => {
 });
 
 describe('standings', () => {
-  const players = [{ id: 'a', name: 'Ada' }, { id: 'b', name: 'Grace' }];
+  const players = [
+    { id: 'a', name: 'Ada' },
+    { id: 'b', name: 'Grace' },
+  ];
   const turn = (playerId: string, points: number, kind: Turn['kind'] = 'play'): Turn => ({
-    id: `${playerId}-${points}`, playerId, kind, words: ['X'], bingo: false, points,
+    id: `${playerId}-${points}`,
+    playerId,
+    kind,
+    words: ['X'],
+    bingo: false,
+    points,
   });
 
   it('ranks by score and averages only over scoring plays', () => {

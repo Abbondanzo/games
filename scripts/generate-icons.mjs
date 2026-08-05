@@ -31,7 +31,10 @@ const TROPHY = `
  * @param {number} opts.radius  Corner radius on the 32 grid. 0 is full bleed.
  * @param {number} opts.scale   Trophy scale about the centre, for mask safe zones.
  */
-const icon = ({ radius = 7, scale = 1 } = {}) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+const icon = ({
+  radius = 7,
+  scale = 1,
+} = {}) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <rect width="32" height="32" rx="${radius}" fill="${ACCENT}"/>
   <g transform="translate(16 16) scale(${scale}) translate(-16 -16)">${TROPHY}
   </g>

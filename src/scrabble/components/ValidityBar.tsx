@@ -23,7 +23,9 @@ export function ValidityBar({ view }: { view: LookupView }) {
     return (
       <div className="validity error" role="status">
         <TriangleAlert {...ICON_PROPS} />
-        <span><b>Couldn’t check {view.word}.</b> {view.message}</span>
+        <span>
+          <b>Couldn’t check {view.word}.</b> {view.message}
+        </span>
       </div>
     );
   }
@@ -32,7 +34,9 @@ export function ValidityBar({ view }: { view: LookupView }) {
     return (
       <div className="validity invalid" role="status">
         <CircleX {...ICON_PROPS} />
-        <span><span className="word">{view.word}</span> is not in the dictionary.</span>
+        <span>
+          <span className="word">{view.word}</span> is not in the dictionary.
+        </span>
       </div>
     );
   }
@@ -40,7 +44,9 @@ export function ValidityBar({ view }: { view: LookupView }) {
   return (
     <div className="validity valid" role="status">
       <CircleCheck {...ICON_PROPS} />
-      <span><span className="word">{view.word}</span> is a valid word. {view.detail}</span>
+      <span>
+        <span className="word">{view.word}</span> is a valid word. {view.detail}
+      </span>
     </div>
   );
 }

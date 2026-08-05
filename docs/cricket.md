@@ -19,11 +19,11 @@ one, a cross for two, a ringed cross for closed.
 
 ## Modes
 
-| Mode | Points go to | Winner |
-| --- | --- | --- |
-| Standard | The thrower | Closed out with the highest score |
-| Cut-throat | Every opponent who has not closed that target | Closed out with the lowest score |
-| No points | Nobody, scoring is off | First to close all seven targets |
+| Mode       | Points go to                                  | Winner                            |
+| ---------- | --------------------------------------------- | --------------------------------- |
+| Standard   | The thrower                                   | Closed out with the highest score |
+| Cut-throat | Every opponent who has not closed that target | Closed out with the lowest score  |
+| No points  | Nobody, scoring is off                        | First to close all seven targets  |
 
 **No points** turns the game into a pure race to close out. Surplus marks past three do nothing,
 the footer row counts total marks instead of points, and the throw preview drops the points

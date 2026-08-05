@@ -39,8 +39,7 @@ describe('web app manifest', () => {
 
   it('points only at files that exist', () => {
     for (const icon of manifest.icons) {
-      expect(existsSync(resolve(process.cwd(), 'public', icon.src.replace(/^\//, ''))))
-        .toBe(true);
+      expect(existsSync(resolve(process.cwd(), 'public', icon.src.replace(/^\//, '')))).toBe(true);
     }
   });
 });

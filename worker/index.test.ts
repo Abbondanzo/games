@@ -32,19 +32,21 @@ describe('the health endpoint', () => {
 
   /** The useful part: whether this room can talk to a given client at all. */
   it('says which protocol it speaks', async () => {
-    const body = await (await call('/health')).json() as { protocol: number };
+    const body = (await (await call('/health')).json()) as { protocol: number };
     expect(body.protocol).toBe(PROTOCOL_VERSION);
   });
 
   it('says which games it can run', async () => {
-    const body = await (await call('/health')).json() as { games: string[] };
+    const body = (await (await call('/health')).json()) as { games: string[] };
     expect(body.games).toEqual([...GAMES]);
   });
 
   it('names the upload behind it when the platform says', async () => {
     const version = { id: 'abc123', tag: 'deadbeef', timestamp: '2026-08-04T00:00:00Z' };
-    const body = await (await call('/health', undefined, { VERSION: version })).json() as {
-      version: string; commit: string; uploadedAt: string;
+    const body = (await (await call('/health', undefined, { VERSION: version })).json()) as {
+      version: string;
+      commit: string;
+      uploadedAt: string;
     };
     expect(body).toMatchObject({
       version: 'abc123',
@@ -55,7 +57,7 @@ describe('the health endpoint', () => {
 
   // Absent when running locally, and that should read as unknown, not crash.
   it('says nothing rather than failing when it is not told', async () => {
-    const body = await (await call('/health')).json() as { version: null; commit: null };
+    const body = (await (await call('/health')).json()) as { version: null; commit: null };
     expect(body).toMatchObject({ version: null, commit: null });
   });
 
@@ -197,9 +199,10 @@ describe('the create body', () => {
  * the client needs to know - so the limit is the defence.
  */
 describe('rate limiting', () => {
-  const refusing = (): Env => env({
-    JOIN_LIMIT: { limit: async () => ({ success: false }) },
-  } as Partial<Env>);
+  const refusing = (): Env =>
+    env({
+      JOIN_LIMIT: { limit: async () => ({ success: false }) },
+    } as Partial<Env>);
 
   it.each([
     ['creating a room', '/rooms', 'POST'],

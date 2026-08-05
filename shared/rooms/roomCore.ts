@@ -10,7 +10,16 @@
  * level up: protocol lives in plain functions.
  */
 import type {
-  Cause, ErrorCode, Game, GameAction, Member, PendingRound, Role, RoomView, ServerMessage, Snapshot,
+  Cause,
+  ErrorCode,
+  Game,
+  GameAction,
+  Member,
+  PendingRound,
+  Role,
+  RoomView,
+  ServerMessage,
+  Snapshot,
 } from './protocol';
 import { PROTOCOL_VERSION } from './protocol';
 import type { ClientMessage } from './protocol';
@@ -112,7 +121,13 @@ export type ApplyAction<S> = (state: S, action: GameAction) => S | null;
 const alsoTellHost = <S extends Snapshot>(state: RoomState<S>, ctx: Context): Effect[] => {
   const host = Object.values(state.members).find((m) => m.role === 'host');
   return host
-    ? [{ to: 'member', memberId: host.memberId, message: { t: 'room', room: roomView(state, ctx, true) } }]
+    ? [
+        {
+          to: 'member',
+          memberId: host.memberId,
+          message: { t: 'room', room: roomView(state, ctx, true) },
+        },
+      ]
     : [];
 };
 
@@ -258,9 +273,7 @@ export function createRoom<S extends Snapshot>(input: {
     locked: false,
     // So a host who hands the room over and leaves can come back to their own
     // player, exactly as anybody else does.
-    devices: input.host.deviceKey && seated.seatId
-      ? { [input.host.deviceKey]: seated.seatId }
-      : {},
+    devices: input.host.deviceKey && seated.seatId ? { [input.host.deviceKey]: seated.seatId } : {},
     everHeld: seated.seatId ? [seated.seatId] : [],
     pending: null,
     lastActiveAt: input.now,
@@ -326,8 +339,9 @@ export function join<S extends Snapshot>(
    * reconnect - which was both a "Grace 2" on the board and, eleven taps later,
    * a full room.
    */
-  const stale = Object.values(state.members)
-    .find((m) => input.deviceKey && m.deviceKey === input.deviceKey);
+  const stale = Object.values(state.members).find(
+    (m) => input.deviceKey && m.deviceKey === input.deviceKey,
+  );
 
   const others = stale
     ? Object.fromEntries(Object.entries(state.members).filter(([id]) => id !== stale.memberId))
@@ -349,9 +363,8 @@ export function join<S extends Snapshot>(
    * than a fact: the player has to still exist and be free.
    */
   const held = input.deviceKey ? devices[input.deviceKey] : undefined;
-  const mine = held && !claimed.has(held)
-    ? playersIn(state.snapshot).find((p) => p.id === held)
-    : undefined;
+  const mine =
+    held && !claimed.has(held) ? playersIn(state.snapshot).find((p) => p.id === held) : undefined;
 
   /**
    * Or a row the host typed out in advance, which this joiner says is them.
@@ -362,9 +375,8 @@ export function join<S extends Snapshot>(
    * player away from a device that already answers for one, which is what
    * `claimable` is for.
    */
-  const claiming = !mine && input.claim
-    ? claimable(state).find((p) => p.id === input.claim)
-    : undefined;
+  const claiming =
+    !mine && input.claim ? claimable(state).find((p) => p.id === input.claim) : undefined;
 
   const taking = mine ?? claiming;
   const seated = taking
@@ -400,14 +412,14 @@ export function join<S extends Snapshot>(
     members: { ...others, [input.memberId]: member },
     // Remembered whichever way they were seated, so the next time they arrive
     // is a return rather than another new player.
-    devices: input.deviceKey && seated.seatId
-      ? { ...devices, [input.deviceKey]: seated.seatId }
-      : devices,
+    devices:
+      input.deviceKey && seated.seatId ? { ...devices, [input.deviceKey]: seated.seatId } : devices,
     // And remembered whether or not a device key came with it, so the player
     // never falls back into the claimable list once somebody has had it.
-    everHeld: seated.seatId && !(state.everHeld ?? []).includes(seated.seatId)
-      ? [...(state.everHeld ?? []), seated.seatId]
-      : state.everHeld,
+    everHeld:
+      seated.seatId && !(state.everHeld ?? []).includes(seated.seatId)
+        ? [...(state.everHeld ?? []), seated.seatId]
+        : state.everHeld,
     lastActiveAt: input.now,
   };
 
@@ -416,7 +428,12 @@ export function join<S extends Snapshot>(
   const effects: Effect[] = [
     ...(stale ? [{ to: 'close' as const, memberId: stale.memberId }] : []),
     ...(added
-      ? [{ to: 'all' as const, message: { t: 'state' as const, rev: next.rev, state: seated.snapshot, cause: null } }]
+      ? [
+          {
+            to: 'all' as const,
+            message: { t: 'state' as const, rev: next.rev, state: seated.snapshot, cause: null },
+          },
+        ]
       : []),
   ];
 
@@ -523,13 +540,19 @@ export function handle<S extends Snapshot>(
         [memberId]: { ...member, name: message.name },
       };
       const next = { ...touched, members };
-      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+      return {
+        state: next,
+        effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }],
+      };
     }
 
     case 'lock': {
       if (member.role !== 'host') return fail(touched, memberId, null, 'host-only');
       const next = { ...touched, locked: message.locked };
-      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+      return {
+        state: next,
+        effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }],
+      };
     }
 
     case 'kick':
@@ -577,7 +600,10 @@ export function handle<S extends Snapshot>(
         return fail(touched, memberId, message.reqId, 'not-your-seat');
       }
       const next = { ...touched, pending: { winnerId: message.winnerId, racks: {} } };
-      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+      return {
+        state: next,
+        effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }],
+      };
     }
 
     case 'rackSubmit': {
@@ -597,7 +623,10 @@ export function handle<S extends Snapshot>(
           racks: { ...touched.pending.racks, [message.seatId]: message.total },
         },
       };
-      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+      return {
+        state: next,
+        effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }],
+      };
     }
 
     /**
@@ -658,7 +687,10 @@ export function handle<S extends Snapshot>(
     case 'roundCancel': {
       if (member.role !== 'host') return fail(touched, memberId, message.reqId, 'host-only');
       const next = { ...touched, pending: null };
-      return { state: next, effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }] };
+      return {
+        state: next,
+        effects: [{ to: 'all', message: { t: 'room', room: roomView(next, ctx) } }],
+      };
     }
 
     default:
@@ -683,8 +715,16 @@ function handleAction<S extends Snapshot>(
     return {
       state,
       effects: [
-        { to: 'member', memberId: member.memberId, message: { t: 'error', reqId: message.reqId, code: 'stale-rev' } },
-        { to: 'member', memberId: member.memberId, message: { t: 'state', rev: state.rev, state: state.snapshot, cause: null } },
+        {
+          to: 'member',
+          memberId: member.memberId,
+          message: { t: 'error', reqId: message.reqId, code: 'stale-rev' },
+        },
+        {
+          to: 'member',
+          memberId: member.memberId,
+          message: { t: 'state', rev: state.rev, state: state.snapshot, cause: null },
+        },
       ],
     };
   }
@@ -702,7 +742,10 @@ function handleAction<S extends Snapshot>(
   // empty word, an undo with no history. Nothing changed, so nothing to say.
   if (snapshot === state.snapshot) {
     return {
-      state: { ...state, members: { ...state.members, [member.memberId]: remember(member, message.reqId) } },
+      state: {
+        ...state,
+        members: { ...state.members, [member.memberId]: remember(member, message.reqId) },
+      },
       effects: [],
     };
   }
@@ -809,5 +852,6 @@ const membersChanged = (
   before: Record<string, StoredMember>,
   after: Record<string, StoredMember>,
 ): boolean =>
-  Object.keys(after).some((id) =>
-    before[id]?.seatId !== after[id]?.seatId || before[id]?.name !== after[id]?.name);
+  Object.keys(after).some(
+    (id) => before[id]?.seatId !== after[id]?.seatId || before[id]?.name !== after[id]?.name,
+  );

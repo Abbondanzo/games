@@ -23,7 +23,11 @@ export function OpenRound({ players, roundNumber, room }: Props) {
   if (room.role !== 'host') {
     return (
       <section className="card">
-        <div className="card-head"><h2>Round <span className="muted">#{roundNumber}</span></h2></div>
+        <div className="card-head">
+          <h2>
+            Round <span className="muted">#{roundNumber}</span>
+          </h2>
+        </div>
         <p className="muted">Waiting for the host to say who went out.</p>
       </section>
     );
@@ -39,7 +43,11 @@ export function OpenRound({ players, roundNumber, room }: Props) {
 
   return (
     <section className="card">
-      <div className="card-head"><h2>Round <span className="muted">#{roundNumber}</span></h2></div>
+      <div className="card-head">
+        <h2>
+          Round <span className="muted">#{roundNumber}</span>
+        </h2>
+      </div>
 
       <WinnerPick players={players} value={winnerId} onPick={setWinnerId} />
 

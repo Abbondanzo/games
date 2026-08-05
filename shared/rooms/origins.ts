@@ -43,4 +43,9 @@ export function isAllowedOrigin(origin: string, patterns: readonly string[]): bo
 }
 
 export const parseOrigins = (value: string | undefined, fallback: readonly string[]): string[] =>
-  value ? value.split(',').map((o) => o.trim()).filter(Boolean) : [...fallback];
+  value
+    ? value
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+    : [...fallback];

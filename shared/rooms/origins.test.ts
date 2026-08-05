@@ -11,13 +11,12 @@ const ALLOWED = [
 const allows = (origin: string) => isAllowedOrigin(origin, ALLOWED);
 
 describe('exact origins', () => {
-  it.each([
-    'https://games.abbondanzo.com',
-    'https://games-ccu.pages.dev',
-    'http://localhost:5173',
-  ])('allows %s', (origin) => {
-    expect(allows(origin)).toBe(true);
-  });
+  it.each(['https://games.abbondanzo.com', 'https://games-ccu.pages.dev', 'http://localhost:5173'])(
+    'allows %s',
+    (origin) => {
+      expect(allows(origin)).toBe(true);
+    },
+  );
 
   it.each([
     ['a different site', 'https://evil.example'],

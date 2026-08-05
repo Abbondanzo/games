@@ -41,8 +41,7 @@ export interface SeatView {
 const PlayerListSchema = z.array(z.object({ id: z.string() })).catch([]);
 const EntryListSchema = z.array(z.object({ playerId: z.string() })).catch([]);
 
-const idsOf = (value: unknown): string[] =>
-  PlayerListSchema.parse(value).map((p) => p.id);
+const idsOf = (value: unknown): string[] => PlayerListSchema.parse(value).map((p) => p.id);
 
 const lastEntryPlayer = (value: unknown): string | null =>
   EntryListSchema.parse(value).at(-1)?.playerId ?? null;
@@ -76,9 +75,33 @@ export const seatView: Record<Game, (state: Snapshot) => SeatView> = {
  * arbitrary points, the other rescores everybody.
  */
 const HOST_ONLY: Record<Game, readonly string[]> = {
-  scrabble: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'adjust', 'newGame', 'resetAll'],
-  cricket: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'setVariant', 'newGame', 'resetAll'],
-  rummikub: ['addPlayers', 'removePlayer', 'movePlayer', 'recordRound', 'newGame', 'resetAll', 'undo'],
+  scrabble: [
+    'addPlayers',
+    'removePlayer',
+    'movePlayer',
+    'setCurrent',
+    'adjust',
+    'newGame',
+    'resetAll',
+  ],
+  cricket: [
+    'addPlayers',
+    'removePlayer',
+    'movePlayer',
+    'setCurrent',
+    'setVariant',
+    'newGame',
+    'resetAll',
+  ],
+  rummikub: [
+    'addPlayers',
+    'removePlayer',
+    'movePlayer',
+    'recordRound',
+    'newGame',
+    'resetAll',
+    'undo',
+  ],
 };
 
 /** Actions a seated player may take, but only when it is their turn. */
@@ -95,12 +118,7 @@ const ON_YOUR_TURN: Record<Game, readonly string[]> = {
  */
 const SELF_UNDO: Record<Game, boolean> = { scrabble: true, cricket: true, rummikub: false };
 
-export function permit(
-  game: Game,
-  view: SeatView,
-  actor: Actor,
-  action: GameAction,
-): Permission {
+export function permit(game: Game, view: SeatView, actor: Actor, action: GameAction): Permission {
   const type = action.type;
 
   // The host runs the room, including entering for anyone who has not joined.
@@ -131,10 +149,10 @@ export function permit(
 }
 
 const known = (game: Game, type: string): boolean =>
-  HOST_ONLY[game].includes(type)
-  || ON_YOUR_TURN[game].includes(type)
-  || type === 'renamePlayer'
-  || (type === 'undo' && SELF_UNDO[game]);
+  HOST_ONLY[game].includes(type) ||
+  ON_YOUR_TURN[game].includes(type) ||
+  type === 'renamePlayer' ||
+  (type === 'undo' && SELF_UNDO[game]);
 
 /** Convenience for the UI: may this actor take this kind of action right now? */
 export const can = (game: Game, view: SeatView, actor: Actor, type: string): boolean =>

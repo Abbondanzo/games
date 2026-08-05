@@ -70,11 +70,12 @@ describe('applying', () => {
     return () => `id-${n++}`;
   };
 
-  it('runs the real reducer with the room\'s own id source', () => {
+  it("runs the real reducer with the room's own id source", () => {
     const apply = cricketApply(uid());
     const state = apply(cricketInitialState(), { type: 'addPlayers', names: 'Ada' });
-    expect(CricketStateSchema.parse(state).players)
-      .toEqual([{ id: 'id-0', name: 'Ada', joinedAtTurn: 0 }]);
+    expect(CricketStateSchema.parse(state).players).toEqual([
+      { id: 'id-0', name: 'Ada', joinedAtTurn: 0 },
+    ]);
   });
 
   it('returns null rather than throwing on a bad payload', () => {

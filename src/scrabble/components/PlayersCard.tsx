@@ -22,8 +22,16 @@ interface Props {
 }
 
 export function PlayersCard({
-  players, turns, currentPlayerId, onAdd, onRemove, onSelect, onMove,
-  editable = true, selectable = true, youId = null,
+  players,
+  turns,
+  currentPlayerId,
+  onAdd,
+  onRemove,
+  onSelect,
+  onMove,
+  editable = true,
+  selectable = true,
+  youId = null,
 }: Props) {
   const rows = standings(players, turns);
   const best = rows.length ? Math.max(...rows.map((r) => r.score)) : 0;
@@ -65,10 +73,11 @@ export function PlayersCard({
           return (
             <li
               key={row.player.id}
-              className={[
-                row.player.id === currentPlayerId ? 'active' : '',
-                isYou ? 'mine' : '',
-              ].filter(Boolean).join(' ') || undefined}
+              className={
+                [row.player.id === currentPlayerId ? 'active' : '', isYou ? 'mine' : '']
+                  .filter(Boolean)
+                  .join(' ') || undefined
+              }
             >
               {selectable ? (
                 <button

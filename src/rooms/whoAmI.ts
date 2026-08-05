@@ -22,7 +22,7 @@ export const isHost = (room: RoomHandle | null): boolean => !room || room.role =
 export const mySeat = <P extends Named>(
   room: RoomHandle | null,
   players: readonly P[],
-): P | null => (room?.seatId ? players.find((p) => p.id === room.seatId) ?? null : null);
+): P | null => (room?.seatId ? (players.find((p) => p.id === room.seatId) ?? null) : null);
 
 export const myName = <P extends Named>(
   room: RoomHandle | null,
@@ -46,7 +46,7 @@ export const isMyTurn = (
  * this action, or it is still waiting on the last one. Never closed when alone.
  */
 export const blocked = (room: RoomHandle | null, actionType: string): boolean =>
-  (room ? !room.can(actionType) || room.sending : false);
+  room ? !room.can(actionType) || room.sending : false;
 
 /**
  * Whether to offer a control at all. Where `blocked` disables, this hides: for
@@ -54,7 +54,7 @@ export const blocked = (room: RoomHandle | null, actionType: string): boolean =>
  * ever refuses is worse than no button.
  */
 export const allowed = (room: RoomHandle | null, actionType: string): boolean =>
-  (room ? room.can(actionType) : true);
+  room ? room.can(actionType) : true;
 
 /** Every game has this action, and it is the only rename a guest may make. */
 interface RenameAction {
@@ -64,9 +64,8 @@ interface RenameAction {
 }
 
 /** Renaming yourself, wired to whichever seat this device holds. */
-export const renameSelf = (
-  room: RoomHandle | null,
-  dispatch: (action: RenameAction) => void,
-) => (name: string): void => {
-  if (room?.seatId) dispatch({ type: 'renamePlayer', id: room.seatId, name });
-};
+export const renameSelf =
+  (room: RoomHandle | null, dispatch: (action: RenameAction) => void) =>
+  (name: string): void => {
+    if (room?.seatId) dispatch({ type: 'renamePlayer', id: room.seatId, name });
+  };

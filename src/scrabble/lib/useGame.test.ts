@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { initialState, reducer, type Action } from './useGame';
 import type { GameState } from '@shared/games/scrabble/types';
 
-const run = (state: GameState, ...actions: Action[]): GameState =>
-  actions.reduce(reducer, state);
+const run = (state: GameState, ...actions: Action[]): GameState => actions.reduce(reducer, state);
 
 const withPlayers = (): GameState =>
   run(initialState, { type: 'addPlayers', names: 'Ada, Grace, Alan' });
 
 const play = (points: number): Action => ({
-  type: 'recordPlay', words: [{ word: 'WORD', points }], bingo: false,
+  type: 'recordPlay',
+  words: [{ word: 'WORD', points }],
+  bingo: false,
 });
 
 const names = (s: GameState) => s.players.map((p) => p.name);
@@ -91,7 +92,10 @@ describe('scoring a play', () => {
   it('sums banked words and adds the bingo bonus', () => {
     const state = run(withPlayers(), {
       type: 'recordPlay',
-      words: [{ word: 'QUIZ', points: 22 }, { word: 'CAT', points: 5 }],
+      words: [
+        { word: 'QUIZ', points: 22 },
+        { word: 'CAT', points: 5 },
+      ],
       bingo: true,
     });
     expect(state.turns[0]).toMatchObject({ points: 77, words: ['QUIZ', 'CAT'], bingo: true });
@@ -136,9 +140,11 @@ describe('undo', () => {
 
   it('does not step the turn back for an adjustment', () => {
     const start = run(withPlayers(), play(20));
-    const after = run(start,
+    const after = run(
+      start,
       { type: 'adjust', playerId: start.players[0]!.id, points: -5 },
-      { type: 'undo' });
+      { type: 'undo' },
+    );
     expect(after.turns).toHaveLength(1);
     expect(current(after)).toBe('Grace');
   });
@@ -151,9 +157,11 @@ describe('undo', () => {
   // changed after the turn was recorded.
   it('hands the turn back to whoever played it', () => {
     const start = run(withPlayers(), play(20)); // Ada played, Grace is up
-    const after = run(start,
+    const after = run(
+      start,
       { type: 'setCurrent', id: start.players[0]!.id }, // hand it back to Ada
-      { type: 'undo' });
+      { type: 'undo' },
+    );
     expect(current(after)).toBe('Ada');
   });
 });
@@ -176,8 +184,13 @@ describe('reset all', () => {
   });
 
   it('leaves a fresh game usable', () => {
-    const state = run(withPlayers(), play(20), { type: 'resetAll' },
-      { type: 'addPlayers', names: 'Kay' }, play(12));
+    const state = run(
+      withPlayers(),
+      play(20),
+      { type: 'resetAll' },
+      { type: 'addPlayers', names: 'Kay' },
+      play(12),
+    );
     expect(names(state)).toEqual(['Kay']);
     expect(state.turns).toHaveLength(1);
   });

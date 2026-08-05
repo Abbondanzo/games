@@ -69,21 +69,22 @@ room and not being connected.
 
 So the room accepts the socket purely in order to close it with a code:
 
-| Code | Meaning | What the device does |
-| --- | --- | --- |
-| 4001 | The token is not one this room knows | Forgets the room |
-| 4002 | Closed by the host, or expired | Forgets the room |
-| 4003 | Removed by the host | Forgets the room |
-| anything else | Unexplained | Retries, with backoff |
+| Code          | Meaning                              | What the device does  |
+| ------------- | ------------------------------------ | --------------------- |
+| 4001          | The token is not one this room knows | Forgets the room      |
+| 4002          | Closed by the host, or expired       | Forgets the room      |
+| 4003          | Removed by the host                  | Forgets the room      |
+| anything else | Unexplained                          | Retries, with backoff |
 
-Forgetting means clearing the stored session, so the *next* visit opens no
+Forgetting means clearing the stored session, so the _next_ visit opens no
 socket at all. The host keeps the game that was in the room, since it was theirs
 before they shared it; everyone else gets their own saved game back.
 
 Retrying also gives up after about a minute. Not every refusal can be explained
+
 - a room deployed before these codes existed still turns the upgrade away with
-nothing readable on it - so the loop needs an end of its own. Returning to the
-tab, or the network coming back, starts it again.
+  nothing readable on it - so the loop needs an end of its own. Returning to the
+  tab, or the network coming back, starts it again.
 
 ## How it works
 
@@ -159,7 +160,7 @@ that is about telling rows apart, not people.
 
 **Claiming a row the host laid out.** Hosts often set the table up before anyone
 arrives, typing everybody in, and those rows are there to be taken. Looking the
-code up happens as soon as it is complete, so the question comes *before* the
+code up happens as soon as it is complete, so the question comes _before_ the
 name field - by the time you have typed a name you have already made a second
 player.
 
@@ -257,8 +258,8 @@ secrets and does not deploy.
 **Deploy the Worker before the client.** The two deploy independently and the
 app is precached by a service worker, so a client can be weeks old.
 
-Only *server-to-client* additions are safe, because an old client ignores a
-frame it cannot read. Adding a *client-to-server* message is not: an old room
+Only _server-to-client_ additions are safe, because an old client ignores a
+frame it cannot read. Adding a _client-to-server_ message is not: an old room
 rejects a frame it has never heard of, and the player just sees a button that
 does nothing useful. Bump `PROTOCOL_VERSION` whenever one side gains something
 the other cannot understand, including that case - the client compares it
@@ -290,5 +291,5 @@ Not covered by tests, so worth a manual pass after changing the Worker:
 6. Turn off Wi-Fi mid-game and confirm it reconnects.
 7. Close a room, then open that game again on a device that was in it. It should
    say the room has ended, once, and open no socket.
-7. Stop the Worker entirely and confirm solo play on all three games is
+8. Stop the Worker entirely and confirm solo play on all three games is
    completely unaffected.

@@ -33,12 +33,12 @@ both so the room runs the same scoring code the app does.
 It is connected to the repo through Cloudflare's Workers Builds, which works the way the Pages
 integration does:
 
-| Setting | Value |
-| --- | --- |
-| Build command | `pnpm install --frozen-lockfile` |
-| Deploy command | `pnpm worker:deploy` |
-| Root directory | the repo root, where `wrangler.toml` is |
-| Non-production branches | build, and **do not** deploy |
+| Setting                 | Value                                   |
+| ----------------------- | --------------------------------------- |
+| Build command           | `pnpm install --frozen-lockfile`        |
+| Deploy command          | `pnpm worker:deploy`                    |
+| Root directory          | the repo root, where `wrangler.toml` is |
+| Non-production branches | build, and **do not** deploy            |
 
 The install step is needed because the Worker bundles zod and the shared library. Connecting it
 keeps API tokens out of the repo, which the GitHub Actions route would not.
@@ -55,11 +55,11 @@ up in [rooms.md](rooms.md) so they are not tried a third time.
 Cloudflare Pages gives every pull request a preview, but there is no matching preview of the
 room server. A preview build talks to **production**:
 
-| Client | Room server |
-| --- | --- |
-| the live site | `games-rooms` |
-| a pull request preview | `games-rooms` |
-| local dev | `games-rooms`, unless `VITE_ROOMS_URL` says otherwise |
+| Client                 | Room server                                           |
+| ---------------------- | ----------------------------------------------------- |
+| the live site          | `games-rooms`                                         |
+| a pull request preview | `games-rooms`                                         |
+| local dev              | `games-rooms`, unless `VITE_ROOMS_URL` says otherwise |
 
 That is a deliberate trade rather than an oversight. A second room server means a second Workers
 Builds project and a second build on every push, which doubles the spend against the free tier
@@ -101,8 +101,14 @@ curl https://games-rooms-preview.abbondanzo.workers.dev/health
 ```
 
 ```json
-{ "ok": true, "protocol": 5, "games": ["scrabble", "cricket", "rummikub"],
-  "version": "...", "commit": "...", "uploadedAt": "..." }
+{
+  "ok": true,
+  "protocol": 5,
+  "games": ["scrabble", "cricket", "rummikub"],
+  "version": "...",
+  "commit": "...",
+  "uploadedAt": "..."
+}
 ```
 
 Every other route needs a room code, so without this an address that was never deployed and one
@@ -141,8 +147,7 @@ Three things address it, and they are worth keeping together:
   with it. `main.tsx` clears the guard on boot, so a later failure can try again.
 
 **Worth checking in the dashboard:** if the Pages project has single-page-app
-handling turned on, a missing file returns `index.html` with a 200 rather than a
-404. This app routes on the hash, so every real route is `/` and it needs no
+handling turned on, a missing file returns `index.html` with a 200 rather than a 404. This app routes on the hash, so every real route is `/` and it needs no
 such fallback. Turning it off makes a missing file fail as a missing file.
 
 ## Toolchain

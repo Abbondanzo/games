@@ -17,8 +17,12 @@ export interface RoomOverrides {
 
 const RoomContext = createContext<RoomOverrides>({});
 
-export const RoomProvider = ({ value, children }: { value: RoomOverrides; children: ReactNode }) => (
-  <RoomContext.Provider value={value}>{children}</RoomContext.Provider>
-);
+export const RoomProvider = ({
+  value,
+  children,
+}: {
+  value: RoomOverrides;
+  children: ReactNode;
+}) => <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;
 
 export const useRoomOverrides = (): RoomOverrides => useContext(RoomContext);

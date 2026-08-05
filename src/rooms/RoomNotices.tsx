@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { GONE_MESSAGES, describeError, type ErrorCode, type GoneReason } from '@shared/rooms/protocol';
+import {
+  GONE_MESSAGES,
+  describeError,
+  type ErrorCode,
+  type GoneReason,
+} from '@shared/rooms/protocol';
 
 /**
  * The two things a room needs to say for itself: that it refused something, and
@@ -21,7 +26,9 @@ export function RoomNotices({ lastError, gone }: Props) {
   return (
     <>
       {lastError && (
-        <div className="banner warn" role="status">{describeError(lastError)}</div>
+        <div className="banner warn" role="status">
+          {describeError(lastError)}
+        </div>
       )}
 
       {gone && dismissed !== gone && (

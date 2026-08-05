@@ -21,15 +21,17 @@ export type Action =
   | { type: 'renamePlayer'; id: string; name: string }
   | { type: 'resetAll' };
 
-const nextIndex = (state: GameState): number =>
-  advance(state.currentIndex, state.players.length);
+const nextIndex = (state: GameState): number => advance(state.currentIndex, state.players.length);
 
 function apply(state: GameState, action: Action, uid: IdSource): GameState {
   switch (action.type) {
     case 'addPlayers': {
       const names = parseNames(action.names);
       if (!names.length) return state;
-      return { ...state, players: [...state.players, ...names.map((name) => ({ id: uid(), name }))] };
+      return {
+        ...state,
+        players: [...state.players, ...names.map((name) => ({ id: uid(), name }))],
+      };
     }
 
     case 'removePlayer': {
@@ -79,15 +81,26 @@ function apply(state: GameState, action: Action, uid: IdSource): GameState {
     case 'pass': {
       const player = state.players[state.currentIndex];
       if (!player) return state;
-      const turn: Turn = { id: uid(), playerId: player.id, kind: 'pass', words: [], bingo: false, points: 0 };
+      const turn: Turn = {
+        id: uid(),
+        playerId: player.id,
+        kind: 'pass',
+        words: [],
+        bingo: false,
+        points: 0,
+      };
       return { ...state, turns: [...state.turns, turn], currentIndex: nextIndex(state) };
     }
 
     case 'adjust': {
       if (!action.points || !state.players.some((p) => p.id === action.playerId)) return state;
       const turn: Turn = {
-        id: uid(), playerId: action.playerId, kind: 'adjust',
-        words: [], bingo: false, points: Math.trunc(action.points),
+        id: uid(),
+        playerId: action.playerId,
+        kind: 'adjust',
+        words: [],
+        bingo: false,
+        points: Math.trunc(action.points),
       };
       // An end-of-game adjustment isn't a turn, so play order doesn't move.
       return { ...state, turns: [...state.turns, turn] };
@@ -105,9 +118,10 @@ function apply(state: GameState, action: Action, uid: IdSource): GameState {
       return {
         ...state,
         turns,
-        currentIndex: playedBy === -1
-          ? (state.currentIndex - 1 + state.players.length) % state.players.length
-          : playedBy,
+        currentIndex:
+          playedBy === -1
+            ? (state.currentIndex - 1 + state.players.length) % state.players.length
+            : playedBy,
       };
     }
 
@@ -132,8 +146,10 @@ function apply(state: GameState, action: Action, uid: IdSource): GameState {
  * Binds an id source to the reducer. The room server passes its own, so ids are
  * minted once by the authority rather than by whichever client happened to act.
  */
-export const createReducer = (uid: IdSource = defaultUid) =>
-  (state: GameState, action: Action): GameState => apply(state, action, uid);
+export const createReducer =
+  (uid: IdSource = defaultUid) =>
+  (state: GameState, action: Action): GameState =>
+    apply(state, action, uid);
 
 /**
  * The ordinary reducer. Deliberately arity two so it drops straight into

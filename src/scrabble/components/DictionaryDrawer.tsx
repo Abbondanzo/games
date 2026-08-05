@@ -73,7 +73,9 @@ export function DictionaryDrawer({ initialWord, onClose }: Props) {
             aria-label="Word to look up"
             autoComplete="off"
           />
-          <button type="submit" className="primary">Look up</button>
+          <button type="submit" className="primary">
+            Look up
+          </button>
         </form>
 
         <div className="dict-result" aria-live="polite">
@@ -82,9 +84,9 @@ export function DictionaryDrawer({ initialWord, onClose }: Props) {
         </div>
 
         <p className="hint">
-          Definitions come from a free online dictionary, so this needs an internet connection.
-          It is a general English dictionary rather than the official Scrabble word list, so a
-          missing word means “probably not allowed”, not a ruling.
+          Definitions come from a free online dictionary, so this needs an internet connection. It
+          is a general English dictionary rather than the official Scrabble word list, so a missing
+          word means “probably not allowed”, not a ruling.
         </p>
       </div>
     </div>

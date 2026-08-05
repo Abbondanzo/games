@@ -159,14 +159,14 @@ it fail first.
 - **Solo play must never touch the network.** There is a test asserting no WebSocket is
   constructed and that storage is still written. Keep it passing.
 - **A browser is never told why a socket would not open.** A refused upgrade is
-  indistinguishable from a lost connection, so a room that is gone has to say so *on* the
+  indistinguishable from a lost connection, so a room that is gone has to say so _on_ the
   socket: it accepts the connection purely to close it with a code from `CLOSE`. Returning a
   404 instead means clients retry a dead room forever. See `docs/rooms.md`.
 - **Anything that ends a room must put the local game back first.** Clearing the session makes
   the solo persist effect fire, and it writes whatever is in state - which is the room's game
   unless the host owns it. `stopFollowing` in `session.ts` is the one way out; use it.
 - **Deploy the Worker before the client.** They deploy separately and the app is precached, so a
-  client can be weeks old. Server-to-client additions are safe; a new *client-to-server* message
+  client can be weeks old. Server-to-client additions are safe; a new _client-to-server_ message
   is not, because an old room rejects a frame it has never heard of and the button just appears
   broken. Bump `PROTOCOL_VERSION` for either, so the mismatch names itself.
 - **Every route is rate limited except `/health`.** The socket upgrade included: its close code

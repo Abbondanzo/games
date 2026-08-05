@@ -33,8 +33,14 @@ interface Props {
  * identically throughout; each game supplies its own scoreboard as children.
  */
 export function PlayersCard({
-  players, onAdd, onRemove, onMove, headerExtra, children,
-  editable = true, reorderable = false,
+  players,
+  onAdd,
+  onRemove,
+  onMove,
+  headerExtra,
+  children,
+  editable = true,
+  reorderable = false,
 }: Props) {
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(true);
@@ -73,7 +79,9 @@ export function PlayersCard({
               autoComplete="off"
               maxLength={24}
             />
-            <button type="submit" className="primary">Add</button>
+            <button type="submit" className="primary">
+              Add
+            </button>
           </form>
 
           <ul className="chips">
@@ -101,7 +109,11 @@ export function PlayersCard({
                     </button>
                   </>
                 )}
-                <button type="button" aria-label={`Remove ${p.name}`} onClick={() => onRemove(p.id)}>
+                <button
+                  type="button"
+                  aria-label={`Remove ${p.name}`}
+                  onClick={() => onRemove(p.id)}
+                >
                   <X size={14} strokeWidth={2.5} aria-hidden="true" />
                 </button>
               </li>

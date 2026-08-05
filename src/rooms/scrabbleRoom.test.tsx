@@ -71,7 +71,8 @@ describe('controls a guest may not use', () => {
     await user.click(within(guest).getByRole('button', { name: 'Score turn' }));
 
     await waitFor(() =>
-      expect(within(guest).getByRole('button', { name: 'Undo last' })).toBeInTheDocument());
+      expect(within(guest).getByRole('button', { name: 'Undo last' })).toBeInTheDocument(),
+    );
     // The host may always undo; the point is that a guest whose turn it was not
     // is not shown a button that would be refused.
     await handTurnTo(user, host, 'Host');
@@ -79,7 +80,8 @@ describe('controls a guest may not use', () => {
     await user.click(within(host).getByRole('button', { name: 'Score turn' }));
 
     await waitFor(() =>
-      expect(within(guest).queryByRole('button', { name: 'Undo last' })).not.toBeInTheDocument());
+      expect(within(guest).queryByRole('button', { name: 'Undo last' })).not.toBeInTheDocument(),
+    );
   });
 });
 
@@ -112,8 +114,7 @@ describe('knowing whether it is your turn', () => {
 
     await handTurnTo(user, host, 'Host');
 
-    await waitFor(() =>
-      expect(within(guest).getByText(/Waiting for/)).toHaveTextContent('Host'));
+    await waitFor(() => expect(within(guest).getByText(/Waiting for/)).toHaveTextContent('Host'));
     expect(within(guest).queryByText('Your turn')).not.toBeInTheDocument();
   });
 
@@ -136,13 +137,19 @@ describe('knowing whether it is your turn', () => {
 
     await handTurnTo(user, host, 'Grace');
     await waitFor(() =>
-      expect(within(guest).getByRole('button', { name: 'Score turn' })).toBeEnabled());
+      expect(within(guest).getByRole('button', { name: 'Score turn' })).toBeEnabled(),
+    );
     expect(within(guest).getByText('Your turn').closest('.card')).toHaveClass('yours');
 
     await handTurnTo(user, host, 'Host');
     await waitFor(() =>
-      expect(within(guest).getByRole('button', { name: 'Score turn' })).toBeDisabled());
-    expect(within(guest).getByText(/Waiting for/).closest('.card')).toHaveClass('theirs');
+      expect(within(guest).getByRole('button', { name: 'Score turn' })).toBeDisabled(),
+    );
+    expect(
+      within(guest)
+        .getByText(/Waiting for/)
+        .closest('.card'),
+    ).toHaveClass('theirs');
   });
 
   it('is announced, so it does not have to be noticed', async () => {
@@ -151,8 +158,9 @@ describe('knowing whether it is your turn', () => {
 
     await handTurnTo(user, host, 'Grace');
     await waitFor(() => {
-      const live = within(guest).getAllByRole('status').find((el) =>
-        el.classList.contains('whose-turn'));
+      const live = within(guest)
+        .getAllByRole('status')
+        .find((el) => el.classList.contains('whose-turn'));
       expect(live).toHaveTextContent('Your turn');
     });
   });

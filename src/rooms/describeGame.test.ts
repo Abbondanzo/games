@@ -7,24 +7,54 @@ import { summarise } from './describeGame';
  */
 describe('summarise', () => {
   it('says nothing about an empty game', () => {
-    expect(summarise([[0, 'player'], [0, 'turn']])).toBeNull();
+    expect(
+      summarise([
+        [0, 'player'],
+        [0, 'turn'],
+      ]),
+    ).toBeNull();
   });
 
   it('mentions only the parts that exist', () => {
-    expect(summarise([[3, 'player'], [0, 'turn']])).toBe('3 players');
-    expect(summarise([[0, 'player'], [1, 'round']])).toBe('1 round');
+    expect(
+      summarise([
+        [3, 'player'],
+        [0, 'turn'],
+      ]),
+    ).toBe('3 players');
+    expect(
+      summarise([
+        [0, 'player'],
+        [1, 'round'],
+      ]),
+    ).toBe('1 round');
   });
 
   it('joins two parts readably', () => {
-    expect(summarise([[3, 'player'], [12, 'turn']])).toBe('3 players and 12 turns');
+    expect(
+      summarise([
+        [3, 'player'],
+        [12, 'turn'],
+      ]),
+    ).toBe('3 players and 12 turns');
   });
 
   it('joins three with a comma', () => {
-    expect(summarise([[1, 'player'], [2, 'turn'], [3, 'round']]))
-      .toBe('1 player, 2 turns and 3 rounds');
+    expect(
+      summarise([
+        [1, 'player'],
+        [2, 'turn'],
+        [3, 'round'],
+      ]),
+    ).toBe('1 player, 2 turns and 3 rounds');
   });
 
   it('gets singulars right', () => {
-    expect(summarise([[1, 'player'], [1, 'turn']])).toBe('1 player and 1 turn');
+    expect(
+      summarise([
+        [1, 'player'],
+        [1, 'turn'],
+      ]),
+    ).toBe('1 player and 1 turn');
   });
 });

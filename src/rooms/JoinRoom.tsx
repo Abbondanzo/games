@@ -104,7 +104,9 @@ export function JoinRoom() {
     <>
       <TopBar title="Join a game" />
       <main className="home">
-        <p className="sub">Enter the code the host gave you, and the name you want on the scoreboard.</p>
+        <p className="sub">
+          Enter the code the host gave you, and the name you want on the scoreboard.
+        </p>
 
         <form className="card join-form" onSubmit={submit}>
           <label className="field">
@@ -160,9 +162,11 @@ export function JoinRoom() {
 
           {error && (
             <p className="room-error" role="status">
-              {error === 'bad-code' ? 'That is not a valid code. Check and try again.'
-                : error === 'no-name' ? 'Enter the name you want on the scoreboard.'
-                : ROOM_ERRORS[error]}
+              {error === 'bad-code'
+                ? 'That is not a valid code. Check and try again.'
+                : error === 'no-name'
+                  ? 'Enter the name you want on the scoreboard.'
+                  : ROOM_ERRORS[error]}
             </p>
           )}
         </form>

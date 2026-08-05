@@ -20,7 +20,10 @@ interface Named extends Identified {
  * and it is how every game reads the field.
  */
 export const parseNames = (raw: string): string[] =>
-  raw.split(',').map((n) => n.trim()).filter(Boolean);
+  raw
+    .split(',')
+    .map((n) => n.trim())
+    .filter(Boolean);
 
 /**
  * Renaming, or null when there is nothing to do.
@@ -66,8 +69,7 @@ export const movedTo = <P extends Identified>(
 };
 
 /** Whoever is up next, wrapping round, and 0 when there is nobody. */
-export const advance = (index: number, count: number): number =>
-  (count ? (index + 1) % count : 0);
+export const advance = (index: number, count: number): number => (count ? (index + 1) % count : 0);
 
 /**
  * Where the turn pointer goes when a player leaves.
@@ -88,9 +90,8 @@ export const indexAfterRemoval = <P extends Identified>(
   if (!after.length) return 0;
 
   const upNow = before[currentIndex]?.id;
-  const stillHere = upNow !== undefined && upNow !== removedId
-    ? after.findIndex((p) => p.id === upNow)
-    : -1;
+  const stillHere =
+    upNow !== undefined && upNow !== removedId ? after.findIndex((p) => p.id === upNow) : -1;
 
   return stillHere === -1 ? removedAt % after.length : stillHere;
 };

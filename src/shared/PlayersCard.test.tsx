@@ -3,7 +3,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PlayersCard } from './PlayersCard';
 
-const PLAYERS = [{ id: 'a', name: 'Ada' }, { id: 'g', name: 'Grace' }];
+const PLAYERS = [
+  { id: 'a', name: 'Ada' },
+  { id: 'g', name: 'Grace' },
+];
 
 const setup = (editable?: boolean) => {
   const onAdd = vi.fn();

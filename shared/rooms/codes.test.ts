@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CODE_ALPHABET, CODE_LENGTH, CODE_SPACE, isCode, mintCode, normaliseCode,
-} from './codes';
+import { CODE_ALPHABET, CODE_LENGTH, CODE_SPACE, isCode, mintCode, normaliseCode } from './codes';
 
 describe('the alphabet', () => {
   it('excludes both halves of every confusable pair', () => {
@@ -72,10 +70,12 @@ describe('normaliseCode', () => {
     },
   );
 
-  it.each([['ABC', 'too short'], ['ABCDE', 'too long'], ['', 'empty'], ['AB!D', 'punctuation']])(
-    'rejects %o (%s)',
-    (input) => {
-      expect(normaliseCode(input)).toBeNull();
-    },
-  );
+  it.each([
+    ['ABC', 'too short'],
+    ['ABCDE', 'too long'],
+    ['', 'empty'],
+    ['AB!D', 'punctuation'],
+  ])('rejects %o (%s)', (input) => {
+    expect(normaliseCode(input)).toBeNull();
+  });
 });

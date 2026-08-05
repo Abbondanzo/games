@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  clearSession, deviceFor, newDevice, readSession, rememberDevice, writeSession,
+  clearSession,
+  deviceFor,
+  newDevice,
+  readSession,
+  rememberDevice,
+  writeSession,
 } from './storage';
 
 beforeEach(() => localStorage.clear());

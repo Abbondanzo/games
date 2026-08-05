@@ -1,6 +1,6 @@
 # Rummikub
 
-Round-by-round scoring. Rummikub is scored on what is *left* rather than what is played, so a
+Round-by-round scoring. Rummikub is scored on what is _left_ rather than what is played, so a
 round is entered after someone goes out.
 
 ## Scoring a round
@@ -29,5 +29,5 @@ column does not sum to zero, a rack was entered wrong. There is a test for that 
 ## Removing a player
 
 Rounds they merely lost are kept and recalculated without their rack, so the winner's pot
-shrinks accordingly. Rounds they *won* are deleted, since a round is defined by who went out and
+shrinks accordingly. Rounds they _won_ are deleted, since a round is defined by who went out and
 cannot survive without them. The confirmation names how many rounds will go.

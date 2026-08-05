@@ -14,7 +14,10 @@ import { draftWord, draftWordScore, emptyDraft } from '@shared/games/scrabble/sc
 import type { Draft } from '@shared/games/scrabble/types';
 
 const describeGame = (s: { players: unknown[]; turns: unknown[] }) =>
-  summarise([[s.players.length, 'player'], [s.turns.length, 'turn']]);
+  summarise([
+    [s.players.length, 'player'],
+    [s.turns.length, 'turn'],
+  ]);
 
 export function ScrabbleTracker() {
   const { state, dispatch, room, onReject, gone } = useGame();
@@ -53,13 +56,15 @@ export function ScrabbleTracker() {
   }
 
   function resetAll() {
-    if (!window.confirm('Reset everything? Scores, history and player names are all cleared.')) return;
+    if (!window.confirm('Reset everything? Scores, history and player names are all cleared.'))
+      return;
     dispatch({ type: 'resetAll' });
     setDraft(emptyDraft());
   }
 
   function newGame() {
-    if (!window.confirm('Start a new game? Scores and history will be cleared. Players are kept.')) return;
+    if (!window.confirm('Start a new game? Scores and history will be cleared. Players are kept.'))
+      return;
     dispatch({ type: 'newGame' });
     setDraft(emptyDraft());
   }
@@ -88,7 +93,7 @@ export function ScrabbleTracker() {
             </button>
           </>
         )}
-    </TopBar>
+      </TopBar>
 
       <main>
         <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />

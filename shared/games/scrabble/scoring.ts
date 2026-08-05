@@ -5,8 +5,32 @@ export const BINGO_BONUS = 50;
 export const WORD_MULTS: readonly WordMult[] = [1, 2, 3, 4, 6, 9];
 
 export const LETTER_VALUES: Readonly<Record<string, number>> = {
-  A: 1, B: 3, C: 3, D: 2, E: 1, F: 4, G: 2, H: 4, I: 1, J: 8, K: 5, L: 1, M: 3,
-  N: 1, O: 1, P: 3, Q: 10, R: 1, S: 1, T: 1, U: 1, V: 4, W: 4, X: 8, Y: 4, Z: 10,
+  A: 1,
+  B: 3,
+  C: 3,
+  D: 2,
+  E: 1,
+  F: 4,
+  G: 2,
+  H: 4,
+  I: 1,
+  J: 8,
+  K: 5,
+  L: 1,
+  M: 3,
+  N: 1,
+  O: 1,
+  P: 3,
+  Q: 10,
+  R: 1,
+  S: 1,
+  T: 1,
+  U: 1,
+  V: 4,
+  W: 4,
+  X: 8,
+  Y: 4,
+  Z: 10,
 };
 
 /** Face value of a tile. Blanks are worth nothing regardless of the letter. */
@@ -47,15 +71,15 @@ export function tilesFromWord(raw: string, previous: readonly Tile[]): Tile[] {
   if (!previous.length) return letters.map(fresh);
 
   // lcs[i][j] = length of the longest common subsequence of previous[i..] and letters[j..].
-  const lcs: number[][] = Array.from(
-    { length: previous.length + 1 },
-    () => new Array<number>(letters.length + 1).fill(0),
+  const lcs: number[][] = Array.from({ length: previous.length + 1 }, () =>
+    new Array<number>(letters.length + 1).fill(0),
   );
   for (let i = previous.length - 1; i >= 0; i--) {
     for (let j = letters.length - 1; j >= 0; j--) {
-      lcs[i]![j] = previous[i]!.ch === letters[j]
-        ? lcs[i + 1]![j + 1]! + 1
-        : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+      lcs[i]![j] =
+        previous[i]!.ch === letters[j]
+          ? lcs[i + 1]![j + 1]! + 1
+          : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
     }
   }
 

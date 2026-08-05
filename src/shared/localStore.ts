@@ -76,5 +76,4 @@ export function keepValid<E>(
 }
 
 /** A turn pointer that survived a roster shrinking under it. */
-export const clampIndex = (index: number, length: number): number =>
-  (index < length ? index : 0);
+export const clampIndex = (index: number, length: number): number => (index < length ? index : 0);

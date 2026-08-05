@@ -18,7 +18,7 @@ export type TurnTone = '' | 'yours' | 'theirs';
  * would be noise. That is why it is three states rather than a boolean.
  */
 export const turnTone = (name: string | null, yours: boolean | null): TurnTone =>
-  (yours === null || !name ? '' : yours ? 'yours' : 'theirs');
+  yours === null || !name ? '' : yours ? 'yours' : 'theirs';
 
 interface Props {
   /** Who is up, or null when there is nobody yet. */
@@ -38,8 +38,18 @@ export function WhoseTurn({ name, yours, nowPlaying, yoursLabel, empty }: Props)
   let said: JSX.Element | string;
   if (!name) said = empty;
   else if (tone === 'yours') said = <b>{yoursLabel}</b>;
-  else if (tone === 'theirs') said = <>Waiting for <b>{name}</b></>;
-  else said = <>{nowPlaying}: <b>{name}</b></>;
+  else if (tone === 'theirs')
+    said = (
+      <>
+        Waiting for <b>{name}</b>
+      </>
+    );
+  else
+    said = (
+      <>
+        {nowPlaying}: <b>{name}</b>
+      </>
+    );
 
   return (
     <div className={`whose-turn${tone ? ` ${tone}` : ''}`} role="status">

@@ -59,7 +59,9 @@ export function RoundEntry({ players, roundNumber, onScore }: Props) {
   return (
     <section className="card">
       <div className="card-head">
-        <h2>Round <span className="muted">#{roundNumber}</span></h2>
+        <h2>
+          Round <span className="muted">#{roundNumber}</span>
+        </h2>
       </div>
 
       {players.length < 2 ? (
@@ -71,8 +73,8 @@ export function RoundEntry({ players, roundNumber, onScore }: Props) {
           {winnerId && (
             <>
               <p className="hint">
-                Tiles left on each rack. Tap a player, then tap the tiles they were holding, or
-                just type the total.
+                Tiles left on each rack. Tap a player, then tap the tiles they were holding, or just
+                type the total.
               </p>
 
               <ul className="rack-list">
@@ -125,7 +127,9 @@ export function RoundEntry({ players, roundNumber, onScore }: Props) {
                   <strong data-testid="round-pot">+{pot}</strong>
                 </div>
                 <div className="total-actions">
-                  <button type="button" className="primary" onClick={submit}>Score round</button>
+                  <button type="button" className="primary" onClick={submit}>
+                    Score round
+                  </button>
                 </div>
               </div>
             </>

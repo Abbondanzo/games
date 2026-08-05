@@ -12,7 +12,10 @@ import { summarise } from '../rooms/describeGame';
 import { HostRoomButton } from '../rooms/HostRoomButton';
 
 const describeGame = (s: { players: unknown[]; rounds: unknown[] }) =>
-  summarise([[s.players.length, 'player'], [s.rounds.length, 'round']]);
+  summarise([
+    [s.players.length, 'player'],
+    [s.rounds.length, 'round'],
+  ]);
 
 export function RummikubTracker() {
   const { state, dispatch, room, gone } = useRummikub();
@@ -75,7 +78,7 @@ export function RummikubTracker() {
             </button>
           </>
         )}
-    </TopBar>
+      </TopBar>
 
       <main>
         <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />
@@ -119,7 +122,8 @@ export function RummikubTracker() {
               roundNumber={state.rounds.length + 1}
               room={room}
               onScore={(winnerId, penalties) =>
-                dispatch({ type: 'recordRound', winnerId, penalties })}
+                dispatch({ type: 'recordRound', winnerId, penalties })
+              }
             />
           ) : (
             <OpenRound players={state.players} roundNumber={state.rounds.length + 1} room={room} />
@@ -128,7 +132,9 @@ export function RummikubTracker() {
           <RoundEntry
             players={state.players}
             roundNumber={state.rounds.length + 1}
-            onScore={(winnerId, penalties) => dispatch({ type: 'recordRound', winnerId, penalties })}
+            onScore={(winnerId, penalties) =>
+              dispatch({ type: 'recordRound', winnerId, penalties })
+            }
           />
         )}
 
