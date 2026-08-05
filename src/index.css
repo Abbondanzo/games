@@ -1510,6 +1510,23 @@ button.link {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
   font-size: 0.85rem;
 }
+/* A pill inside a pill: match the button's ends to the container's curve. */
+.update-prompt .primary {
+  border-radius: 999px;
+}
+/* On a phone, stretch across the screen so the message keeps to one line
+   instead of collapsing into a narrow, wrapped column. */
+@media (max-width: 480px) {
+  .update-prompt {
+    left: 0.75rem;
+    right: 0.75rem;
+    transform: none;
+    justify-content: space-between;
+  }
+  .update-prompt .primary {
+    flex-shrink: 0;
+  }
+}
 
 .my-rack {
   margin: 0.75rem 0;
