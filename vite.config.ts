@@ -19,6 +19,10 @@ export default defineConfig({
         // no connection. Only the dictionary lookup needs the network.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
         navigateFallback: 'index.html',
+        // The fallback is for navigations, and Workbox already scopes it to
+        // those. Saying so as well means an asset request can never be answered
+        // with the page, which is the shape of the bug this is guarding.
+        navigateFallbackDenylist: [/^\/assets\//],
         cleanupOutdatedCaches: true,
       },
       devOptions: { enabled: false },
