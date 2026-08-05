@@ -19,13 +19,15 @@ type User = ReturnType<typeof userEvent.setup>;
 beforeEach(() => localStorage.clear());
 
 const roster = (client: HTMLElement) =>
-  within(client).getAllByRole('listitem')
+  within(client)
+    .getAllByRole('listitem')
     .filter((li) => li.querySelector('.order'))
     .map((li) => li.querySelector('.order')?.textContent ?? '');
 
 /** Names as the roster editor lists them, which is the order they play in. */
 const order = (client: HTMLElement) =>
-  within(client).getAllByRole('listitem')
+  within(client)
+    .getAllByRole('listitem')
     .filter((li) => li.querySelector('.order'))
     .map((li) => li.textContent?.replace(/^\d+/, '') ?? '');
 
@@ -148,7 +150,8 @@ describe('once the game has started', () => {
     await user.click(within(client).getByRole('button', { name: 'New game' }));
 
     await waitFor(() =>
-      expect(within(client).getByRole('button', { name: 'Move Ada later' })).toBeInTheDocument());
+      expect(within(client).getByRole('button', { name: 'Move Ada later' })).toBeInTheDocument(),
+    );
   });
 });
 
@@ -193,10 +196,12 @@ describe('handing the room over', () => {
     const { host } = await table();
 
     await openPanel(user, host);
-    expect(within(host).getByRole('button', { name: 'Put Grace in charge of the room' }))
-      .toBeInTheDocument();
-    expect(within(host).queryByRole('button', { name: /Put Host in charge/ }))
-      .not.toBeInTheDocument();
+    expect(
+      within(host).getByRole('button', { name: 'Put Grace in charge of the room' }),
+    ).toBeInTheDocument();
+    expect(
+      within(host).queryByRole('button', { name: /Put Host in charge/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('is not offered to a guest at all', async () => {
@@ -231,7 +236,8 @@ describe('handing the room over', () => {
     await user.click(within(host).getByRole('button', { name: 'Put Grace in charge of the room' }));
 
     await waitFor(() =>
-      expect(within(guest).getByRole('button', { name: 'New game' })).toBeInTheDocument());
+      expect(within(guest).getByRole('button', { name: 'New game' })).toBeInTheDocument(),
+    );
     expect(within(host).queryByRole('button', { name: 'New game' })).not.toBeInTheDocument();
   });
 
@@ -260,7 +266,8 @@ describe('handing the room over', () => {
     await user.click(within(host).getByRole('button', { name: 'Put Grace in charge of the room' }));
 
     await waitFor(() =>
-      expect(within(host).getByRole('button', { name: 'Leave' })).toBeInTheDocument());
+      expect(within(host).getByRole('button', { name: 'Leave' })).toBeInTheDocument(),
+    );
     expect(within(guest).queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument();
   });
 
@@ -289,7 +296,9 @@ describe('handing the room over', () => {
     await openPanel(user, host);
     await user.click(within(host).getByRole('button', { name: 'Put Grace in charge of the room' }));
 
-    await waitFor(() => expect(within(host).getByRole('button', { name: 'Leave' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(host).getByRole('button', { name: 'Leave' })).toBeInTheDocument(),
+    );
     expect(room.state().snapshot).toEqual(before);
     // Handing over is room business, not a move in the game.
     expect(room.state().rev).toBe(rev);

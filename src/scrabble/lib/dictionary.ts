@@ -16,8 +16,7 @@ export interface DictEntry {
 }
 
 export type LookupResult =
-  | { status: 'found'; word: string; entries: DictEntry[] }
-  | { status: 'missing'; word: string };
+  { status: 'found'; word: string; entries: DictEntry[] } | { status: 'missing'; word: string };
 
 export class DictionaryError extends Error {
   /** HTTP status, when the failure came back as a response rather than a throw. */
@@ -70,8 +69,7 @@ function describeFailure(err: unknown): string {
   return 'The dictionary is unavailable right now. Please try again in a moment.';
 }
 
-const isAbort = (err: unknown): boolean =>
-  err instanceof DOMException && err.name === 'AbortError';
+const isAbort = (err: unknown): boolean => err instanceof DOMException && err.name === 'AbortError';
 
 export async function lookup(rawWord: string, signal?: AbortSignal): Promise<LookupResult> {
   const word = rawWord.trim().toLowerCase();

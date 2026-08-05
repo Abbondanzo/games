@@ -22,11 +22,11 @@ pnpm icons
 Output goes to `public/` and is committed, so neither CI nor a deploy has to rasterise anything.
 Three variants come out of the same artwork:
 
-| Variant | Used for | Why it differs |
-| --- | --- | --- |
-| Rounded, transparent corners | `favicon.svg`, `favicon-16/32.png` | Sits on its own in a tab, so it carries its own rounding |
-| Square, opaque | `apple-touch-icon.png`, `icon-192/512.png` | iOS and Android apply their own mask, so rounding here would clip the corners twice; iOS also composites on white, so alpha would show through |
-| Square, artwork at 62% | `icon-maskable-512.png` | A maskable icon may be cropped to a circle, so content stays inside the safe zone |
+| Variant                      | Used for                                   | Why it differs                                                                                                                                 |
+| ---------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rounded, transparent corners | `favicon.svg`, `favicon-16/32.png`         | Sits on its own in a tab, so it carries its own rounding                                                                                       |
+| Square, opaque               | `apple-touch-icon.png`, `icon-192/512.png` | iOS and Android apply their own mask, so rounding here would clip the corners twice; iOS also composites on white, so alpha would show through |
+| Square, artwork at 62%       | `icon-maskable-512.png`                    | A maskable icon may be cropped to a circle, so content stays inside the safe zone                                                              |
 
 UI icons come from [lucide-react](https://lucide.dev), tree-shaken so only the ones used are
 bundled (about 2 kB gzipped). The cricket marks are purpose-drawn SVG, since no icon set has

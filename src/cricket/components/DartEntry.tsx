@@ -34,7 +34,15 @@ const RINGS: { value: Ring; label: string; short: string }[] = [
 ];
 
 export function DartEntry({
-  currentPlayer, board, preview, darts, onChangeDarts, onRecord, onUndo, canUndo, disabled,
+  currentPlayer,
+  board,
+  preview,
+  darts,
+  onChangeDarts,
+  onRecord,
+  onUndo,
+  canUndo,
+  disabled,
   yourTurn = null,
 }: Props) {
   const [ring, setRing] = useState<Ring>(1);
@@ -162,8 +170,8 @@ export function DartEntry({
       </div>
 
       <p className="hint">
-        Pick a ring, then tap where the dart landed - the turn passes on automatically after
-        three darts. A triple on the bull counts as the inner bull.
+        Pick a ring, then tap where the dart landed - the turn passes on automatically after three
+        darts. A triple on the bull counts as the inner bull.
       </p>
     </section>
   );

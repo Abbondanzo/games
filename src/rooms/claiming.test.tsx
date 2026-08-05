@@ -13,7 +13,10 @@ import { JoinRoom } from './JoinRoom';
 import { mountClient } from './testClient';
 import * as api from './api';
 
-const WAITING = [{ id: 'p1', name: 'Ada' }, { id: 'p2', name: 'Grace' }];
+const WAITING = [
+  { id: 'p1', name: 'Ada' },
+  { id: 'p2', name: 'Grace' },
+];
 
 beforeEach(() => {
   localStorage.clear();
@@ -29,12 +32,14 @@ const stubReload = () => {
 
 const peekReturns = (claimable: { id: string; name: string }[]) =>
   vi.spyOn(api, 'peekRoom').mockResolvedValue({
-    ok: true, value: { game: 'cricket', open: true, claimable },
+    ok: true,
+    value: { game: 'cricket', open: true, claimable },
   });
 
 const joinSucceeds = () =>
   vi.spyOn(api, 'joinRoom').mockResolvedValue({
-    ok: true, value: { game: 'cricket', code: 'AB23', token: 't', memberId: 'm' },
+    ok: true,
+    value: { game: 'cricket', code: 'AB23', token: 't', memberId: 'm' },
   });
 
 async function enterCode(user: ReturnType<typeof userEvent.setup>) {
@@ -49,7 +54,8 @@ describe('being offered the players already set up', () => {
     await enterCode(user);
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Join as Ada' })).toBeInTheDocument());
+      expect(screen.getByRole('button', { name: 'Join as Ada' })).toBeInTheDocument(),
+    );
     expect(screen.getByRole('button', { name: 'Join as Grace' })).toBeInTheDocument();
   });
 
@@ -79,7 +85,9 @@ describe('being offered the players already set up', () => {
     peekReturns(WAITING);
     await enterCode(user);
 
-    await waitFor(() => expect(screen.getByText(/Has the host already added you/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Has the host already added you/)).toBeInTheDocument(),
+    );
     const question = screen.getByText(/Has the host already added you/);
     const nameField = screen.getByLabelText('Your name');
     // eslint-disable-next-line no-bitwise
@@ -96,10 +104,14 @@ describe('claiming one', () => {
     stubReload();
     await enterCode(user);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Join as Grace' })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join as Grace' })).toBeEnabled(),
+    );
     await user.click(screen.getByRole('button', { name: 'Join as Grace' }));
 
-    await waitFor(() => expect(join).toHaveBeenCalledWith('AB23', 'Grace', expect.any(String), 'p2'));
+    await waitFor(() =>
+      expect(join).toHaveBeenCalledWith('AB23', 'Grace', expect.any(String), 'p2'),
+    );
   });
 
   it('sends the device secret with it, as any join does', async () => {
@@ -140,7 +152,8 @@ describe('claiming one', () => {
     await user.click(screen.getByRole('button', { name: 'Join as Ada' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent('removed you from this game'));
+      expect(screen.getByRole('status')).toHaveTextContent('removed you from this game'),
+    );
   });
 });
 
@@ -152,10 +165,14 @@ describe('adding yourself instead', () => {
     stubReload();
     await enterCode(user);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Join as Ada' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Join as Ada' })).toBeInTheDocument(),
+    );
     await user.type(screen.getByLabelText('Your name'), 'Alan');
     await user.click(screen.getByRole('button', { name: /^Join$/ }));
 
-    await waitFor(() => expect(join).toHaveBeenCalledWith('AB23', 'Alan', expect.any(String), null));
+    await waitFor(() =>
+      expect(join).toHaveBeenCalledWith('AB23', 'Alan', expect.any(String), null),
+    );
   });
 });

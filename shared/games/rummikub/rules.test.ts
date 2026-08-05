@@ -9,8 +9,11 @@ const two = [ada, grace];
 const three = [ada, grace, alan];
 
 let seq = 0;
-const round = (winnerId: string, penalties: Record<string, number>): Round =>
-  ({ id: `r${seq++}`, winnerId, penalties });
+const round = (winnerId: string, penalties: Record<string, number>): Round => ({
+  id: `r${seq++}`,
+  winnerId,
+  penalties,
+});
 
 describe('roundScores', () => {
   it('pays the winner the sum of everyone else’s rack', () => {
@@ -60,11 +63,13 @@ describe('standings', () => {
   ];
 
   it('accumulates across rounds and ranks by total', () => {
-    expect(standings(three, rounds).map((s) => [s.player.name, s.score])).toEqual([
-      ['Alan', 1],   // -41 + 42
-      ['Ada', 35],   // 65 - 30
-      ['Grace', -36], // -24 - 12
-    ].sort((x, y) => (y[1] as number) - (x[1] as number)));
+    expect(standings(three, rounds).map((s) => [s.player.name, s.score])).toEqual(
+      [
+        ['Alan', 1], // -41 + 42
+        ['Ada', 35], // 65 - 30
+        ['Grace', -36], // -24 - 12
+      ].sort((x, y) => (y[1] as number) - (x[1] as number)),
+    );
   });
 
   it('counts rounds won', () => {

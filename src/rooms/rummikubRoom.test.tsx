@@ -51,7 +51,7 @@ describe('opening a round', () => {
 });
 
 describe('collecting the tiles', () => {
-  it('asks each player for their own rack and nobody else\'s', async () => {
+  it("asks each player for their own rack and nobody else's", async () => {
     const user = userEvent.setup();
     const room = createTestRoom('rummikub');
     const guestSession = room.addMember('Grace');
@@ -63,7 +63,8 @@ describe('collecting the tiles', () => {
 
     // Grace is asked for hers; there is no field for anyone else.
     await waitFor(() =>
-      expect(within(guest).getByLabelText('Your tiles left')).toBeInTheDocument());
+      expect(within(guest).getByLabelText('Your tiles left')).toBeInTheDocument(),
+    );
     expect(within(guest).queryByLabelText(/Tiles left for/)).not.toBeInTheDocument();
   });
 
@@ -78,7 +79,8 @@ describe('collecting the tiles', () => {
     await collect(user, host, 'Grace');
 
     await waitFor(() =>
-      expect(within(guest).getByText(/nothing left to count/)).toBeInTheDocument());
+      expect(within(guest).getByText(/nothing left to count/)).toBeInTheDocument(),
+    );
     expect(within(guest).queryByLabelText('Your tiles left')).not.toBeInTheDocument();
   });
 
@@ -172,7 +174,8 @@ describe('scoring the round', () => {
     await user.click(within(host).getByRole('button', { name: /Score round/ }));
 
     await waitFor(() =>
-      expect(within(host).getByRole('button', { name: /Collect tiles/ })).toBeInTheDocument());
+      expect(within(host).getByRole('button', { name: /Collect tiles/ })).toBeInTheDocument(),
+    );
   });
 
   it('lets the host abandon a round', async () => {
@@ -186,7 +189,8 @@ describe('scoring the round', () => {
     await user.click(within(host).getByRole('button', { name: /Cancel/ }));
 
     await waitFor(() =>
-      expect(within(host).getByRole('button', { name: /Collect tiles/ })).toBeInTheDocument());
+      expect(within(host).getByRole('button', { name: /Collect tiles/ })).toBeInTheDocument(),
+    );
     expect(scores(host)).toEqual(['Host:0', 'Grace:0']);
   });
 
@@ -200,7 +204,9 @@ describe('scoring the round', () => {
 
     await waitFor(() => expect(scores(guest)).toHaveLength(2));
     await collect(user, host, 'Host');
-    await waitFor(() => expect(within(guest).getByLabelText('Your tiles left')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(guest).getByLabelText('Your tiles left')).toBeInTheDocument(),
+    );
 
     expect(within(guest).queryByRole('button', { name: /Score round/ })).not.toBeInTheDocument();
     expect(within(guest).queryByRole('button', { name: /Cancel/ })).not.toBeInTheDocument();
@@ -242,7 +248,8 @@ describe('controls a Rummikub guest may not use', () => {
     await user.click(within(host).getByRole('button', { name: /Score round/ }));
 
     await waitFor(() =>
-      expect(within(host).getByRole('button', { name: 'Undo last' })).toBeInTheDocument());
+      expect(within(host).getByRole('button', { name: 'Undo last' })).toBeInTheDocument(),
+    );
     expect(within(guest).queryByRole('button', { name: 'Undo last' })).not.toBeInTheDocument();
   });
 

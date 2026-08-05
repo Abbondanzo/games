@@ -52,11 +52,11 @@ list (TWL/SOWPODS), so a miss means "probably not a word", not a ruling.
 
 Every lookup ends in one of three verdict bars:
 
-| Bar | Meaning |
-| --- | --- |
-| Green | The dictionary has the word. |
-| Red | The dictionary answered and does not have the word. Proper nouns land here, which is right for Scrabble. |
-| Amber | No answer at all. This says nothing about the word - retry. |
+| Bar   | Meaning                                                                                                  |
+| ----- | -------------------------------------------------------------------------------------------------------- |
+| Green | The dictionary has the word.                                                                             |
+| Red   | The dictionary answered and does not have the word. Proper nouns land here, which is right for Scrabble. |
+| Amber | No answer at all. This says nothing about the word - retry.                                              |
 
 Keeping amber distinct from red matters. The upstream serves sporadic `5xx` responses that have
 nothing to do with the word: `ax`, `za`, `jo` and `xu` are all valid and have each been observed

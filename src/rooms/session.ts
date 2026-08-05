@@ -10,13 +10,24 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   compareProtocol,
-  type ErrorCode, type Game, type GameAction, type GoneReason, type Member, type PendingRound,
-  type Removed, type Role, type Snapshot, type VersionGap,
+  type ErrorCode,
+  type Game,
+  type GameAction,
+  type GoneReason,
+  type Member,
+  type PendingRound,
+  type Removed,
+  type Role,
+  type Snapshot,
+  type VersionGap,
 } from '@shared/rooms/protocol';
 import { can as canDo, seatView } from '@shared/rooms/permissions';
 import {
-  ROOMS_URL, webSocketTransport,
-  type ConnectionStatus, type Transport, type TransportFactory,
+  ROOMS_URL,
+  webSocketTransport,
+  type ConnectionStatus,
+  type Transport,
+  type TransportFactory,
 } from './transport';
 import { clearSession, readSession, type StoredSession } from './storage';
 import { writeJson } from '../shared/localStore';
@@ -105,21 +116,19 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
   const { game, reducer, initialState, readStored, storeKey } = options;
   const overrides = useRoomOverrides();
 
-  const [session, setSession] = useState<StoredSession | null>(
-    () => (overrides.session !== undefined ? overrides.session : readSession(game)),
+  const [session, setSession] = useState<StoredSession | null>(() =>
+    overrides.session !== undefined ? overrides.session : readSession(game),
   );
 
   // Snapshots replace the state wholesale; everything else goes to the reducer.
   const wrapped = useCallback(
     (state: S, action: A | SnapshotAction): S =>
-      (isSnapshot(action) ? (action.state as S) : reducer(state, action)),
+      isSnapshot(action) ? (action.state as S) : reducer(state, action),
     [reducer],
   );
 
-  const [state, rawDispatch] = useReducer(
-    wrapped,
-    initialState,
-    (init) => (session ? init : readStored() ?? init),
+  const [state, rawDispatch] = useReducer(wrapped, initialState, (init) =>
+    session ? init : (readStored() ?? init),
   );
 
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
@@ -164,12 +173,15 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
    * persist effect fires as soon as the session clears, and would otherwise
    * write the room's game straight over the top of it.
    */
-  const stopFollowing = useCallback((keepTheRoomsGame: boolean) => {
-    if (keepTheRoomsGame) keepLocally();
-    else rawDispatch({ type: '__snapshot', state: readStored() ?? initialState });
-    clearSession(game);
-    setSession(null);
-  }, [game, keepLocally, readStored, initialState]);
+  const stopFollowing = useCallback(
+    (keepTheRoomsGame: boolean) => {
+      if (keepTheRoomsGame) keepLocally();
+      else rawDispatch({ type: '__snapshot', state: readStored() ?? initialState });
+      clearSession(game);
+      setSession(null);
+    },
+    [game, keepLocally, readStored, initialState],
+  );
 
   /* ── solo: persist exactly as before ── */
   useEffect(() => {
@@ -311,8 +323,7 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
       makeHost: (memberId) =>
         transport.current?.send({ t: 'makeHost', reqId: nextRequestId(), memberId }),
       removed,
-      allowBack: (ref) =>
-        transport.current?.send({ t: 'allowBack', reqId: nextRequestId(), ref }),
+      allowBack: (ref) => transport.current?.send({ t: 'allowBack', reqId: nextRequestId(), ref }),
       leave: () => {
         // A host has no way out that is not closing the room.
         if (role === 'host') return;
@@ -329,8 +340,22 @@ export function useGameSession<S extends Snapshot, A extends { type: string }>(
         transport.current?.send({ t: 'rackSubmit', reqId: nextRequestId(), seatId, total }),
       cancelRound: () => transport.current?.send({ t: 'roundCancel', reqId: nextRequestId() }),
     };
-  }, [session, game, state, role, seatId, members, locked, pending, status, inFlightCount,
-      lastError, outdated, removed, stopFollowing]);
+  }, [
+    session,
+    game,
+    state,
+    role,
+    seatId,
+    members,
+    locked,
+    pending,
+    status,
+    inFlightCount,
+    lastError,
+    outdated,
+    removed,
+    stopFollowing,
+  ]);
 
   return { state, dispatch, room, onReject, gone };
 }

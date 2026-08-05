@@ -3,7 +3,13 @@ import { RotateCcw, Trash2, Trophy } from 'lucide-react';
 import { PlayersCard } from '../shared/PlayersCard';
 import { CricketBoard } from './components/CricketBoard';
 import { DartEntry } from './components/DartEntry';
-import { computeBoard, dartShorthand, previewTurn, standings, totalMarks } from '@shared/games/cricket/rules';
+import {
+  computeBoard,
+  dartShorthand,
+  previewTurn,
+  standings,
+  totalMarks,
+} from '@shared/games/cricket/rules';
 import { useCricket } from './lib/useCricket';
 import { RoomStrip } from '../rooms/RoomStrip';
 import { TopBar } from '../shared/TopBar';
@@ -25,7 +31,10 @@ const WIN_REASON: Record<Variant, string> = {
 };
 
 const describeGame = (s: { players: unknown[]; turns: unknown[] }) =>
-  summarise([[s.players.length, 'player'], [s.turns.length, 'turn']]);
+  summarise([
+    [s.players.length, 'player'],
+    [s.turns.length, 'turn'],
+  ]);
 
 export function CricketTracker() {
   const { state, dispatch, room, onReject, gone } = useCricket();
@@ -46,9 +55,10 @@ export function CricketTracker() {
    * entered rather than only when the turn ends.
    */
   const board = useMemo(() => {
-    const pending = darts.length && currentPlayer
-      ? [...state.turns, { id: 'in-progress', playerId: currentPlayer.id, darts }]
-      : state.turns;
+    const pending =
+      darts.length && currentPlayer
+        ? [...state.turns, { id: 'in-progress', playerId: currentPlayer.id, darts }]
+        : state.turns;
     return computeBoard(state.players, pending, state.variant);
   }, [state.players, state.turns, state.variant, currentPlayer, darts]);
 
@@ -64,9 +74,10 @@ export function CricketTracker() {
   }, [winner, darts, dispatch]);
 
   const preview = useMemo(
-    () => (currentPlayer
-      ? previewTurn(state.players, state.turns, state.variant, currentPlayer.id, darts)
-      : { marks: 0, points: 0 }),
+    () =>
+      currentPlayer
+        ? previewTurn(state.players, state.turns, state.variant, currentPlayer.id, darts)
+        : { marks: 0, points: 0 },
     [state.players, state.turns, state.variant, currentPlayer, darts],
   );
 
@@ -90,7 +101,9 @@ export function CricketTracker() {
       const held = [
         marks > 0 ? `${marks} mark${marks === 1 ? '' : 's'}` : '',
         points > 0 ? `${points} point${points === 1 ? '' : 's'}` : '',
-      ].filter(Boolean).join(' and ');
+      ]
+        .filter(Boolean)
+        .join(' and ');
 
       const ok = window.confirm(
         `Remove ${player.name}? They have ${held}. Their throws are deleted and the game is rescored, which can change other players' totals.`,
@@ -103,7 +116,8 @@ export function CricketTracker() {
   }
 
   function resetAll() {
-    if (!window.confirm('Reset everything? The board, history and player names are all cleared.')) return;
+    if (!window.confirm('Reset everything? The board, history and player names are all cleared.'))
+      return;
     dispatch({ type: 'resetAll' });
     setDarts([]);
   }
@@ -159,7 +173,7 @@ export function CricketTracker() {
             </button>
           </>
         )}
-    </TopBar>
+      </TopBar>
 
       <main>
         <RoomStrip room={room} players={state.players} dispatch={dispatch} gone={gone} />
@@ -167,7 +181,9 @@ export function CricketTracker() {
         {winner && (
           <div className="banner win" role="status">
             <Trophy size={18} aria-hidden="true" className="mark" />
-            <span><b>{winner.name} wins.</b> {WIN_REASON[state.variant]}</span>
+            <span>
+              <b>{winner.name} wins.</b> {WIN_REASON[state.variant]}
+            </span>
           </div>
         )}
 
@@ -178,22 +194,24 @@ export function CricketTracker() {
           onRemove={removePlayer}
           onMove={(id, to) => dispatch({ type: 'movePlayer', id, to })}
           reorderable={state.turns.length === 0}
-          headerExtra={isHost && (
-            <div className="seg" role="group" aria-label="Game mode">
-              {VARIANTS.map((v) => (
-                <button
-                  key={v.value}
-                  type="button"
-                  className={state.variant === v.value ? 'on' : undefined}
-                  aria-pressed={state.variant === v.value}
-                  title={v.blurb}
-                  onClick={() => changeVariant(v.value)}
-                >
-                  {v.label}
-                </button>
-              ))}
-            </div>
-          )}
+          headerExtra={
+            isHost && (
+              <div className="seg" role="group" aria-label="Game mode">
+                {VARIANTS.map((v) => (
+                  <button
+                    key={v.value}
+                    type="button"
+                    className={state.variant === v.value ? 'on' : undefined}
+                    aria-pressed={state.variant === v.value}
+                    title={v.blurb}
+                    onClick={() => changeVariant(v.value)}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            )
+          }
         >
           <CricketBoard
             players={state.players}
@@ -222,7 +240,9 @@ export function CricketTracker() {
         />
 
         <section className="card">
-          <div className="card-head"><h2>History</h2></div>
+          <div className="card-head">
+            <h2>History</h2>
+          </div>
           <ol className="history">
             {state.turns.length === 0 && <li className="muted">No darts thrown yet.</li>}
             {[...state.turns].reverse().map((turn) => (
@@ -230,9 +250,7 @@ export function CricketTracker() {
                 <span className="who">
                   {state.players.find((p) => p.id === turn.playerId)?.name ?? '-'}
                 </span>
-                <span className="what">
-                  {turn.darts.map((d) => dartShorthand(d)).join('  ')}
-                </span>
+                <span className="what">{turn.darts.map((d) => dartShorthand(d)).join('  ')}</span>
               </li>
             ))}
           </ol>

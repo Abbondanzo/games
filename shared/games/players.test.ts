@@ -23,7 +23,10 @@ describe('reading a list of names', () => {
 });
 
 describe('renaming', () => {
-  const players = [{ id: 'a', name: 'Ada' }, { id: 'g', name: 'Grace' }];
+  const players = [
+    { id: 'a', name: 'Ada' },
+    { id: 'g', name: 'Grace' },
+  ];
 
   it('changes the one named and nobody else', () => {
     expect(renamedTo(players, 'a', 'Ada L')).toEqual([
@@ -41,12 +44,12 @@ describe('renaming', () => {
    * back untouched, and the room reads that identity to decide whether to bump
    * its revision. Returning a fresh array would tell everyone about nothing.
    */
-  it.each([['an empty name', ''], ['only spaces', '   ']])(
-    'declines %s rather than making a new list',
-    (_label, name) => {
-      expect(renamedTo(players, 'a', name)).toBeNull();
-    },
-  );
+  it.each([
+    ['an empty name', ''],
+    ['only spaces', '   '],
+  ])('declines %s rather than making a new list', (_label, name) => {
+    expect(renamedTo(players, 'a', name)).toBeNull();
+  });
 
   it('is content to match nobody', () => {
     expect(renamedTo(players, 'nobody', 'Ada L')).toEqual(players);

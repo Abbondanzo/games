@@ -39,8 +39,7 @@ describe('web app manifest', () => {
 
   it('points only at files that exist', () => {
     for (const icon of manifest.icons) {
-      expect(existsSync(resolve(process.cwd(), 'public', icon.src.replace(/^\//, ''))))
-        .toBe(true);
+      expect(existsSync(resolve(process.cwd(), 'public', icon.src.replace(/^\//, '')))).toBe(true);
     }
   });
 });
@@ -152,9 +151,9 @@ describe('cache headers', () => {
 
 describe('recovering from a stale page', () => {
   it('watches for the page failing to load at all', () => {
-    expect(html).toMatch(/addEventListener\('error'/);
+    expect(html).toMatch(/addEventListener\(\s*'error'/);
     // Capture phase: a failed script or stylesheet does not bubble.
-    expect(html).toMatch(/\}, true\)/);
+    expect(html).toMatch(/\},\s*true,?\s*\)/);
   });
 
   it('clears what this device is holding before trying again', () => {

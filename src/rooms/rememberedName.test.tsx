@@ -116,7 +116,10 @@ describe('joining a room', () => {
 
   it('remembers the name once the join lands', async () => {
     const user = userEvent.setup();
-    vi.spyOn(api, 'peekRoom').mockResolvedValue({ ok: true, value: { game: 'cricket', open: true, claimable: [] } });
+    vi.spyOn(api, 'peekRoom').mockResolvedValue({
+      ok: true,
+      value: { game: 'cricket', open: true, claimable: [] },
+    });
     vi.spyOn(api, 'joinRoom').mockResolvedValue({
       ok: true,
       value: { game: 'cricket', code: 'AB23', token: 't', memberId: 'm' },

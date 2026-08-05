@@ -12,8 +12,13 @@
  * step.
  */
 import {
-  connect, createRoom, handle, join,
-  type Context, type Effect, type RoomState,
+  connect,
+  createRoom,
+  handle,
+  join,
+  type Context,
+  type Effect,
+  type RoomState,
 } from '@shared/rooms/roomCore';
 import { decodeServerMessage, encode, type Game } from '@shared/rooms/protocol';
 import { GAME_SETUP } from '@shared/rooms/games';
@@ -75,9 +80,8 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
         for (const handlers of dropped) handlers.onGone('removed');
         continue;
       }
-      const targets = effect.to === 'all'
-        ? [...sockets.values()].flat()
-        : sockets.get(effect.memberId) ?? [];
+      const targets =
+        effect.to === 'all' ? [...sockets.values()].flat() : (sockets.get(effect.memberId) ?? []);
 
       const raw = encode(effect.message);
       for (const handlers of targets) {
@@ -108,31 +112,37 @@ export function createTestRoom(game: Game, hostName = 'Host'): TestRoom {
 
     signIn: writeSession,
 
-    transport: (options) => ({ token, handlers }) => {
-      const memberId = tokens.get(token);
-      if (!memberId) throw new Error('unknown token');
+    transport:
+      (options) =>
+      ({ token, handlers }) => {
+        const memberId = tokens.get(token);
+        if (!memberId) throw new Error('unknown token');
 
-      sockets.set(memberId, [...(sockets.get(memberId) ?? []), handlers]);
-      handlers.onStatus('open');
+        sockets.set(memberId, [...(sockets.get(memberId) ?? []), handlers]);
+        handlers.onStatus('open');
 
-      const opened = connect(state, memberId, ctx());
-      state = opened.state;
-      deliver(options?.protocol === undefined
-        ? opened.effects
-        : opened.effects.map((e) => (e.to === 'member' && e.message.t === 'welcome'
-          ? { ...e, message: { ...e.message, protocol: options.protocol! } }
-          : e)));
+        const opened = connect(state, memberId, ctx());
+        state = opened.state;
+        deliver(
+          options?.protocol === undefined
+            ? opened.effects
+            : opened.effects.map((e) =>
+                e.to === 'member' && e.message.t === 'welcome'
+                  ? { ...e, message: { ...e.message, protocol: options.protocol! } }
+                  : e,
+              ),
+        );
 
-      return {
-        send(message) {
-          const outcome = handle(state, memberId, message, ctx(), apply);
-          state = outcome.state;
-          deliver(outcome.effects);
-        },
-        close() {
-          sockets.delete(memberId);
-        },
-      };
-    },
+        return {
+          send(message) {
+            const outcome = handle(state, memberId, message, ctx(), apply);
+            state = outcome.state;
+            deliver(outcome.effects);
+          },
+          close() {
+            sockets.delete(memberId);
+          },
+        };
+      },
   };
 }

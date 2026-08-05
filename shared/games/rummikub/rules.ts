@@ -21,10 +21,7 @@ export const isJoker = (tile: number): boolean => tile === JOKER_PENALTY;
  * Only players currently in the game are counted, so removing someone rescores
  * the rounds they took part in rather than leaving a phantom contribution.
  */
-export function roundScores(
-  players: readonly Player[],
-  round: Round,
-): Record<string, number> {
+export function roundScores(players: readonly Player[], round: Round): Record<string, number> {
   const scores: Record<string, number> = Object.fromEntries(players.map((p) => [p.id, 0]));
   if (!players.some((p) => p.id === round.winnerId)) return scores;
 
@@ -52,7 +49,8 @@ export function standings(players: readonly Player[], rounds: readonly Round[]):
 
   for (const round of rounds) {
     const scores = roundScores(players, round);
-    for (const player of players) totals[player.id] = (totals[player.id] ?? 0) + (scores[player.id] ?? 0);
+    for (const player of players)
+      totals[player.id] = (totals[player.id] ?? 0) + (scores[player.id] ?? 0);
     if (wins[round.winnerId] !== undefined) wins[round.winnerId]! += 1;
   }
 
@@ -76,5 +74,9 @@ export const scoreFor = (
  * The winner's score for a round in progress: the sum of what everyone else is
  * still holding.
  */
-export const potFor = (penalties: Record<string, number>, players: readonly Player[], winnerId: string): number =>
+export const potFor = (
+  penalties: Record<string, number>,
+  players: readonly Player[],
+  winnerId: string,
+): number =>
   players.reduce((sum, p) => (p.id === winnerId ? sum : sum + (penalties[p.id] ?? 0)), 0);

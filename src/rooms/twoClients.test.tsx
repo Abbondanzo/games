@@ -6,16 +6,14 @@
  * a rooms regression, and it needs no network at all.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CricketTracker } from '../cricket/CricketTracker';
 import { ScrabbleTracker } from '../scrabble/ScrabbleTracker';
 import { createTestRoom, type TestRoom } from './testRoom';
 import { PROTOCOL_VERSION } from '@shared/rooms/protocol';
 import type { StoredSession } from './storage';
-import {
-  boardColumns, countingSockets, mountClient, myColumn, scoreboard,
-} from './testClient';
+import { boardColumns, countingSockets, mountClient, myColumn, scoreboard } from './testClient';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -35,7 +33,8 @@ const warning = () => screen.queryAllByRole('status').find((el) => el.classList.
 const players = boardColumns;
 
 const marksOn = (client: HTMLElement, target: string, column: number) => {
-  const row = within(board(client)).getAllByRole('row')
+  const row = within(board(client))
+    .getAllByRole('row')
     .find((r) => r.querySelector('th')?.textContent?.startsWith(target))!;
   return within(row).getAllByRole('cell')[column]?.textContent ?? '';
 };
@@ -120,8 +119,7 @@ describe('a host and a guest in one room', () => {
     await addPlayers(user, host, 'Ada');
     await waitFor(() => expect(players(guest)).toEqual(['Host', 'Grace', 'Ada']));
     await user.click(within(host).getByTitle("Make it Ada's turn"));
-    await waitFor(() =>
-      expect(within(guest).getByText(/Waiting for/)).toHaveTextContent('Ada'));
+    await waitFor(() => expect(within(guest).getByText(/Waiting for/)).toHaveTextContent('Ada'));
 
     // The controls are closed off rather than failing after the fact.
     expect(within(guest).getByRole('button', { name: 'Miss' })).toBeDisabled();
@@ -166,16 +164,25 @@ describe('a host and a guest in one room', () => {
     const guestSession = room.addMember('Grace');
 
     const host = mount(room, room.hostSession, 'host');
-    mount(room, guestSession, 'guest');
+    const guest = mount(room, guestSession, 'guest');
 
     await user.click(within(host).getByRole('button', { name: 'Who is here' }));
     await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
 
     await waitFor(() => expect(room.state().members[guestSession.memberId]).toBeUndefined());
+    // The one who was removed is told so, rather than left staring at a room
+    // that has quietly stopped answering.
+    expect(within(guest).getByText(/removed you from that room/)).toBeInTheDocument();
+
     // Removing one person is not a decision about everybody else, so the door
     // is left as the host set it. Their device is what is kept out.
     expect(room.state().locked).toBe(false);
-    expect(() => room.addMember('Grace', 'her-phone')).not.toThrow();
+    // A bare join delivers its broadcast straight into the mounted host, so it
+    // has to go through act the way a click on the page would.
+    act(() => {
+      room.addMember('Grace', 'her-phone');
+    });
+    expect(players(host)).toContain('Grace 2');
   });
 
   it('keeps a removed device out for the rest of the game', async () => {
@@ -203,11 +210,13 @@ describe('a host and a guest in one room', () => {
     await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
 
     await waitFor(() =>
-      expect(within(host).getByText('Removed from this game')).toBeInTheDocument());
+      expect(within(host).getByText('Removed from this game')).toBeInTheDocument(),
+    );
     await user.click(within(host).getByRole('button', { name: 'Let Grace back into the game' }));
 
     await waitFor(() =>
-      expect(within(host).queryByText('Removed from this game')).not.toBeInTheDocument());
+      expect(within(host).queryByText('Removed from this game')).not.toBeInTheDocument(),
+    );
     expect(() => room.addMember('Grace', 'her-phone')).not.toThrow();
   });
 
@@ -231,7 +240,8 @@ describe('a host and a guest in one room', () => {
 
     // Back to playing alone, with the roster still there.
     await waitFor(() =>
-      expect(within(host).queryByRole('button', { name: 'Who is here' })).not.toBeInTheDocument());
+      expect(within(host).queryByRole('button', { name: 'Who is here' })).not.toBeInTheDocument(),
+    );
     expect(localStorage.getItem('games.cricket.v1')).toContain('Grace');
     confirm.mockRestore();
   });
@@ -246,7 +256,12 @@ describe('a host and a guest in one room', () => {
     // A game this person was already keeping on their own device.
     localStorage.setItem(
       'games.cricket.v1',
-      JSON.stringify({ players: [{ id: 'x', name: 'Solo', joinedAtTurn: 0 }], turns: [], currentIndex: 0, variant: 'standard' }),
+      JSON.stringify({
+        players: [{ id: 'x', name: 'Solo', joinedAtTurn: 0 }],
+        turns: [],
+        currentIndex: 0,
+        variant: 'standard',
+      }),
     );
 
     const host = mount(room, room.hostSession, 'host');
@@ -257,7 +272,8 @@ describe('a host and a guest in one room', () => {
 
     // Out of the room, with their own game back and untouched.
     await waitFor(() =>
-      expect(within(guest).queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument());
+      expect(within(guest).queryByRole('button', { name: 'Leave' })).not.toBeInTheDocument(),
+    );
     expect(localStorage.getItem('games.cricket.v1')).toContain('Solo');
     // The room dropped them, so they are no longer taking up a place.
     expect(room.state().members[guestSession.memberId]).toBeUndefined();
@@ -272,7 +288,8 @@ describe('a host and a guest in one room', () => {
 
     // Without opening "Who is here" first.
     await waitFor(() =>
-      expect(within(guest).getByRole('button', { name: 'Leave' })).toBeInTheDocument());
+      expect(within(guest).getByRole('button', { name: 'Leave' })).toBeInTheDocument(),
+    );
   });
 
   it('offers the host no way to leave without closing', async () => {
@@ -299,8 +316,7 @@ describe('a host and a guest in one room', () => {
     const room = createTestRoom('cricket');
     const host = mount(room, room.hostSession, 'host', { protocol: PROTOCOL_VERSION - 1 });
 
-    await waitFor(() =>
-      expect(within(host).getByText(/needs updating/i)).toBeInTheDocument());
+    await waitFor(() => expect(within(host).getByText(/needs updating/i)).toBeInTheDocument());
   });
 
   it('says nothing when both sides match', async () => {
@@ -372,15 +388,13 @@ describe('controls a cricket guest may not use', () => {
     await throwDart(user, guest, 'Triple', 'Triple 20');
     await user.click(within(guest).getByRole('button', { name: 'End turn' }));
 
-    await waitFor(() =>
-      expect(within(guest).getByRole('button', { name: /Undo/ })).toBeEnabled());
+    await waitFor(() => expect(within(guest).getByRole('button', { name: /Undo/ })).toBeEnabled());
 
     // The host throws, so the last turn on the board is no longer the guest's.
     await throwDart(user, host, 'Triple', 'Triple 19');
     await user.click(within(host).getByRole('button', { name: 'End turn' }));
 
-    await waitFor(() =>
-      expect(within(guest).getByRole('button', { name: /Undo/ })).toBeDisabled());
+    await waitFor(() => expect(within(guest).getByRole('button', { name: /Undo/ })).toBeDisabled());
   });
 
   it('still lets a guest clear the darts in their own hand', async () => {
@@ -543,7 +557,8 @@ describe('a Scrabble room', () => {
     await user.click(within(host).getByTitle("Make it Ada's turn"));
 
     await waitFor(() =>
-      expect(within(guest).getByRole('button', { name: 'Score turn' })).toBeDisabled());
+      expect(within(guest).getByRole('button', { name: 'Score turn' })).toBeDisabled(),
+    );
     expect(within(guest).getByRole('button', { name: 'Pass' })).toBeDisabled();
 
     // The host, whose turn it is not either, is never gated: they run the room.
@@ -555,12 +570,18 @@ describe('a Scrabble room', () => {
 describe('starting to share', () => {
   it('warns, and names what is on screen, before clearing it', async () => {
     const user = userEvent.setup();
-    localStorage.setItem('games.cricket.v1', JSON.stringify({
-      players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }, { id: 'b', name: 'Bo', joinedAtTurn: 0 }],
-      turns: [{ id: 't', playerId: 'a', darts: [{ target: 20, multiplier: 3 }] }],
-      currentIndex: 0,
-      variant: 'standard',
-    }));
+    localStorage.setItem(
+      'games.cricket.v1',
+      JSON.stringify({
+        players: [
+          { id: 'a', name: 'Ada', joinedAtTurn: 0 },
+          { id: 'b', name: 'Bo', joinedAtTurn: 0 },
+        ],
+        turns: [{ id: 't', playerId: 'a', darts: [{ target: 20, multiplier: 3 }] }],
+        currentIndex: 0,
+        variant: 'standard',
+      }),
+    );
 
     mountClient(CricketTracker);
     await user.click(screen.getByRole('button', { name: 'Share' }));
@@ -586,10 +607,15 @@ describe('starting to share', () => {
   // thrown, because retyping it is the annoying part.
   it('warns about players alone, with no turns yet', async () => {
     const user = userEvent.setup();
-    localStorage.setItem('games.cricket.v1', JSON.stringify({
-      players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }],
-      turns: [], currentIndex: 0, variant: 'standard',
-    }));
+    localStorage.setItem(
+      'games.cricket.v1',
+      JSON.stringify({
+        players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }],
+        turns: [],
+        currentIndex: 0,
+        variant: 'standard',
+      }),
+    );
 
     mountClient(CricketTracker);
     await user.click(screen.getByRole('button', { name: 'Share' }));
@@ -602,9 +628,15 @@ describe('starting to share', () => {
     const user = userEvent.setup();
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
-    localStorage.setItem('games.cricket.v1', JSON.stringify({
-      players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }], turns: [], currentIndex: 0, variant: 'standard',
-    }));
+    localStorage.setItem(
+      'games.cricket.v1',
+      JSON.stringify({
+        players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }],
+        turns: [],
+        currentIndex: 0,
+        variant: 'standard',
+      }),
+    );
 
     mountClient(CricketTracker);
     await user.click(screen.getByRole('button', { name: 'Share' }));

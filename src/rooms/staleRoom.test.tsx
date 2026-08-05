@@ -48,8 +48,7 @@ describe('opening a game that remembers a room which has ended', () => {
     writeSession(SESSION);
     mountClient(CricketTracker, { transport: refusing('ended').factory });
 
-    await waitFor(() =>
-      expect(screen.getByText(/That room has ended/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/That room has ended/)).toBeInTheDocument());
   });
 
   it('forgets the room, so nothing tries it again', async () => {
@@ -85,17 +84,21 @@ describe('opening a game that remembers a room which has ended', () => {
   it('gives the game back that was on this device', async () => {
     writeSession(SESSION);
     // A game of their own, from before any of this.
-    localStorage.setItem('games.cricket.v1', JSON.stringify({
-      players: [{ id: 'p1', name: 'Solo Ada', joinedAtTurn: 0 }],
-      turns: [],
-      currentIndex: 0,
-      variant: 'standard',
-    }));
+    localStorage.setItem(
+      'games.cricket.v1',
+      JSON.stringify({
+        players: [{ id: 'p1', name: 'Solo Ada', joinedAtTurn: 0 }],
+        turns: [],
+        currentIndex: 0,
+        variant: 'standard',
+      }),
+    );
 
     mountClient(CricketTracker, { transport: refusing('ended').factory });
 
     await waitFor(() =>
-      expect(within(screen.getByRole('table')).getByText('Solo Ada')).toBeInTheDocument());
+      expect(within(screen.getByRole('table')).getByText('Solo Ada')).toBeInTheDocument(),
+    );
     // And it is still theirs afterwards, not overwritten by the room's game.
     expect(localStorage.getItem('games.cricket.v1')).toContain('Solo Ada');
   });
@@ -124,8 +127,11 @@ describe('opening a game that remembers a room which has ended', () => {
 
 /** The same thing, but happening while somebody is looking at the game. */
 describe('a room that ends mid-game', () => {
-  const mount = (room: ReturnType<typeof createTestRoom>, session: typeof SESSION | undefined, label: string) =>
-    mountClient(CricketTracker, { room, session: session ?? room.hostSession, label });
+  const mount = (
+    room: ReturnType<typeof createTestRoom>,
+    session: typeof SESSION | undefined,
+    label: string,
+  ) => mountClient(CricketTracker, { room, session: session ?? room.hostSession, label });
 
   it('tells a guest when the host closes it', async () => {
     const user = userEvent.setup();
@@ -140,8 +146,7 @@ describe('a room that ends mid-game', () => {
     await user.click(within(host).getByRole('button', { name: /Who is here/ }));
     await user.click(within(host).getByRole('button', { name: /Close room/ }));
 
-    await waitFor(() =>
-      expect(within(guest).getByText(/That room has ended/)).toBeInTheDocument());
+    await waitFor(() => expect(within(guest).getByText(/That room has ended/)).toBeInTheDocument());
   });
 
   it('tells a guest when the host removes them', async () => {
@@ -158,7 +163,8 @@ describe('a room that ends mid-game', () => {
     await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
 
     await waitFor(() =>
-      expect(within(guest).getByText(/removed you from that room/)).toBeInTheDocument());
+      expect(within(guest).getByText(/removed you from that room/)).toBeInTheDocument(),
+    );
   });
 
   // Nobody needs telling about a door they shut themselves.
@@ -175,7 +181,8 @@ describe('a room that ends mid-game', () => {
     await user.click(within(guest).getByRole('button', { name: 'Leave' }));
 
     await waitFor(() =>
-      expect(within(guest).queryByRole('button', { name: /Who is here/ })).not.toBeInTheDocument());
+      expect(within(guest).queryByRole('button', { name: /Who is here/ })).not.toBeInTheDocument(),
+    );
     expect(within(guest).queryByText(/room has ended/)).not.toBeInTheDocument();
     expect(within(guest).queryByText(/removed you/)).not.toBeInTheDocument();
   });
@@ -189,7 +196,8 @@ describe('a room that ends mid-game', () => {
     await user.type(within(host).getByLabelText('Player name'), 'Ada');
     await user.click(within(host).getByRole('button', { name: 'Add' }));
     await waitFor(() =>
-      expect(within(within(host).getByRole('table')).getByText('Ada')).toBeInTheDocument());
+      expect(within(within(host).getByRole('table')).getByText('Ada')).toBeInTheDocument(),
+    );
 
     await user.click(within(host).getByRole('button', { name: /Who is here/ }));
     await user.click(within(host).getByRole('button', { name: /Close room/ }));

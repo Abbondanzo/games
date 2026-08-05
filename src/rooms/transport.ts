@@ -6,8 +6,12 @@
  * protocol without a network.
  */
 import {
-  GONE_BY_CODE, decodeServerMessage, encode,
-  type ClientMessage, type GoneReason, type ServerMessage,
+  GONE_BY_CODE,
+  decodeServerMessage,
+  encode,
+  type ClientMessage,
+  type GoneReason,
+  type ServerMessage,
 } from '@shared/rooms/protocol';
 
 export type ConnectionStatus = 'connecting' | 'open' | 'offline';
@@ -102,7 +106,8 @@ export const webSocketTransport: TransportFactory = ({ baseUrl, code, token, han
     if (timer) clearTimeout(timer);
     if (attempt >= MAX_ATTEMPTS) return;
     // Jitter, so a room full of phones does not reconnect in lockstep.
-    const delay = Math.min(BASE_RETRY_MS * 2 ** attempt, MAX_RETRY_MS) * (0.7 + Math.random() * 0.6);
+    const delay =
+      Math.min(BASE_RETRY_MS * 2 ** attempt, MAX_RETRY_MS) * (0.7 + Math.random() * 0.6);
     attempt += 1;
     timer = setTimeout(open, delay);
   }

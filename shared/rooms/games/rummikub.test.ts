@@ -33,7 +33,10 @@ describe('refusing a hostile payload', () => {
     ['a fractional seat', { type: 'movePlayer', id: 'p1', to: 1.5 }],
     ['a move with no seat at all', { type: 'movePlayer', id: 'p1' }],
     ['penalties that are not an object', { type: 'recordRound', winnerId: 'p1', penalties: 24 }],
-    ['a penalty that is not a number', { type: 'recordRound', winnerId: 'p1', penalties: { p2: 'lots' } }],
+    [
+      'a penalty that is not a number',
+      { type: 'recordRound', winnerId: 'p1', penalties: { p2: 'lots' } },
+    ],
     ['a fractional penalty', { type: 'recordRound', winnerId: 'p1', penalties: { p2: 1.5 } }],
     ['a negative penalty', { type: 'recordRound', winnerId: 'p1', penalties: { p2: -5 } }],
     ['an action nobody handles', { type: 'shuffleEverything' }],
@@ -43,9 +46,13 @@ describe('refusing a hostile payload', () => {
 
   // A rack cannot be worth more than every tile in the box.
   it('refuses a rack larger than the game contains', () => {
-    expect(decodeRummikubAction({
-      type: 'recordRound', winnerId: 'p1', penalties: { p2: 1_000_000 },
-    })).toBeNull();
+    expect(
+      decodeRummikubAction({
+        type: 'recordRound',
+        winnerId: 'p1',
+        penalties: { p2: 1_000_000 },
+      }),
+    ).toBeNull();
   });
 });
 
@@ -69,7 +76,8 @@ describe('applying', () => {
 
   it('refuses a snapshot that is not a Rummikub game', () => {
     const apply = rummikubApply(uid());
-    expect(apply({ players: [], turns: [], currentIndex: 0, variant: 'standard' }, { type: 'undo' }))
-      .toBeNull();
+    expect(
+      apply({ players: [], turns: [], currentIndex: 0, variant: 'standard' }, { type: 'undo' }),
+    ).toBeNull();
   });
 });

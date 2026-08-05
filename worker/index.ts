@@ -9,7 +9,10 @@
 import { mintCode, normaliseCode } from '../shared/rooms/codes';
 import { isAllowedOrigin, parseOrigins } from '../shared/rooms/origins';
 import {
-  CreateRequestSchema, GAMES, JoinRequestSchema, PROTOCOL_VERSION,
+  CreateRequestSchema,
+  GAMES,
+  JoinRequestSchema,
+  PROTOCOL_VERSION,
 } from '../shared/rooms/protocol';
 
 export { Room } from './room';
@@ -40,10 +43,7 @@ interface RateLimit {
  * talking to itself, deliberately - a deploy that lost its configuration should
  * fail loudly rather than quietly let the whole web in.
  */
-const DEFAULT_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:4173',
-];
+const DEFAULT_ORIGINS = ['http://localhost:5173', 'http://localhost:4173'];
 
 /** How many codes to try before admitting defeat. Collisions are vanishingly rare. */
 const MINT_ATTEMPTS = 5;
@@ -77,7 +77,9 @@ const rateKey = (request: Request): string => {
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
   // IPv6 to /48, not /64: a /64 is handed out per instance, so bucketing on
   // one makes the limit free to rotate past.
-  return ip.includes(':') ? ip.split(':').slice(0, 3).join(':') : ip.split('.').slice(0, 3).join('.');
+  return ip.includes(':')
+    ? ip.split(':').slice(0, 3).join(':')
+    : ip.split('.').slice(0, 3).join('.');
 };
 
 async function withinLimit(request: Request, env: Env): Promise<boolean> {
@@ -105,15 +107,19 @@ export default {
      * nobody can curl is not much of one.
      */
     if (url.pathname === '/health') {
-      return json({
-        ok: true,
-        protocol: PROTOCOL_VERSION,
-        games: GAMES,
-        version: env.VERSION?.id ?? null,
-        // Workers Builds tags a version with the commit it was built from.
-        commit: env.VERSION?.tag ?? null,
-        uploadedAt: env.VERSION?.timestamp ?? null,
-      }, 200, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
+      return json(
+        {
+          ok: true,
+          protocol: PROTOCOL_VERSION,
+          games: GAMES,
+          version: env.VERSION?.id ?? null,
+          // Workers Builds tags a version with the commit it was built from.
+          commit: env.VERSION?.tag ?? null,
+          uploadedAt: env.VERSION?.timestamp ?? null,
+        },
+        200,
+        { 'access-control-allow-origin': '*', 'cache-control': 'no-store' },
+      );
     }
 
     // WebSocket upgrades are not subject to CORS, so the origin is checked here

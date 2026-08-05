@@ -9,16 +9,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { allowed, blocked, isHost, isMyTurn, myName, mySeat, renameSelf } from './whoAmI';
 import type { RoomHandle } from './session';
 
-const PLAYERS = [{ id: 'p1', name: 'Ada' }, { id: 'p2', name: 'Grace' }];
+const PLAYERS = [
+  { id: 'p1', name: 'Ada' },
+  { id: 'p2', name: 'Grace' },
+];
 
 /** Only the parts these functions touch; the rest of a room is not their business. */
-const room = (over: Partial<RoomHandle> = {}): RoomHandle => ({
-  role: 'player',
-  seatId: 'p2',
-  sending: false,
-  can: () => true,
-  ...over,
-} as RoomHandle);
+const room = (over: Partial<RoomHandle> = {}): RoomHandle =>
+  ({
+    role: 'player',
+    seatId: 'p2',
+    sending: false,
+    can: () => true,
+    ...over,
+  }) as RoomHandle;
 
 describe('being the host', () => {
   it('is true playing alone, where there is nobody to be host over', () => {

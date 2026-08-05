@@ -8,9 +8,11 @@ interface Props {
   onSet: (index: number, patch: Partial<Tile>) => void;
 }
 
-const bonusLabel = (t: Tile): string => (t.blank ? 'BL' : t.lm === 2 ? 'DL' : t.lm === 3 ? 'TL' : '');
+const bonusLabel = (t: Tile): string =>
+  t.blank ? 'BL' : t.lm === 2 ? 'DL' : t.lm === 3 ? 'TL' : '';
 
-const bonusClass = (t: Tile): string => (t.blank ? 'bl' : t.lm === 2 ? 'dl' : t.lm === 3 ? 'tl' : '');
+const bonusClass = (t: Tile): string =>
+  t.blank ? 'bl' : t.lm === 2 ? 'dl' : t.lm === 3 ? 'tl' : '';
 
 const describe = (t: Tile): string => {
   const worth = t.blank ? 'blank tile, 0 points' : `${tileValue(t)} points`;
@@ -47,8 +49,12 @@ export function TileRow({ tiles, onCycle, onSet }: Props) {
             onKeyDown={(e) => handleKey(e, i, tile)}
           >
             {tile.ch}
-            <span className="tag" aria-hidden="true">{bonusLabel(tile)}</span>
-            <span className="val" aria-hidden="true">{tileValue(tile) * tile.lm}</span>
+            <span className="tag" aria-hidden="true">
+              {bonusLabel(tile)}
+            </span>
+            <span className="val" aria-hidden="true">
+              {tileValue(tile) * tile.lm}
+            </span>
           </button>
         ))}
       </div>

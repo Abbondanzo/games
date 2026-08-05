@@ -15,13 +15,18 @@ const Router = ({ children }: { children: ReactNode }) => (
 
 function setup() {
   const user = userEvent.setup();
-  render(<Router><ScrabbleTracker /></Router>);
+  render(
+    <Router>
+      <ScrabbleTracker />
+    </Router>,
+  );
   return user;
 }
 
 const wordBox = () => screen.getByLabelText('Word played');
 const total = () => Number(screen.getByTestId('turn-total').textContent);
-const tiles = () => within(screen.getByRole('group', { name: 'Letters played' })).getAllByRole('button');
+const tiles = () =>
+  within(screen.getByRole('group', { name: 'Letters played' })).getAllByRole('button');
 const board = () => scoreboard();
 
 async function addPlayers(user: ReturnType<typeof userEvent.setup>, names: string) {
@@ -32,11 +37,15 @@ async function addPlayers(user: ReturnType<typeof userEvent.setup>, names: strin
 const dictResponse = (word: string) => ({
   ok: true,
   status: 200,
-  json: async () => [{
-    word,
-    phonetic: '/test/',
-    meanings: [{ partOfSpeech: 'noun', definitions: [{ definition: `a definition of ${word}` }] }],
-  }],
+  json: async () => [
+    {
+      word,
+      phonetic: '/test/',
+      meanings: [
+        { partOfSpeech: 'noun', definitions: [{ definition: `a definition of ${word}` }] },
+      ],
+    },
+  ],
 });
 
 /**
@@ -223,7 +232,11 @@ describe('game management', () => {
     await user.click(screen.getByRole('button', { name: 'Reset all' }));
 
     cleanup();
-    render(<Router><ScrabbleTracker /></Router>);
+    render(
+      <Router>
+        <ScrabbleTracker />
+      </Router>,
+    );
     expect(board()).toEqual([]);
     confirm.mockRestore();
   });
@@ -236,22 +249,32 @@ describe('game management', () => {
     expect(localStorage.getItem('games.scrabble.v1')).toContain('Ada');
 
     cleanup();
-    render(<Router><ScrabbleTracker /></Router>);
+    render(
+      <Router>
+        <ScrabbleTracker />
+      </Router>,
+    );
     expect(board()).toEqual(['Ada:5']);
   });
 });
 
 describe('a stored game that is malformed', () => {
-  const seed = (value: unknown) =>
-    localStorage.setItem('games.scrabble.v1', JSON.stringify(value));
+  const seed = (value: unknown) => localStorage.setItem('games.scrabble.v1', JSON.stringify(value));
 
   it('recovers from a current player index that is out of range', () => {
     seed({
-      players: [{ id: 'a', name: 'Ada' }, { id: 'g', name: 'Grace' }],
+      players: [
+        { id: 'a', name: 'Ada' },
+        { id: 'g', name: 'Grace' },
+      ],
       turns: [],
       currentIndex: 5,
     });
-    render(<Router><ScrabbleTracker /></Router>);
+    render(
+      <Router>
+        <ScrabbleTracker />
+      </Router>,
+    );
     expect(screen.getByText(/Now playing/)).toHaveTextContent('Ada');
     expect(screen.getByRole('button', { name: 'Score turn' })).toBeEnabled();
   });
@@ -262,20 +285,33 @@ describe('a stored game that is malformed', () => {
       turns: [{ id: 't', playerId: 'a', kind: 'play', words: ['X'], bingo: false, points: 'lots' }],
       currentIndex: 0,
     });
-    render(<Router><ScrabbleTracker /></Router>);
+    render(
+      <Router>
+        <ScrabbleTracker />
+      </Router>,
+    );
     expect(board()).toEqual(['Ada:0']);
   });
 
   it('starts clean when the players themselves are malformed', () => {
     seed({ players: ['Ada'], turns: [], currentIndex: 0 });
-    expect(() => render(<Router><ScrabbleTracker /></Router>)).not.toThrow();
+    expect(() =>
+      render(
+        <Router>
+          <ScrabbleTracker />
+        </Router>,
+      ),
+    ).not.toThrow();
     expect(board()).toEqual([]);
   });
 });
 
 describe('dictionary', () => {
   it('confirms a valid word inline', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => dictResponse('hello')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => dictResponse('hello')),
+    );
     const user = setup();
     await addPlayers(user, 'Ada');
     await user.type(wordBox(), 'hello');
@@ -286,7 +322,10 @@ describe('dictionary', () => {
   });
 
   it('reports a word that is not in the dictionary', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 404 })),
+    );
     const user = setup();
     await addPlayers(user, 'Ada');
     await user.type(wordBox(), 'zzzz');
@@ -298,7 +337,12 @@ describe('dictionary', () => {
 
   // Regression: a failed fetch used to surface the raw "Failed to fetch".
   it('explains a network failure instead of showing the raw error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
     const user = setup();
     await addPlayers(user, 'Ada');
     await user.type(wordBox(), 'hello');
@@ -313,7 +357,10 @@ describe('dictionary', () => {
   // Regression: the drawer used the `hidden` attribute, which `display: flex`
   // overrode, so it was stuck open. It is now conditionally rendered.
   it('opens the drawer prefilled and removes it from the DOM on close', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => dictResponse('quiz')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => dictResponse('quiz')),
+    );
     const user = setup();
     await addPlayers(user, 'Ada');
     await user.type(wordBox(), 'quiz');
@@ -340,7 +387,10 @@ describe('dictionary', () => {
     };
 
     it('shows a green bar for a valid word', async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => dictResponse('quiz')));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => dictResponse('quiz')),
+      );
       const user = setup();
       const verdict = await openDrawer(user, 'quiz');
 
@@ -349,7 +399,10 @@ describe('dictionary', () => {
     });
 
     it('shows a red bar for a word the dictionary does not have', async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({ ok: false, status: 404 })),
+      );
       const user = setup();
       const verdict = await openDrawer(user, 'zzzz');
 
@@ -360,10 +413,14 @@ describe('dictionary', () => {
     // Regression: a 502 used to surface as an error where the user read it as
     // "not a word". It is transient and unrelated to validity.
     it('recovers from a 502 and still calls a valid word valid', async () => {
-      vi.stubGlobal('fetch', vi.fn()
-        .mockResolvedValueOnce({ ok: false, status: 502 })
-        .mockResolvedValueOnce({ ok: false, status: 502 })
-        .mockResolvedValue(dictResponse('ax')));
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValueOnce({ ok: false, status: 502 })
+          .mockResolvedValueOnce({ ok: false, status: 502 })
+          .mockResolvedValue(dictResponse('ax')),
+      );
       const user = setup();
       const verdict = await openDrawer(user, 'ax');
 
@@ -372,7 +429,10 @@ describe('dictionary', () => {
     });
 
     it('distinguishes a persistent 502 from an invalid word', async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 502 })));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({ ok: false, status: 502 })),
+      );
       const user = setup();
       const verdict = await openDrawer(user, 'quiz');
 
@@ -384,7 +444,10 @@ describe('dictionary', () => {
   });
 
   it('closes the drawer on Escape and on a backdrop click', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => dictResponse('cat')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => dictResponse('cat')),
+    );
     const user = setup();
     await addPlayers(user, 'Ada');
 

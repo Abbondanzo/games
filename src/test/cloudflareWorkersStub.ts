@@ -6,5 +6,8 @@
  * `worker/index.ts`, and never reach a Durable Object.
  */
 export class DurableObject<Env = unknown> {
-  constructor(readonly ctx: unknown, readonly env: Env) {}
+  constructor(
+    readonly ctx: unknown,
+    readonly env: Env,
+  ) {}
 }

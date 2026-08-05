@@ -18,11 +18,21 @@ interface Props {
 const describe = (turn: Turn): JSX.Element => {
   if (turn.kind === 'pass') return <span className="plain">passed</span>;
   if (turn.kind === 'adjust') return <span className="plain">adjustment</span>;
-  return <>{turn.words.join(' + ')}{turn.bingo && ' + bingo'}</>;
+  return (
+    <>
+      {turn.words.join(' + ')}
+      {turn.bingo && ' + bingo'}
+    </>
+  );
 };
 
 export function HistoryCard({
-  players, turns, onUndo, onAdjust, canUndo = true, canAdjust = true,
+  players,
+  turns,
+  onUndo,
+  onAdjust,
+  canUndo = true,
+  canAdjust = true,
 }: Props) {
   const [playerId, setPlayerId] = useState('');
   const [points, setPoints] = useState('');
@@ -41,7 +51,9 @@ export function HistoryCard({
       <div className="card-head">
         <h2>History</h2>
         {turns.length > 0 && canUndo && (
-          <button type="button" className="link" onClick={onUndo}>Undo last</button>
+          <button type="button" className="link" onClick={onUndo}>
+            Undo last
+          </button>
         )}
       </div>
 
@@ -67,7 +79,9 @@ export function HistoryCard({
             onChange={(e) => setPlayerId(e.target.value)}
           >
             {players.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
           <input
@@ -79,7 +93,9 @@ export function HistoryCard({
             inputMode="numeric"
             onChange={(e) => setPoints(e.target.value)}
           />
-          <button type="button" className="ghost" onClick={applyAdjustment}>Apply</button>
+          <button type="button" className="ghost" onClick={applyAdjustment}>
+            Apply
+          </button>
         </div>
       )}
     </section>

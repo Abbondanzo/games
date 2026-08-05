@@ -28,8 +28,7 @@ export function readSession(game: Game): StoredSession | null {
   return stored?.game === game ? stored : null;
 }
 
-export const writeSession = (session: StoredSession): void =>
-  writeJson(key(session.game), session);
+export const writeSession = (session: StoredSession): void => writeJson(key(session.game), session);
 
 export const clearSession = (game: Game): void => removeKey(key(game));
 

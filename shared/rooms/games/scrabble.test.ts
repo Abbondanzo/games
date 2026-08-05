@@ -42,7 +42,10 @@ describe('refusing a hostile payload', () => {
     ['a move with no seat at all', { type: 'movePlayer', id: 'p1' }],
     ['words that are not an array', { type: 'recordPlay', words: 'QUIZ', bingo: false }],
     ['a word with no points', { type: 'recordPlay', words: [{ word: 'QUIZ' }], bingo: false }],
-    ['fractional points', { type: 'recordPlay', words: [{ word: 'A', points: 1.5 }], bingo: false }],
+    [
+      'fractional points',
+      { type: 'recordPlay', words: [{ word: 'A', points: 1.5 }], bingo: false },
+    ],
     ['negative points', { type: 'recordPlay', words: [{ word: 'A', points: -5 }], bingo: false }],
     ['a missing bingo flag', { type: 'recordPlay', words: [] }],
     ['a bingo that is not a boolean', { type: 'recordPlay', words: [], bingo: 'yes' }],
@@ -55,12 +58,20 @@ describe('refusing a hostile payload', () => {
   // A play forms a handful of words at most, and a score has a ceiling.
   it('refuses absurd magnitudes', () => {
     const word = { word: 'A', points: 1 };
-    expect(decodeScrabbleAction({
-      type: 'recordPlay', words: Array(9).fill(word), bingo: false,
-    })).toBeNull();
-    expect(decodeScrabbleAction({
-      type: 'recordPlay', words: [{ word: 'A', points: 99_999 }], bingo: false,
-    })).toBeNull();
+    expect(
+      decodeScrabbleAction({
+        type: 'recordPlay',
+        words: Array(9).fill(word),
+        bingo: false,
+      }),
+    ).toBeNull();
+    expect(
+      decodeScrabbleAction({
+        type: 'recordPlay',
+        words: [{ word: 'A', points: 99_999 }],
+        bingo: false,
+      }),
+    ).toBeNull();
     expect(decodeScrabbleAction({ type: 'adjust', playerId: 'p1', points: 100_000 })).toBeNull();
   });
 

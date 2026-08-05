@@ -6,11 +6,11 @@ uses a small room server.
 
 **[games.abbondanzo.com](https://games.abbondanzo.com/)**
 
-| Game | What it tracks |
-| --- | --- |
-| [Scrabble](docs/scrabble.md) | Words, bonus squares, blanks and bingos, with a dictionary lookup |
+| Game                               | What it tracks                                                    |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| [Scrabble](docs/scrabble.md)       | Words, bonus squares, blanks and bingos, with a dictionary lookup |
 | [Cricket (darts)](docs/cricket.md) | Marks, closing out and points - standard, cut-throat or no points |
-| [Rummikub](docs/rummikub.md) | Round-by-round scoring from the tiles left on each rack |
+| [Rummikub](docs/rummikub.md)       | Round-by-round scoring from the tiles left on each rack           |
 
 Any game can be [shared with a four-character code](docs/rooms.md), so everyone at the table
 sees the score and enters their own turns.
@@ -28,17 +28,17 @@ Then open the `http://localhost:5173` address it prints. It must be **served**, 
 file: browsers give `file://` pages a `null` origin and block their network requests, which
 breaks the dictionary.
 
-| Script | What it does |
-| --- | --- |
-| `pnpm dev` | Dev server with hot reload |
-| `pnpm build` | Type-check and build to `dist/` |
-| `pnpm preview` | Serve the production build locally |
-| `pnpm test` | Run the test suite once |
-| `pnpm test:watch` | Re-run tests on change |
-| `pnpm typecheck` | Types only, no build |
-| `pnpm icons` | Regenerate the icon set from the trophy artwork |
-| `pnpm worker:dev` | Run the room server locally on :8787 |
-| `pnpm worker:deploy` | Deploy the room server |
+| Script               | What it does                                    |
+| -------------------- | ----------------------------------------------- |
+| `pnpm dev`           | Dev server with hot reload                      |
+| `pnpm build`         | Type-check and build to `dist/`                 |
+| `pnpm preview`       | Serve the production build locally              |
+| `pnpm test`          | Run the test suite once                         |
+| `pnpm test:watch`    | Re-run tests on change                          |
+| `pnpm typecheck`     | Types only, no build                            |
+| `pnpm icons`         | Regenerate the icon set from the trophy artwork |
+| `pnpm worker:dev`    | Run the room server locally on :8787            |
+| `pnpm worker:deploy` | Deploy the room server                          |
 
 Needs Node 20+ and pnpm; `corepack enable` picks up the pinned version.
 

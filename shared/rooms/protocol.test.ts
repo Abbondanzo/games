@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLOSE, ERROR_CODES, ERROR_MESSAGES, GONE_BY_CODE, GONE_MESSAGES,
-  MAX_FRAME_BYTES, PROTOCOL_VERSION, VERSION_MESSAGES,
+  CLOSE,
+  ERROR_CODES,
+  ERROR_MESSAGES,
+  GONE_BY_CODE,
+  GONE_MESSAGES,
+  MAX_FRAME_BYTES,
+  PROTOCOL_VERSION,
+  VERSION_MESSAGES,
   compareProtocol,
-  type ClientMessage, type ServerMessage,
-  decodeClientMessage, decodeServerMessage, encode,
+  type ClientMessage,
+  type ServerMessage,
+  decodeClientMessage,
+  decodeServerMessage,
+  encode,
 } from './protocol';
 
 const CLIENT: ClientMessage[] = [
@@ -103,8 +112,14 @@ describe('malformed input is dropped, not thrown on', () => {
   });
 
   it.each([
-    ['a bad role', '{"t":"welcome","protocol":1,"code":"AB2D","game":"cricket","you":{"memberId":"m","role":"admin","seatId":null,"name":"A"},"rev":0,"state":{},"room":{"members":[],"locked":false}}'],
-    ['an unknown game', '{"t":"welcome","protocol":1,"code":"AB2D","game":"chess","you":{"memberId":"m","role":"host","seatId":null,"name":"A"},"rev":0,"state":{},"room":{"members":[],"locked":false}}'],
+    [
+      'a bad role',
+      '{"t":"welcome","protocol":1,"code":"AB2D","game":"cricket","you":{"memberId":"m","role":"admin","seatId":null,"name":"A"},"rev":0,"state":{},"room":{"members":[],"locked":false}}',
+    ],
+    [
+      'an unknown game',
+      '{"t":"welcome","protocol":1,"code":"AB2D","game":"chess","you":{"memberId":"m","role":"host","seatId":null,"name":"A"},"rev":0,"state":{},"room":{"members":[],"locked":false}}',
+    ],
     ['an unknown error code', '{"t":"error","reqId":null,"code":"teapot"}'],
   ])('drops server frames with %s', (_label, raw) => {
     expect(decodeServerMessage(raw)).toBeNull();
@@ -217,7 +232,10 @@ describe('what a client is allowed to read', () => {
     });
 
     const decoded = decodeServerMessage(frame);
-    expect(decoded).toEqual({ t: 'room', room: { members: [], locked: false, pending: null, removed: [] } });
+    expect(decoded).toEqual({
+      t: 'room',
+      room: { members: [], locked: false, pending: null, removed: [] },
+    });
     expect(JSON.stringify(decoded)).not.toContain('secret');
   });
 
@@ -225,10 +243,16 @@ describe('what a client is allowed to read', () => {
     const frame = JSON.stringify({
       t: 'room',
       room: {
-        members: [{
-          memberId: 'm1', name: 'Ada', role: 'player', seatId: 'p1', online: true,
-          deviceKey: 'sha256:secret',
-        }],
+        members: [
+          {
+            memberId: 'm1',
+            name: 'Ada',
+            role: 'player',
+            seatId: 'p1',
+            online: true,
+            deviceKey: 'sha256:secret',
+          },
+        ],
         locked: false,
         pending: null,
         removed: [],

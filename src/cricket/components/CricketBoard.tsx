@@ -26,7 +26,13 @@ const FOOTER_LABEL: Record<Variant, string> = {
 };
 
 export function CricketBoard({
-  players, board, variant, currentPlayerId, onSelect, selectable = true, youId = null,
+  players,
+  board,
+  variant,
+  currentPlayerId,
+  onSelect,
+  selectable = true,
+  youId = null,
 }: Props) {
   if (!players.length) return null;
 
@@ -38,7 +44,9 @@ export function CricketBoard({
         </caption>
         <thead>
           <tr>
-            <th scope="col" className="corner">Target</th>
+            <th scope="col" className="corner">
+              Target
+            </th>
             {players.map((p) => {
               const inside = (
                 <>
@@ -51,10 +59,11 @@ export function CricketBoard({
                 <th
                   key={p.id}
                   scope="col"
-                  className={[
-                    p.id === currentPlayerId ? 'active' : '',
-                    p.id === youId ? 'mine' : '',
-                  ].filter(Boolean).join(' ') || undefined}
+                  className={
+                    [p.id === currentPlayerId ? 'active' : '', p.id === youId ? 'mine' : '']
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
                 >
                   {selectable ? (
                     <button

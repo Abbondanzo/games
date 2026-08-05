@@ -24,7 +24,11 @@ describe('recording a round', () => {
   const scored = (): RummikubState => {
     const s = withPlayers();
     const [a, g, l] = s.players;
-    return run(s, { type: 'recordRound', winnerId: a!.id, penalties: { [g!.id]: 24, [l!.id]: 41 } });
+    return run(s, {
+      type: 'recordRound',
+      winnerId: a!.id,
+      penalties: { [g!.id]: 24, [l!.id]: 41 },
+    });
   };
 
   it('stores the winner and every penalty', () => {
@@ -43,7 +47,9 @@ describe('recording a round', () => {
     const s = withPlayers();
     const [a, g] = s.players;
     const after = run(s, {
-      type: 'recordRound', winnerId: a!.id, penalties: { [a!.id]: 50, [g!.id]: 10 },
+      type: 'recordRound',
+      winnerId: a!.id,
+      penalties: { [a!.id]: 50, [g!.id]: 10 },
     });
     expect(after.rounds[0]!.penalties[a!.id]).toBeUndefined();
     expect(after.rounds[0]!.penalties[g!.id]).toBe(10);
@@ -71,9 +77,11 @@ describe('removing a player', () => {
   const played = (): RummikubState => {
     const s = withPlayers();
     const [a, g, l] = s.players;
-    return run(s,
+    return run(
+      s,
       { type: 'recordRound', winnerId: a!.id, penalties: { [g!.id]: 24, [l!.id]: 41 } },
-      { type: 'recordRound', winnerId: g!.id, penalties: { [a!.id]: 10, [l!.id]: 5 } });
+      { type: 'recordRound', winnerId: g!.id, penalties: { [a!.id]: 10, [l!.id]: 5 } },
+    );
   };
 
   it('keeps rounds they only lost, and rescores them', () => {

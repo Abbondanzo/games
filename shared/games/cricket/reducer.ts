@@ -92,9 +92,10 @@ function apply(state: CricketState, action: Action, uid: IdSource): CricketState
       return {
         ...state,
         turns: state.turns.slice(0, -1),
-        currentIndex: thrownBy === -1
-          ? (state.currentIndex - 1 + state.players.length) % state.players.length
-          : thrownBy,
+        currentIndex:
+          thrownBy === -1
+            ? (state.currentIndex - 1 + state.players.length) % state.players.length
+            : thrownBy,
       };
     }
 
@@ -120,8 +121,10 @@ function apply(state: CricketState, action: Action, uid: IdSource): CricketState
  * Binds an id source to the reducer. The room server passes its own, so ids are
  * minted once by the authority rather than by whichever client happened to act.
  */
-export const createReducer = (uid: IdSource = defaultUid) =>
-  (state: CricketState, action: Action): CricketState => apply(state, action, uid);
+export const createReducer =
+  (uid: IdSource = defaultUid) =>
+  (state: CricketState, action: Action): CricketState =>
+    apply(state, action, uid);
 
 /**
  * The ordinary reducer. Deliberately arity two so it drops straight into

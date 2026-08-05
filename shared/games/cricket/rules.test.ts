@@ -82,7 +82,7 @@ describe('scoring', () => {
     const turns = [
       ...triples('a', 20, 1), // Ada closes 20
       ...triples('g', 20, 1), // Grace closes 20 - the number is now dead
-      turn('a', d(20, 3)),    // scores nothing
+      turn('a', d(20, 3)), // scores nothing
     ];
     const b = board(two, turns);
     expect(b.dead[20]).toBe(true);
@@ -119,7 +119,7 @@ describe('a player who joins mid-game', () => {
     const turns = [
       ...triples('a', 20, 1), // Ada closes 20
       ...triples('g', 20, 1), // Grace closes 20, so 20 is dead
-      turn('a', d(20, 3)),    // scored nothing when it was thrown
+      turn('a', d(20, 3)), // scored nothing when it was thrown
     ];
     expect(board(two, turns).points.a).toBe(0);
     expect(board([...two, late(3)], turns).points.a).toBe(0);
@@ -134,9 +134,9 @@ describe('a player who joins mid-game', () => {
 
   it('does take part from the moment they join', () => {
     const turns = [
-      ...triples('a', 20, 1),  // turn 0: Ada closes 20
-      ...triples('g', 20, 1),  // turn 1: Grace closes 20
-      turn('a', d(20, 3)),     // turn 2: dead for the original two
+      ...triples('a', 20, 1), // turn 0: Ada closes 20
+      ...triples('g', 20, 1), // turn 1: Grace closes 20
+      turn('a', d(20, 3)), // turn 2: dead for the original two
     ];
     // Alan joins before that last throw, so 20 is open again and it pays.
     expect(board([...two, late(2)], turns).points.a).toBe(60);
@@ -170,7 +170,7 @@ describe('cut-throat', () => {
     const turns = [
       ...triples('a', 20, 1),
       ...triples('g', 20, 1), // Grace is safe on 20
-      turn('a', d(20, 3)),    // only Alan takes it
+      turn('a', d(20, 3)), // only Alan takes it
     ];
     const b = board(three, turns, 'cutthroat');
     expect(b.points.g).toBe(0);
@@ -207,8 +207,10 @@ describe('no points mode', () => {
 
   it('previews marks but no points', () => {
     const existing = [...triples('a', 20, 1)];
-    expect(previewTurn(two, existing, 'nopoints', 'a', [d(20, 3), d(19)]))
-      .toEqual({ marks: 1, points: 0 });
+    expect(previewTurn(two, existing, 'nopoints', 'a', [d(20, 3), d(19)])).toEqual({
+      marks: 1,
+      points: 0,
+    });
   });
 });
 
@@ -229,10 +231,10 @@ describe('winning', () => {
   it('is won once the trailing player catches up on points', () => {
     const turns = [
       ...triples('g', 20, 1),
-      turn('g', d(20, 3)),        // Grace 60
-      ...closeAll('a'),           // Ada closed out but on 0
-      turn('a', d(19, 3)),        // 19 still open for Grace: 57
-      turn('a', d(19, 3)),        // 114 - now ahead
+      turn('g', d(20, 3)), // Grace 60
+      ...closeAll('a'), // Ada closed out but on 0
+      turn('a', d(19, 3)), // 19 still open for Grace: 57
+      turn('a', d(19, 3)), // 114 - now ahead
     ];
     const b = board(two, turns);
     expect(b.points.a).toBe(114);
@@ -278,14 +280,18 @@ describe('standings', () => {
 describe('previewTurn', () => {
   it('reports the marks and points a throw would add', () => {
     const existing = [...triples('a', 20, 1)];
-    expect(previewTurn(two, existing, 'standard', 'a', [d(20, 3), d(19)]))
-      .toEqual({ marks: 1, points: 60 });
+    expect(previewTurn(two, existing, 'standard', 'a', [d(20, 3), d(19)])).toEqual({
+      marks: 1,
+      points: 60,
+    });
   });
 
   it('reports points dealt to opponents in cut-throat', () => {
     const existing = [...triples('a', 20, 1)];
-    expect(previewTurn(three, existing, 'cutthroat', 'a', [d(20, 3)]))
-      .toEqual({ marks: 0, points: 120 });
+    expect(previewTurn(three, existing, 'cutthroat', 'a', [d(20, 3)])).toEqual({
+      marks: 0,
+      points: 120,
+    });
   });
 });
 

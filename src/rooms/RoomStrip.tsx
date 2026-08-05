@@ -20,7 +20,10 @@ interface Props<P extends { id: string; name: string }> {
 }
 
 export function RoomStrip<P extends { id: string; name: string }>({
-  room, players, dispatch, gone,
+  room,
+  players,
+  dispatch,
+  gone,
 }: Props<P>) {
   return (
     <>

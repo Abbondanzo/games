@@ -18,7 +18,11 @@ type Throw = [Ring, string];
 
 function setup() {
   const user = userEvent.setup();
-  render(<Router><CricketTracker /></Router>);
+  render(
+    <Router>
+      <CricketTracker />
+    </Router>,
+  );
   return user;
 }
 
@@ -29,7 +33,8 @@ async function addPlayers(user: User, names: string) {
 
 const boardTable = () => screen.getByRole('table');
 const rowFor = (label: string) =>
-  within(boardTable()).getAllByRole('row')
+  within(boardTable())
+    .getAllByRole('row')
     .find((r) => r.querySelector('th')?.textContent?.startsWith(label))!;
 
 /** What the scoreboard says for a player on a target row. */
@@ -49,12 +54,16 @@ async function dart(user: User, [ring, target]: Throw) {
 /** Throw darts and close out the turn, which three darts do on their own. */
 async function playTurn(user: User, ...throws: Throw[]) {
   for (const t of throws) await dart(user, t);
-  if (throws.length < 3 && !screen.getByRole('button', { name: 'End turn' }).hasAttribute('disabled')) {
+  if (
+    throws.length < 3 &&
+    !screen.getByRole('button', { name: 'End turn' }).hasAttribute('disabled')
+  ) {
     await user.click(screen.getByRole('button', { name: 'End turn' }));
   }
 }
 
-const missTurn = (user: User) => playTurn(user, ['Single', 'Miss'], ['Single', 'Miss'], ['Single', 'Miss']);
+const missTurn = (user: User) =>
+  playTurn(user, ['Single', 'Miss'], ['Single', 'Miss'], ['Single', 'Miss']);
 
 /**
  * The win banner. The turn header is also a live region, so that whoever is
@@ -140,7 +149,7 @@ describe('points', () => {
     const user = setup();
     await addPlayers(user, 'Ada, Grace');
     await playTurn(user, ['Triple', 'Triple 20']); // Ada closes
-    await missTurn(user);                          // Grace
+    await missTurn(user); // Grace
     await playTurn(user, ['Triple', 'Triple 20']); // Ada scores 60
 
     expect(pointsFor(0)).toBe('60');
@@ -235,8 +244,7 @@ describe('correcting a throw', () => {
 });
 
 describe('a stored game that is malformed', () => {
-  const seed = (value: unknown) =>
-    localStorage.setItem('games.cricket.v1', JSON.stringify(value));
+  const seed = (value: unknown) => localStorage.setItem('games.cricket.v1', JSON.stringify(value));
 
   it('recovers from a turn with no darts instead of crashing on every load', () => {
     seed({
@@ -244,17 +252,30 @@ describe('a stored game that is malformed', () => {
       turns: [{ id: 't', playerId: 'a' }],
       currentIndex: 0,
     });
-    expect(() => render(<Router><CricketTracker /></Router>)).not.toThrow();
+    expect(() =>
+      render(
+        <Router>
+          <CricketTracker />
+        </Router>,
+      ),
+    ).not.toThrow();
     expect(screen.getByText(/Now throwing/)).toHaveTextContent('Ada');
   });
 
   it('recovers from a current player index that is out of range', () => {
     seed({
-      players: [{ id: 'a', name: 'Ada', joinedAtTurn: 0 }, { id: 'g', name: 'Grace', joinedAtTurn: 0 }],
+      players: [
+        { id: 'a', name: 'Ada', joinedAtTurn: 0 },
+        { id: 'g', name: 'Grace', joinedAtTurn: 0 },
+      ],
       turns: [],
       currentIndex: 9,
     });
-    render(<Router><CricketTracker /></Router>);
+    render(
+      <Router>
+        <CricketTracker />
+      </Router>,
+    );
     expect(screen.getByText(/Now throwing/)).toHaveTextContent('Ada');
     expect(screen.getByRole('button', { name: 'Miss' })).toBeEnabled();
   });
@@ -265,13 +286,23 @@ describe('a stored game that is malformed', () => {
       turns: [{ id: 't', playerId: 'ghost', darts: [{ target: 20, multiplier: 3 }] }],
       currentIndex: 0,
     });
-    render(<Router><CricketTracker /></Router>);
+    render(
+      <Router>
+        <CricketTracker />
+      </Router>,
+    );
     expect(screen.getByText('No darts thrown yet.')).toBeInTheDocument();
   });
 
   it('starts clean when the players themselves are malformed', () => {
     seed({ players: [null], turns: [], currentIndex: 0 });
-    expect(() => render(<Router><CricketTracker /></Router>)).not.toThrow();
+    expect(() =>
+      render(
+        <Router>
+          <CricketTracker />
+        </Router>,
+      ),
+    ).not.toThrow();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 });
@@ -304,7 +335,11 @@ describe('winning', () => {
     await adaClosesOut(user);
 
     cleanup();
-    render(<Router><CricketTracker /></Router>);
+    render(
+      <Router>
+        <CricketTracker />
+      </Router>,
+    );
     expect(banner()).toHaveTextContent('Ada wins');
   });
 
@@ -441,7 +476,10 @@ describe('no points mode', () => {
 describe('removing a player', () => {
   const removeButton = (name: string) => screen.getByRole('button', { name: `Remove ${name}` });
   const playerNames = () =>
-    within(boardTable()).getAllByRole('columnheader').slice(1).map((h) => h.textContent);
+    within(boardTable())
+      .getAllByRole('columnheader')
+      .slice(1)
+      .map((h) => h.textContent);
 
   it('removes a player who has thrown nothing without asking', async () => {
     const user = setup();
@@ -499,7 +537,10 @@ describe('removing a player', () => {
 
 describe('reset all', () => {
   const columns = () =>
-    within(boardTable()).getAllByRole('columnheader').slice(1).map((h) => h.textContent);
+    within(boardTable())
+      .getAllByRole('columnheader')
+      .slice(1)
+      .map((h) => h.textContent);
 
   it('clears the board and the players', async () => {
     const user = setup();
@@ -536,7 +577,10 @@ describe('reset all', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset all' }));
 
-    expect(screen.getByRole('button', { name: 'Cut-throat' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Cut-throat' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     confirm.mockRestore();
   });
 
@@ -548,7 +592,11 @@ describe('reset all', () => {
     await user.click(screen.getByRole('button', { name: 'Reset all' }));
 
     cleanup();
-    render(<Router><CricketTracker /></Router>);
+    render(
+      <Router>
+        <CricketTracker />
+      </Router>,
+    );
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     confirm.mockRestore();
   });
@@ -561,7 +609,11 @@ describe('persistence', () => {
     await playTurn(user, ['Triple', 'Triple 20']);
 
     cleanup();
-    render(<Router><CricketTracker /></Router>);
+    render(
+      <Router>
+        <CricketTracker />
+      </Router>,
+    );
 
     expect(marksOn('20', 0)).toContain('closed');
     expect(whoseTurn()).toContain('Grace');

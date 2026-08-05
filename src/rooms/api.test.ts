@@ -14,9 +14,14 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('creating a room', () => {
   it('returns the session the server issued', async () => {
-    mockFetch(async () => respond(200, {
-      code: 'AB2D', token: 't', memberId: 'm', game: 'cricket',
-    }));
+    mockFetch(async () =>
+      respond(200, {
+        code: 'AB2D',
+        token: 't',
+        memberId: 'm',
+        game: 'cricket',
+      }),
+    );
     await expect(createRoom('cricket', 'Ada', 'secret')).resolves.toEqual({
       ok: true,
       value: { code: 'AB2D', token: 't', memberId: 'm', game: 'cricket' },
@@ -27,14 +32,20 @@ describe('creating a room', () => {
   it('refuses a reply that is missing fields', async () => {
     mockFetch(async () => respond(200, { code: 'AB2D' }));
     await expect(createRoom('cricket', 'Ada', 'secret')).resolves.toEqual({
-      ok: false, error: 'unreachable',
+      ok: false,
+      error: 'unreachable',
     });
   });
 
   it('refuses a reply naming a game that does not exist', async () => {
-    mockFetch(async () => respond(200, {
-      code: 'AB2D', token: 't', memberId: 'm', game: 'chess',
-    }));
+    mockFetch(async () =>
+      respond(200, {
+        code: 'AB2D',
+        token: 't',
+        memberId: 'm',
+        game: 'chess',
+      }),
+    );
     await expect(createRoom('cricket', 'Ada', 'secret')).resolves.toMatchObject({ ok: false });
   });
 });
@@ -54,23 +65,42 @@ describe('what can go wrong', () => {
   // 409 covers two different refusals, so the body decides which.
   it('tells a locked room from a full one', async () => {
     mockFetch(async () => respond(409, { error: 'room-full' }));
-    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({ ok: false, error: 'room-full' });
+    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({
+      ok: false,
+      error: 'room-full',
+    });
 
     mockFetch(async () => respond(409, { error: 'room-locked' }));
-    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({ ok: false, error: 'room-locked' });
+    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({
+      ok: false,
+      error: 'room-locked',
+    });
   });
 
   it('treats a dead network as unreachable rather than throwing', async () => {
     mockFetch(async () => {
       throw new TypeError('Failed to fetch');
     });
-    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({ ok: false, error: 'unreachable' });
+    await expect(joinRoom('AB2D', 'Grace', 'secret')).resolves.toEqual({
+      ok: false,
+      error: 'unreachable',
+    });
   });
 
   it('survives a body that is not JSON', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true, status: 200, json: async () => { throw new Error('not json'); },
-    }) as unknown as Response));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          ({
+            ok: true,
+            status: 200,
+            json: async () => {
+              throw new Error('not json');
+            },
+          }) as unknown as Response,
+      ),
+    );
     await expect(peekRoom('AB2D')).resolves.toMatchObject({ ok: false });
   });
 });
@@ -79,14 +109,19 @@ describe('looking a code up', () => {
   it('reports which game it belongs to', async () => {
     mockFetch(async () => respond(200, { game: 'rummikub', open: true }));
     await expect(peekRoom('AB2D')).resolves.toEqual({
-      ok: true, value: { game: 'rummikub', open: true, claimable: [] },
+      ok: true,
+      value: { game: 'rummikub', open: true, claimable: [] },
     });
   });
 
   it('reports who is waiting to be claimed', async () => {
-    mockFetch(async () => respond(200, {
-      game: 'cricket', open: true, claimable: [{ id: 'p1', name: 'Ada' }],
-    }));
+    mockFetch(async () =>
+      respond(200, {
+        game: 'cricket',
+        open: true,
+        claimable: [{ id: 'p1', name: 'Ada' }],
+      }),
+    );
     await expect(peekRoom('AB2D')).resolves.toEqual({
       ok: true,
       value: { game: 'cricket', open: true, claimable: [{ id: 'p1', name: 'Ada' }] },
@@ -108,7 +143,13 @@ describe('looking a code up', () => {
 
 describe('the messages a player sees', () => {
   it('covers every failure', () => {
-    for (const error of ['no-room', 'room-locked', 'room-full', 'rate-limited', 'unreachable'] as const) {
+    for (const error of [
+      'no-room',
+      'room-locked',
+      'room-full',
+      'rate-limited',
+      'unreachable',
+    ] as const) {
       expect(ROOM_ERRORS[error]).toBeTruthy();
     }
   });

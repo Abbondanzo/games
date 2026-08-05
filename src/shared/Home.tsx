@@ -55,7 +55,9 @@ export function Home() {
         <DoorOpen className="icon" size={26} strokeWidth={1.75} aria-hidden="true" />
         <span>
           <span className="title">Join a game</span>
-          <span className="desc">Someone else is keeping score. Enter their code to follow along.</span>
+          <span className="desc">
+            Someone else is keeping score. Enter their code to follow along.
+          </span>
         </span>
       </Link>
     </main>

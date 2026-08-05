@@ -8,10 +8,7 @@ import { z } from 'zod';
 import { TARGETS } from './rules';
 
 /** Target 0 is a miss; everything else must be one of the seven real targets. */
-export const TargetSchema = z.union([
-  z.literal(0),
-  ...TARGETS.map((t) => z.literal(t)),
-]);
+export const TargetSchema = z.union([z.literal(0), ...TARGETS.map((t) => z.literal(t))]);
 
 export const MultiplierSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 

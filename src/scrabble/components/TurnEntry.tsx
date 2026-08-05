@@ -37,8 +37,15 @@ interface Props {
 const IDLE: LookupView = { kind: 'idle' };
 
 export function TurnEntry({
-  draft, setDraft, currentPlayer, turnNumber, onScore, onPass, onOpenDictionary,
-  disabled = false, yourTurn = null,
+  draft,
+  setDraft,
+  currentPlayer,
+  turnNumber,
+  onScore,
+  onPass,
+  onOpenDictionary,
+  disabled = false,
+  yourTurn = null,
 }: Props) {
   const [check, setCheck] = useState<LookupView>(IDLE);
   const word = draftWord(draft);
@@ -95,7 +102,9 @@ export function TurnEntry({
   return (
     <section className={`card${tone ? ` entry ${tone}` : ''}`}>
       <div className="card-head">
-        <h2>Turn <span className="muted">#{turnNumber}</span></h2>
+        <h2>
+          Turn <span className="muted">#{turnNumber}</span>
+        </h2>
         <WhoseTurn
           name={currentPlayer?.name ?? null}
           yours={yourTurn}
@@ -118,12 +127,18 @@ export function TurnEntry({
             spellCheck={false}
             maxLength={15}
           />
-          <button type="button" className="ghost" onClick={() => void runCheck()}>Check</button>
+          <button type="button" className="ghost" onClick={() => void runCheck()}>
+            Check
+          </button>
         </div>
 
         <ValidityBar view={check} />
 
-        <TileRow tiles={draft.tiles} onCycle={(i) => setTile(i, cycleTile(draft.tiles[i]!))} onSet={setTile} />
+        <TileRow
+          tiles={draft.tiles}
+          onCycle={(i) => setTile(i, cycleTile(draft.tiles[i]!))}
+          onSet={setTile}
+        />
 
         <div className="bonus-row">
           <div className="seg" role="group" aria-label="Word multiplier">
@@ -159,7 +174,9 @@ export function TurnEntry({
                 <button
                   type="button"
                   aria-label={`Remove ${w.word}`}
-                  onClick={() => setDraft((d) => ({ ...d, words: d.words.filter((_, j) => j !== i) }))}
+                  onClick={() =>
+                    setDraft((d) => ({ ...d, words: d.words.filter((_, j) => j !== i) }))
+                  }
                 >
                   <X size={14} strokeWidth={2.5} aria-hidden="true" />
                 </button>
@@ -184,7 +201,10 @@ export function TurnEntry({
               type="button"
               className="ghost"
               disabled={disabled}
-              onClick={() => { onPass(); setCheck(IDLE); }}
+              onClick={() => {
+                onPass();
+                setCheck(IDLE);
+              }}
             >
               Pass
             </button>

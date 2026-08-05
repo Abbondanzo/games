@@ -90,12 +90,18 @@ describe('keeping the entries that still make sense', () => {
   const ownerOf = (e: { owner: string }) => e.owner;
 
   it('keeps entries owned by somebody on the roster', () => {
-    const raw = [{ id: '1', owner: 'a' }, { id: '2', owner: 'g' }];
+    const raw = [
+      { id: '1', owner: 'a' },
+      { id: '2', owner: 'g' },
+    ];
     expect(keepValid(raw, Entry, ownerOf, owners)).toEqual(raw);
   });
 
   it('drops an entry whose owner has been removed', () => {
-    const raw = [{ id: '1', owner: 'a' }, { id: '2', owner: 'gone' }];
+    const raw = [
+      { id: '1', owner: 'a' },
+      { id: '2', owner: 'gone' },
+    ];
     expect(keepValid(raw, Entry, ownerOf, owners)).toEqual([{ id: '1', owner: 'a' }]);
   });
 

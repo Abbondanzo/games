@@ -50,8 +50,7 @@ describe('removing a player keeps the right person up', () => {
 
 describe('joining', () => {
   it('stamps the join point with the turns played so far', () => {
-    const state = run(withPlayers(), throwTurn, throwTurn,
-      { type: 'addPlayers', names: 'Kay' });
+    const state = run(withPlayers(), throwTurn, throwTurn, { type: 'addPlayers', names: 'Kay' });
     expect(state.players.map((p) => p.joinedAtTurn)).toEqual([0, 0, 0, 2]);
   });
 });
@@ -87,9 +86,7 @@ describe('undo', () => {
 
   it('hands the turn back to whoever threw it', () => {
     const start = run(withPlayers(), throwTurn); // Ada threw, Grace is up
-    const after = run(start,
-      { type: 'setCurrent', id: start.players[0]!.id },
-      { type: 'undo' });
+    const after = run(start, { type: 'setCurrent', id: start.players[0]!.id }, { type: 'undo' });
     expect(current(after)).toBe('Ada');
   });
 });
@@ -97,7 +94,10 @@ describe('undo', () => {
 describe('variant', () => {
   // Only darts are stored, so a mode change rescores rather than restarts.
   it('keeps every throw when the mode changes', () => {
-    const state = run(withPlayers(), throwTurn, throwTurn, { type: 'setVariant', variant: 'cutthroat' });
+    const state = run(withPlayers(), throwTurn, throwTurn, {
+      type: 'setVariant',
+      variant: 'cutthroat',
+    });
     expect(state.variant).toBe('cutthroat');
     expect(state.turns).toHaveLength(2);
     expect(state.players).toHaveLength(3);
@@ -110,7 +110,8 @@ describe('variant', () => {
 
   it('survives a round trip through every mode', () => {
     const state = run(
-      withPlayers(), throwTurn,
+      withPlayers(),
+      throwTurn,
       { type: 'setVariant', variant: 'cutthroat' },
       { type: 'setVariant', variant: 'nopoints' },
       { type: 'setVariant', variant: 'standard' },
@@ -135,8 +136,12 @@ describe('reset all', () => {
 
   // The mode is a preference rather than game data.
   it('keeps the chosen mode', () => {
-    const state = run(withPlayers(), throwTurn,
-      { type: 'setVariant', variant: 'cutthroat' }, { type: 'resetAll' });
+    const state = run(
+      withPlayers(),
+      throwTurn,
+      { type: 'setVariant', variant: 'cutthroat' },
+      { type: 'resetAll' },
+    );
     expect(state.variant).toBe('cutthroat');
   });
 });

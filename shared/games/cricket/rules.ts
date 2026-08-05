@@ -7,7 +7,8 @@ export const MARKS_TO_CLOSE = 3;
 
 export const DARTS_PER_TURN = 3;
 
-export const targetLabel = (target: CricketTarget): string => (target === 25 ? 'Bull' : String(target));
+export const targetLabel = (target: CricketTarget): string =>
+  target === 25 ? 'Bull' : String(target);
 
 /** How many marks a dart is worth. A miss is worth none. */
 export const dartMarks = (dart: Dart): number => (dart.target === 0 ? 0 : dart.multiplier);
@@ -93,15 +94,18 @@ export function computeBoard(
 
       // Marks beyond closing score, but only while an opponent still has it open.
       const surplus = hits - usedToClose;
-      if (variant !== 'nopoints'
-        && surplus > 0
-        && scoringIsOpen(marks, atTheBoard, turn.playerId, target)) {
+      if (
+        variant !== 'nopoints' &&
+        surplus > 0 &&
+        scoringIsOpen(marks, atTheBoard, turn.playerId, target)
+      ) {
         const scored = surplus * target;
         if (variant === 'cutthroat') {
           // Points are dealt to everyone who has not closed the number.
           for (const p of atTheBoard) {
             if (p.id === turn.playerId) continue;
-            if ((marks[p.id]?.[target] ?? 0) < MARKS_TO_CLOSE) points[p.id] = (points[p.id] ?? 0) + scored;
+            if ((marks[p.id]?.[target] ?? 0) < MARKS_TO_CLOSE)
+              points[p.id] = (points[p.id] ?? 0) + scored;
           }
         } else {
           points[turn.playerId] = (points[turn.playerId] ?? 0) + scored;

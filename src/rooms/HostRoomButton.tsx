@@ -54,16 +54,22 @@ export function HostRoomButton({ game, existing }: Props) {
   return (
     <>
       <button type="button" className="ghost" onClick={() => setOpen(true)}>
-        <Users size={15} aria-hidden="true" />{' '}
-        <span className="btn-label">Share</span>
+        <Users size={15} aria-hidden="true" /> <span className="btn-label">Share</span>
       </button>
 
       {open && (
         <div className="drawer" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="drawer-panel" role="dialog" aria-modal="true" aria-label="Share this game">
+          <div
+            className="drawer-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Share this game"
+          >
             <div className="card-head">
               <h2>Share this game</h2>
-              <button type="button" className="link" onClick={() => setOpen(false)}>Close</button>
+              <button type="button" className="link" onClick={() => setOpen(false)}>
+                Close
+              </button>
             </div>
 
             <form className="join-form" onSubmit={start}>
@@ -97,7 +103,11 @@ export function HostRoomButton({ game, existing }: Props) {
                 {busy ? 'Starting' : existing ? 'Clear and start sharing' : 'Start sharing'}
               </button>
 
-              {error && <p className="room-error" role="status">{ROOM_ERRORS[error]}</p>}
+              {error && (
+                <p className="room-error" role="status">
+                  {ROOM_ERRORS[error]}
+                </p>
+              )}
 
               <p className="hint">
                 You get a code to share. Everyone who joins is added to the game and enters their

@@ -22,7 +22,10 @@ function apply(state: RummikubState, action: Action, uid: IdSource): RummikubSta
     case 'addPlayers': {
       const names = parseNames(action.names);
       if (!names.length) return state;
-      return { ...state, players: [...state.players, ...names.map((name) => ({ id: uid(), name }))] };
+      return {
+        ...state,
+        players: [...state.players, ...names.map((name) => ({ id: uid(), name }))],
+      };
     }
 
     case 'removePlayer': {
@@ -78,8 +81,10 @@ function apply(state: RummikubState, action: Action, uid: IdSource): RummikubSta
  * Binds an id source to the reducer. The room server passes its own, so ids are
  * minted once by the authority rather than by whichever client happened to act.
  */
-export const createReducer = (uid: IdSource = defaultUid) =>
-  (state: RummikubState, action: Action): RummikubState => apply(state, action, uid);
+export const createReducer =
+  (uid: IdSource = defaultUid) =>
+  (state: RummikubState, action: Action): RummikubState =>
+    apply(state, action, uid);
 
 /**
  * The ordinary reducer. Deliberately arity two so it drops straight into

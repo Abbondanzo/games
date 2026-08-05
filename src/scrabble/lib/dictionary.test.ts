@@ -7,10 +7,12 @@ import {
   retryConfig,
 } from './dictionary';
 
-const entry = (word: string) => [{
-  word,
-  meanings: [{ partOfSpeech: 'noun', definitions: [{ definition: `meaning of ${word}` }] }],
-}];
+const entry = (word: string) => [
+  {
+    word,
+    meanings: [{ partOfSpeech: 'noun', definitions: [{ definition: `meaning of ${word}` }] }],
+  },
+];
 
 const okResponse = (word: string) => ({ ok: true, status: 200, json: async () => entry(word) });
 const bad = (status: number) => ({ ok: false, status });
@@ -29,13 +31,19 @@ afterEach(() => {
 
 describe('lookup', () => {
   it('returns entries for a known word', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => okResponse('quiz')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => okResponse('quiz')),
+    );
     const result = await lookup('QUIZ');
     expect(result).toMatchObject({ status: 'found', word: 'quiz' });
   });
 
   it('treats a 404 as a miss rather than an error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 404 })),
+    );
     await expect(lookup('zzzz')).resolves.toMatchObject({ status: 'missing' });
   });
 
@@ -48,15 +56,23 @@ describe('lookup', () => {
   });
 
   it('raises a DictionaryError with guidance when the network fails', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
     await expect(lookup('cat')).rejects.toBeInstanceOf(DictionaryError);
     await expect(lookup('cat')).rejects.toThrow(/Check your internet connection/);
   });
 
   it('propagates an abort rather than reporting it as a failure', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      throw new DOMException('aborted', 'AbortError');
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new DOMException('aborted', 'AbortError');
+      }),
+    );
     await expect(lookup('cat')).rejects.toBeInstanceOf(DOMException);
   });
 
@@ -72,7 +88,8 @@ describe('lookup', () => {
   });
 
   it('retries through the CORS proxy when the direct call is blocked', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockRejectedValueOnce(new TypeError('Failed to fetch'))
       .mockResolvedValueOnce(okResponse('cat'));
     vi.stubGlobal('fetch', fetchMock);
@@ -90,7 +107,9 @@ describe('lookup', () => {
   });
 
   it('gives up with guidance when every attempt fails', async () => {
-    const fetchMock = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
     vi.stubGlobal('fetch', fetchMock);
     await expect(lookup('cat')).rejects.toThrow(/Check your internet connection/);
     // 3 rounds × 2 endpoints.
@@ -102,7 +121,8 @@ describe('lookup', () => {
 // 502'd once and then resolved on retry. A 5xx must never read as "not a word".
 describe('flaky upstream (502)', () => {
   it('retries a 502 and returns the word as valid when it recovers', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(bad(502))
       .mockResolvedValueOnce(bad(502))
       .mockResolvedValueOnce(okResponse('ax'));
@@ -112,16 +132,17 @@ describe('flaky upstream (502)', () => {
   });
 
   it('retries a 502 and reports a genuine miss when the retry 404s', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(bad(502))
-      .mockResolvedValueOnce(bad(404));
+    const fetchMock = vi.fn().mockResolvedValueOnce(bad(502)).mockResolvedValueOnce(bad(404));
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(lookup('flooble')).resolves.toMatchObject({ status: 'missing' });
   });
 
   it('reports a persistent 502 as a service problem, never as an invalid word', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => bad(502)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => bad(502)),
+    );
 
     const error = await lookup('quiz').catch((e: unknown) => e);
     expect(error).toBeInstanceOf(DictionaryError);
@@ -135,7 +156,10 @@ describe('flaky upstream (502)', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(lookup('quiz')).rejects.toThrow();
 
-    vi.stubGlobal('fetch', vi.fn(async () => okResponse('quiz')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => okResponse('quiz')),
+    );
     await expect(lookup('quiz')).resolves.toMatchObject({ status: 'found' });
   });
 
@@ -144,10 +168,18 @@ describe('flaky upstream (502)', () => {
   it('never exposes technical detail in a failure message', async () => {
     const JARGON = /\b(http|https|cors|proxy|fetch|api|localhost|server|\d{3})\b/i;
 
-    vi.stubGlobal('fetch', vi.fn(async () => bad(502)));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => bad(502)),
+    );
     const serviceFailure = await lookup('alpha').catch((e: unknown) => (e as Error).message);
 
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
     const networkFailure = await lookup('beta').catch((e: unknown) => (e as Error).message);
 
     for (const message of [serviceFailure, networkFailure]) {
@@ -156,7 +188,6 @@ describe('flaky upstream (502)', () => {
     }
   });
 });
-
 
 describe('firstDefinition', () => {
   it('prefixes the part of speech', () => {

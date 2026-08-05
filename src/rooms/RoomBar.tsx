@@ -1,4 +1,14 @@
-import { Copy, Crown, DoorOpen, Lock, LockOpen, Pencil, PowerOff, UserX, Users } from 'lucide-react';
+import {
+  Copy,
+  Crown,
+  DoorOpen,
+  Lock,
+  LockOpen,
+  Pencil,
+  PowerOff,
+  UserX,
+  Users,
+} from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { VERSION_MESSAGES } from '@shared/rooms/protocol';
 import type { RoomHandle } from './session';
@@ -47,9 +57,10 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
 
   function endRoom() {
     const others = room.members.length - 1;
-    const warning = others > 0
-      ? `Close the room? The ${others} other ${others === 1 ? 'person' : 'people'} here will stop seeing the score. The game stays on this device.`
-      : 'Close the room? The game stays on this device.';
+    const warning =
+      others > 0
+        ? `Close the room? The ${others} other ${others === 1 ? 'person' : 'people'} here will stop seeing the score. The game stays on this device.`
+        : 'Close the room? The game stays on this device.';
     if (window.confirm(warning)) room.close();
   }
 
@@ -74,9 +85,15 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
         <span className="muted">
           {room.status === 'open'
             ? `${online} here`
-            : room.status === 'connecting' ? 'Getting back to the room' : 'Not connected'}
+            : room.status === 'connecting'
+              ? 'Getting back to the room'
+              : 'Not connected'}
         </span>
-        {room.locked && <span className="muted locked-tag"><Lock size={12} aria-hidden="true" /> locked</span>}
+        {room.locked && (
+          <span className="muted locked-tag">
+            <Lock size={12} aria-hidden="true" /> locked
+          </span>
+        )}
         <button type="button" className="link" onClick={() => setOpen((v) => !v)}>
           {open ? 'Hide' : 'Who is here'}
         </button>
@@ -89,13 +106,15 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
       </div>
 
       {room.outdated && (
-        <p className="room-error" role="status">{VERSION_MESSAGES[room.outdated]}</p>
+        <p className="room-error" role="status">
+          {VERSION_MESSAGES[room.outdated]}
+        </p>
       )}
 
       {open && (
         <div className="room-detail">
-          {myName !== null && (
-            renaming ? (
+          {myName !== null &&
+            (renaming ? (
               <form className="row rename-row" onSubmit={submitName}>
                 <input
                   value={draftName}
@@ -104,7 +123,9 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
                   aria-label="Your name"
                   autoComplete="off"
                 />
-                <button type="submit" className="primary">Save</button>
+                <button type="submit" className="primary">
+                  Save
+                </button>
                 <button type="button" className="ghost" onClick={() => setRenaming(false)}>
                   Cancel
                 </button>
@@ -123,8 +144,7 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
                   <Pencil size={13} aria-hidden="true" /> Change name
                 </button>
               </p>
-            )
-          )}
+            ))}
 
           <ul className="chips">
             {room.members.map((m) => (
@@ -181,9 +201,15 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
             </button>
             {isHost && (
               <button type="button" className="ghost" onClick={() => room.setLocked(!room.locked)}>
-                {room.locked
-                  ? <><LockOpen size={15} aria-hidden="true" /> Allow new players</>
-                  : <><Lock size={15} aria-hidden="true" /> Stop new players</>}
+                {room.locked ? (
+                  <>
+                    <LockOpen size={15} aria-hidden="true" /> Allow new players
+                  </>
+                ) : (
+                  <>
+                    <Lock size={15} aria-hidden="true" /> Stop new players
+                  </>
+                )}
               </button>
             )}
             {isHost ? (
@@ -206,12 +232,12 @@ export function RoomBar({ room, onLeave, myName, onRename }: Props) {
 
           {isHost && (
             <p className="hint">
-              Share the code or the link. Anyone who joins can pick their name and enter their
-              own scores; only you can change the rules. Stopping new players closes the door
-              without ending anything. Removing somebody keeps them out for the rest of the game,
-              whether the room is open or not, until you let them back. You can put someone else
-              in charge, which is how to leave without ending the game. Closing the room ends it
-              for everyone and keeps the game on this device.
+              Share the code or the link. Anyone who joins can pick their name and enter their own
+              scores; only you can change the rules. Stopping new players closes the door without
+              ending anything. Removing somebody keeps them out for the rest of the game, whether
+              the room is open or not, until you let them back. You can put someone else in charge,
+              which is how to leave without ending the game. Closing the room ends it for everyone
+              and keeps the game on this device.
             </p>
           )}
         </div>
