@@ -13,6 +13,7 @@ import {
 } from '../shared/rooms/roomCore';
 import { CLOSE, decodeClientMessage, encode, type Game } from '../shared/rooms/protocol';
 import { GAME_SETUP } from '../shared/rooms/games';
+import { claimable } from '../shared/rooms/roomCore';
 import type { ApplyAction } from '../shared/rooms/roomCore';
 import type { Snapshot } from '../shared/rooms/protocol';
 
@@ -31,6 +32,19 @@ interface Attachment {
 }
 
 const uid = () => crypto.randomUUID();
+
+/**
+ * A device's secret, as the room stores it.
+ *
+ * Hashed so the stored room holds nothing that could be replayed if the storage
+ * were ever read. The digest is only ever compared with another digest, and
+ * never leaves the room in any form.
+ */
+async function deviceKeyOf(secret: unknown): Promise<string | null> {
+  if (typeof secret !== 'string' || !secret) return null;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 export class Room extends DurableObject {
   /**
@@ -99,14 +113,16 @@ export class Room extends DurableObject {
     // A room already at this code means the mint collided; the caller retries.
     if (await this.load()) return json({ error: 'taken' }, 409);
 
-    const body = (await request.json()) as { code: string; game: Game; name: string };
+    const body = (await request.json()) as {
+      code: string; game: Game; name: string; device?: unknown;
+    };
     const memberId = uid();
     const token = uid();
 
     const state = createRoom({
       code: body.code,
       game: body.game,
-      host: { memberId, name: body.name },
+      host: { memberId, name: body.name, deviceKey: await deviceKeyOf(body.device) ?? undefined },
       snapshot: GAME_SETUP[body.game].initial(),
       now: Date.now(),
       apply: this.applyFor(body.game),
@@ -118,23 +134,43 @@ export class Room extends DurableObject {
   }
 
   private async handleJoin(request: Request): Promise<Response> {
+    // Read before touching storage. Awaiting the body reopens the input gate,
+    // so a load either side of it can be overwritten by a join that arrived in
+    // between - which drops a member whose token has already been filed, and
+    // tells them they were removed by a host who did nothing of the kind.
+    const body = (await request.json()) as {
+      name: string; device?: unknown; claim?: unknown;
+    };
+    const deviceKey = await deviceKeyOf(body.device);
+
     const state = await this.load();
     if (!state) return json({ error: 'no-room' }, 404);
 
-    const body = (await request.json()) as { name: string };
     const memberId = uid();
     const token = uid();
 
     const result = join(
       state,
-      { memberId, name: body.name, now: Date.now() },
+      {
+        memberId,
+        name: body.name,
+        now: Date.now(),
+        // Who this device already is, if the room has met it. Unguessable, so
+        // an absent or invented one simply means a new player.
+        deviceKey,
+        // Or a row the host laid out that this joiner says is them. Checked
+        // against what is actually claimable, so a stale one falls through.
+        claim: typeof body.claim === 'string' ? body.claim : null,
+      },
       this.applyFor(state.game),
     );
-    if (!result.ok) return json({ error: result.code }, 409);
+    if (!result.ok) return json({ error: result.code }, result.code === 'kicked-out' ? 403 : 409);
 
     const tokens = (await this.ctx.storage.get<Record<string, string>>('tokens')) ?? {};
     await this.ctx.storage.put('tokens', { ...tokens, [token]: memberId });
     await this.save(result.state);
+    // A device rejoining replaces the member it had, so that one's token goes.
+    if (result.effects.some((e) => e.to === 'close')) await this.forgetTokens(result.state);
     // Joining adds a player, so whoever is already connected needs to see it.
     this.dispatch(result.effects);
 
@@ -144,7 +180,13 @@ export class Room extends DurableObject {
   private async handlePeek(): Promise<Response> {
     const state = await this.load();
     if (!state) return json({ error: 'no-room' }, 404);
-    return json({ game: state.game, open: !state.locked });
+    // The rows a host laid out in advance, so a joiner can say which is them
+    // before typing a name. Only ever the unspoken-for ones.
+    return json({
+      game: state.game,
+      open: !state.locked,
+      claimable: claimable(state).map(({ id, name }) => ({ id, name })),
+    });
   }
 
   private async handleSocket(url: URL): Promise<Response> {

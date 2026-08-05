@@ -8,7 +8,9 @@
  */
 import { mintCode, normaliseCode } from '../shared/rooms/codes';
 import { isAllowedOrigin, parseOrigins } from '../shared/rooms/origins';
-import { GAMES, PROTOCOL_VERSION, type Game } from '../shared/rooms/protocol';
+import {
+  CreateRequestSchema, GAMES, JoinRequestSchema, PROTOCOL_VERSION,
+} from '../shared/rooms/protocol';
 
 export { Room } from './room';
 
@@ -73,7 +75,9 @@ const json = (body: unknown, status: number, headers: Record<string, string>): R
 /** The address someone is connecting from, bucketed so a single device cannot rotate. */
 const rateKey = (request: Request): string => {
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  return ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip.split('.').slice(0, 3).join('.');
+  // IPv6 to /48, not /64: a /64 is handed out per instance, so bucketing on
+  // one makes the limit free to rotate past.
+  return ip.includes(':') ? ip.split(':').slice(0, 3).join(':') : ip.split('.').slice(0, 3).join('.');
 };
 
 async function withinLimit(request: Request, env: Env): Promise<boolean> {
@@ -83,9 +87,6 @@ async function withinLimit(request: Request, env: Env): Promise<boolean> {
 }
 
 const roomStub = (env: Env, code: string) => env.ROOMS.get(env.ROOMS.idFromName(code));
-
-const isGame = (value: string | null): value is Game =>
-  value !== null && (GAMES as readonly string[]).includes(value);
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -134,8 +135,12 @@ export default {
     const code = parts[1] ? normaliseCode(parts[1]) : null;
     if (!code) return json({ error: 'bad-code' }, 400, cors);
 
-    // GET /rooms/:code - peek, so a deep link knows which game to open
+    // GET /rooms/:code - peek, so a deep link knows which game to open and who
+    // is waiting to be claimed. It names people, so it is rate limited too.
     if (parts.length === 2 && request.method === 'GET') {
+      if (!(await withinLimit(request, env))) {
+        return json({ error: 'rate-limited' }, 429, cors);
+      }
       return forward(env, code, 'peek', cors);
     }
 
@@ -144,11 +149,20 @@ export default {
       if (!(await withinLimit(request, env))) {
         return json({ error: 'rate-limited' }, 429, cors);
       }
-      return forward(env, code, 'join', cors, request);
+      // Parsed and rebuilt here rather than passed through, so the room only
+      // ever sees a body of the shape and size it expects.
+      const body = JoinRequestSchema.safeParse(await readJson(request));
+      if (!body.success) return json({ error: 'bad-message' }, 400, cors);
+      return forward(env, code, 'join', cors, JSON.stringify(body.data));
     }
 
     // GET /rooms/:code/socket - upgrade
     if (parts[2] === 'socket') {
+      // Limited like everything else. Without this the close code is a free
+      // oracle for whether a room exists, and the whole code space is small.
+      if (!(await withinLimit(request, env))) {
+        return json({ error: 'rate-limited' }, 429, cors);
+      }
       if (request.headers.get('Upgrade') !== 'websocket') {
         return json({ error: 'expected-websocket' }, 426, cors);
       }
@@ -164,10 +178,9 @@ export default {
 async function createRoom(request: Request, env: Env, cors: Record<string, string>) {
   if (!(await withinLimit(request, env))) return json({ error: 'rate-limited' }, 429, cors);
 
-  const body = (await request.json().catch(() => null)) as { game?: string; name?: string } | null;
-  if (!isGame(body?.game ?? null)) return json({ error: 'bad-game' }, 400, cors);
-  const game = body!.game as Game;
-  const name = typeof body?.name === 'string' ? body.name.slice(0, 24) : 'Host';
+  const parsed = CreateRequestSchema.safeParse(await readJson(request));
+  if (!parsed.success) return json({ error: 'bad-game' }, 400, cors);
+  const { game, name, device } = parsed.data;
 
   // A room exists at a code or it does not, and the room itself is the only
   // thing that knows, so there is no separate registry to fall out of step.
@@ -176,7 +189,7 @@ async function createRoom(request: Request, env: Env, cors: Record<string, strin
     const response = await roomStub(env, code).fetch(
       new Request(`https://room/?do=create`, {
         method: 'POST',
-        body: JSON.stringify({ code, game, name }),
+        body: JSON.stringify({ code, game, name, device }),
       }),
     );
     if (response.status !== 409) return withCors(response, cors);
@@ -184,17 +197,33 @@ async function createRoom(request: Request, env: Env, cors: Record<string, strin
   return json({ error: 'no-code-available' }, 503, cors);
 }
 
+/** Bodies are capped well under any real one, so a huge one is not even read. */
+const MAX_BODY_BYTES = 4 * 1024;
+
+async function readJson(request: Request): Promise<unknown> {
+  const declared = Number(request.headers.get('content-length') ?? '0');
+  if (declared > MAX_BODY_BYTES) return null;
+
+  const text = await request.text().catch(() => '');
+  if (text.length > MAX_BODY_BYTES) return null;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 async function forward(
   env: Env,
   code: string,
   action: string,
   cors: Record<string, string>,
-  request?: Request,
+  body?: string,
 ) {
-  const body = request ? await request.text() : undefined;
   const response = await roomStub(env, code).fetch(
     new Request(`https://room/?do=${action}`, {
-      method: request ? request.method : 'GET',
+      method: body === undefined ? 'GET' : 'POST',
       body,
     }),
   );

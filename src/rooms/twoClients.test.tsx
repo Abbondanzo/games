@@ -172,8 +172,43 @@ describe('a host and a guest in one room', () => {
     await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
 
     await waitFor(() => expect(room.state().members[guestSession.memberId]).toBeUndefined());
-    // Kicking closes the room, or they would simply rejoin.
-    expect(room.state().locked).toBe(true);
+    // Removing one person is not a decision about everybody else, so the door
+    // is left as the host set it. Their device is what is kept out.
+    expect(room.state().locked).toBe(false);
+    expect(() => room.addMember('Grace', 'her-phone')).not.toThrow();
+  });
+
+  it('keeps a removed device out for the rest of the game', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('cricket');
+    const guest = room.addMember('Grace', 'her-phone');
+    const host = mount(room, room.hostSession, 'host');
+    mount(room, guest, 'guest');
+
+    await user.click(within(host).getByRole('button', { name: 'Who is here' }));
+    await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
+    await waitFor(() => expect(room.state().members[guest.memberId]).toBeUndefined());
+
+    expect(() => room.addMember('Grace', 'her-phone')).toThrow(/kicked-out/);
+  });
+
+  it('shows the host who they removed, and lets them back', async () => {
+    const user = userEvent.setup();
+    const room = createTestRoom('cricket');
+    const guest = room.addMember('Grace', 'her-phone');
+    const host = mount(room, room.hostSession, 'host');
+    mount(room, guest, 'guest');
+
+    await user.click(within(host).getByRole('button', { name: 'Who is here' }));
+    await user.click(within(host).getByRole('button', { name: 'Remove Grace from the room' }));
+
+    await waitFor(() =>
+      expect(within(host).getByText('Removed from this game')).toBeInTheDocument());
+    await user.click(within(host).getByRole('button', { name: 'Let Grace back into the game' }));
+
+    await waitFor(() =>
+      expect(within(host).queryByText('Removed from this game')).not.toBeInTheDocument());
+    expect(() => room.addMember('Grace', 'her-phone')).not.toThrow();
   });
 
   // A host leaving would strand the game on the server, so the only way out
@@ -362,6 +397,87 @@ describe('controls a cricket guest may not use', () => {
     await throwDart(user, guest, 'Triple', 'Triple 20');
     // Nothing has been sent to the room yet, so taking it back is nobody's business.
     expect(within(guest).getByRole('button', { name: /Undo/ })).toBeEnabled();
+  });
+});
+
+/**
+ * Coming back after leaving.
+ *
+ * Reported from a real table: the host was Peter, Peter joined again from a
+ * second device and became "Peter 2", left, came back typing "Peter" - and
+ * became "Peter 3". A name cannot identify somebody returning, because the name
+ * they type is the one somebody else already has, and because names are theirs
+ * to change. The room recognises a secret the device keeps instead.
+ */
+describe('coming back after leaving', () => {
+  const seatOf = (room: TestRoom, memberId: string) => room.state().members[memberId]?.seatId;
+
+  it('takes back the same player, even sharing a name with the host', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const room = createTestRoom('cricket', 'Peter');
+    const second = room.addMember('Peter', 'this-phone');
+
+    const guest = mount(room, second, 'guest');
+    await waitFor(() => expect(players(guest)).toEqual(['Peter', 'Peter 2']));
+    const seat = seatOf(room, second.memberId);
+
+    await user.click(within(guest).getByRole('button', { name: 'Leave' }));
+
+    // Typing "Peter" again, which is the host's name, not theirs.
+    const back = room.addMember('Peter', 'this-phone');
+    expect(seatOf(room, back.memberId)).toBe(seat);
+
+    const returned = mount(room, back, 'returned');
+    await waitFor(() => expect(players(returned)).toEqual(['Peter', 'Peter 2']));
+  });
+
+  it('keeps the score that player had', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const room = createTestRoom('cricket', 'Peter');
+    const second = room.addMember('Peter', 'this-phone');
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, second, 'guest');
+    await waitFor(() => expect(players(guest)).toEqual(['Peter', 'Peter 2']));
+
+    await user.click(within(host).getByTitle("Make it Peter 2's turn"));
+    await throwDart(user, guest, 'Triple', 'Triple 20');
+    await user.click(within(guest).getByRole('button', { name: 'End turn' }));
+    await waitFor(() => expect(marksOn(host, '20', 1)).toContain('closed'));
+
+    await user.click(within(guest).getByRole('button', { name: 'Leave' }));
+    const returned = mount(room, room.addMember('Peter', 'this-phone'), 'returned');
+
+    await waitFor(() => expect(players(returned)).toEqual(['Peter', 'Peter 2']));
+    // Their marks are still theirs, which is the point of coming back.
+    expect(marksOn(returned, '20', 1)).toContain('closed');
+  });
+
+  it('makes a new player for a device that was never here', async () => {
+    const room = createTestRoom('cricket', 'Peter');
+    const client = mount(room, room.addMember('Peter', 'another-phone'), 'other');
+    await waitFor(() => expect(players(client)).toEqual(['Peter', 'Peter 2']));
+  });
+
+  // Locking is for new players, and somebody coming back is not one.
+  it('gets back into a room the host has closed to new players', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const room = createTestRoom('cricket', 'Peter');
+    const second = room.addMember('Peter', 'this-phone');
+    const host = mount(room, room.hostSession, 'host');
+    const guest = mount(room, second, 'guest');
+    await waitFor(() => expect(players(guest)).toEqual(['Peter', 'Peter 2']));
+
+    await user.click(within(host).getByRole('button', { name: 'Who is here' }));
+    await user.click(within(host).getByRole('button', { name: 'Stop new players' }));
+    await waitFor(() => expect(room.state().locked).toBe(true));
+    await user.click(within(guest).getByRole('button', { name: 'Leave' }));
+
+    expect(() => room.addMember('Peter', 'this-phone')).not.toThrow();
+    // A device it has never met is still a stranger.
+    expect(() => room.addMember('Alan', 'a-third-phone')).toThrow(/room-locked/);
   });
 });
 

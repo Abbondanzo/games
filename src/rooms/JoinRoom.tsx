@@ -3,14 +3,17 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { DoorOpen } from 'lucide-react';
 import { CODE_LENGTH, normaliseCode } from '@shared/rooms/codes';
 import { TopBar } from '../shared/TopBar';
-import { ROOM_ERRORS, joinRoom, peekRoom, type RoomError } from './api';
-import { readName, writeName, writeSession } from './storage';
+import { ROOM_ERRORS, joinRoom, peekRoom, type Peek, type RoomError } from './api';
+import { deviceFor, readName, writeName, writeSession } from './storage';
 
 /**
  * Joining, whether the code was typed on the home page or arrived as a link.
  *
  * The code is looked up before joining, because until it resolves there is no
- * way to know which game it belongs to.
+ * way to know which game it belongs to - and, if the host laid the table out
+ * before anyone arrived, no way to know that "Grace" is sitting there waiting
+ * to be claimed. Looking it up as soon as the code is complete is what lets
+ * that be offered before a name is typed rather than after.
  */
 export function JoinRoom() {
   const { code: linkCode } = useParams<{ code: string }>();
@@ -20,22 +23,46 @@ export function JoinRoom() {
   const [name, setName] = useState(readName);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<RoomError | 'bad-code' | 'no-name' | null>(null);
+  const [room, setRoom] = useState<Peek | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     nameRef.current?.focus();
   }, []);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  /**
+   * Look the code up as soon as it is a code. Quietly: a wrong one is the
+   * ordinary state of a half-typed field, and saying so is the submit's job.
+   */
+  useEffect(() => {
+    const clean = normaliseCode(code);
+    if (!clean) {
+      setRoom(null);
+      return undefined;
+    }
+
+    let current = true;
+    void peekRoom(clean).then((found) => {
+      if (current) setRoom(found.ok ? found.value : null);
+    });
+    return () => {
+      current = false;
+    };
+  }, [code]);
+
+  /** Everything that happens once the room has said yes. */
+  function entered(game: Peek['game'], session: Parameters<typeof writeSession>[0]) {
+    writeSession(session);
+    // Replace, so Back does not try to join a second time.
+    navigate(`/${game}`, { replace: true });
+    // The session is read once on mount, so the tracker needs a fresh start.
+    window.location.reload();
+  }
+
+  async function go(wanted: string, claim: string | null) {
     const clean = normaliseCode(code);
     if (!clean) {
       setError('bad-code');
-      return;
-    }
-
-    if (!name.trim()) {
-      setError('no-name');
       return;
     }
 
@@ -49,20 +76,29 @@ export function JoinRoom() {
       return;
     }
 
-    const joined = await joinRoom(clean, name.trim());
+    // The secret this device keeps for this room, which is how the room tells
+    // somebody coming back from somebody new. Minted here the first time.
+    const joined = await joinRoom(clean, wanted, deviceFor(found.value.game, clean), claim);
     setBusy(false);
     if (!joined.ok) {
       setError(joined.error);
       return;
     }
 
-    writeName(name.trim());
-    writeSession(joined.value);
-    // Replace, so Back does not try to join a second time.
-    navigate(`/${found.value.game}`, { replace: true });
-    // The session is read once on mount, so the tracker needs a fresh start.
-    window.location.reload();
+    if (wanted) writeName(wanted);
+    entered(found.value.game, joined.value);
   }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) {
+      setError('no-name');
+      return;
+    }
+    void go(name.trim(), null);
+  }
+
+  const waiting = room?.claimable ?? [];
 
   return (
     <>
@@ -84,6 +120,26 @@ export function JoinRoom() {
               aria-label="Room code"
             />
           </label>
+
+          {waiting.length > 0 && (
+            <fieldset className="claim">
+              <legend>Has the host already added you?</legend>
+              <div className="seg wrap">
+                {waiting.map((player) => (
+                  <button
+                    key={player.id}
+                    type="button"
+                    disabled={busy}
+                    aria-label={`Join as ${player.name}`}
+                    onClick={() => void go(player.name, player.id)}
+                  >
+                    {player.name}
+                  </button>
+                ))}
+              </div>
+              <p className="hint">Or add yourself below.</p>
+            </fieldset>
+          )}
 
           <label className="field">
             <span>Your name</span>

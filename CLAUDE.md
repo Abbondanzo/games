@@ -86,8 +86,11 @@ an opponent for darts thrown before they existed.
 
 ## Untrusted input
 
-Three places take input nobody vouches for: a stored game out of `localStorage`, a frame off a
-socket, and a game action inside that frame. All three go through zod.
+Four places take input nobody vouches for: a stored game out of `localStorage`, a frame off a
+socket, a game action inside that frame, and the body of a join or create request. All four go
+through zod, and the join body is validated at the Worker's front door before it is forwarded to
+a room - it was not, and an unbounded name is not a silly display name but a room nobody can
+play in, since names are kept on the member and rebroadcast on every presence change.
 
 The action case is the subtle one. The protocol only checks that an action has a `type`; the
 payload belongs to the game that owns it, so each game has a `schema.ts` with its own action
@@ -162,6 +165,22 @@ it fail first.
   client can be weeks old. Server-to-client additions are safe; a new *client-to-server* message
   is not, because an old room rejects a frame it has never heard of and the button just appears
   broken. Bump `PROTOCOL_VERSION` for either, so the mismatch names itself.
+- **Every route is rate limited except `/health`.** The socket upgrade included: its close code
+  says whether a room exists, which makes it an enumeration oracle, and it cannot answer any
+  other way because the client needs to know.
+- **A room recognises a device, never a name.** Names are public, typeable by anyone, and
+  changeable by their owner, so nothing may key off them. Each device keeps a secret per room
+  code; the room stores `sha256(secret) -> seatId` in `RoomState.devices` and hands the player
+  back to whoever presents it. It goes in the join body over HTTPS and nowhere else - never over
+  the socket, never in `roomView`, and the closed message schemas mean a leak would be stripped
+  by the client's own decode. Do not reintroduce name matching; it was there, it was spoofable,
+  and it did not even work for two people called Peter.
+- **Locking lets a returning device back in but not a new one.** Being removed is separate and
+  lasts the game: it is keyed on the device, survives the door being unlocked, and the host is
+  shown the list and can undo it. Kicking deliberately does not lock the room any more.
+- **A player is claimable only while no device has ever held it.** That is what lets a host lay
+  the table out in advance and have people take their rows, without letting anybody take a row
+  that is already somebody's. `claimable()` in `roomCore.ts` is the one definition.
 - **Play order is fixed by the first turn.** `movePlayer` is refused once a game has any
   turns, because the roster order is the turn order and moving somebody would hand the turn
   to a different player. The UI hides the buttons then, but the reducer is what enforces it.

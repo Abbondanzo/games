@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { TriangleAlert, Users } from 'lucide-react';
 import type { Game } from '@shared/rooms/protocol';
 import { ROOM_ERRORS, createRoom, type RoomError } from './api';
-import { readName, writeName, writeSession } from './storage';
+import { newDevice, readName, rememberDevice, writeName, writeSession } from './storage';
 
 /**
  * Starts sharing the game on screen.
@@ -34,13 +34,17 @@ export function HostRoomButton({ game, existing }: Props) {
 
     setBusy(true);
     setError(null);
-    const result = await createRoom(game, chosen);
+    // Minted before the room exists, because the code comes back with it.
+    const device = newDevice();
+    const result = await createRoom(game, chosen, device);
     setBusy(false);
 
     if (!result.ok) {
       setError(result.error);
       return;
     }
+    // So a host who hands the room on and leaves can come back to their player.
+    rememberDevice(game, result.value.code, device);
     writeName(chosen);
     writeSession(result.value);
     // The session is read once on mount, so a reload is the simplest way in.

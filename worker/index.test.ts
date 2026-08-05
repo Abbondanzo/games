@@ -126,3 +126,100 @@ describe('paths that are not there', () => {
     expect((await call('/rooms/AB2D/socket')).status).toBe(426);
   });
 });
+
+/**
+ * The join body, which was the last untrusted input here that met no schema.
+ *
+ * It matters more than it looks. A name is kept on the member and rebroadcast
+ * to every device on every presence change, so an unbounded one is not a silly
+ * display name - it is a room nobody can play in, for four hours, with no host
+ * action that recovers it.
+ */
+describe('the join body', () => {
+  const join = (body: unknown, raw?: string) =>
+    call('/rooms/AB2D/join', {
+      method: 'POST',
+      headers: { Origin: LIVE, 'content-type': 'application/json' },
+      body: raw ?? JSON.stringify(body),
+    });
+
+  it.each([
+    ['a name that is not a string', { name: 42 }],
+    ['no name at all', { device: 'x' }],
+    ['a name longer than the field allows', { name: 'A'.repeat(25) }],
+    ['a device secret of absurd length', { name: 'Ada', device: 'x'.repeat(300) }],
+    ['a claim that is not a string', { name: 'Ada', claim: { evil: true } }],
+    ['nothing', null],
+  ])('refuses %s', async (_label, body) => {
+    expect((await join(body)).status).toBe(400);
+  });
+
+  it('refuses a body that is not JSON', async () => {
+    expect((await join(null, 'not json at all {')).status).toBe(400);
+  });
+
+  // The one that bricked a room: ~190 KB of name, ten times over.
+  it('refuses a body far larger than any real one', async () => {
+    const huge = JSON.stringify({ name: 'A'.repeat(200_000) });
+    expect((await join(null, huge)).status).toBe(400);
+  });
+
+  it('refuses one that only says it is small', async () => {
+    const response = await call('/rooms/AB2D/join', {
+      method: 'POST',
+      headers: { Origin: LIVE, 'content-length': '10' },
+      body: JSON.stringify({ name: 'A'.repeat(200_000) }),
+    });
+    expect(response.status).toBe(400);
+  });
+});
+
+describe('the create body', () => {
+  const create = (body: unknown) =>
+    call('/rooms', {
+      method: 'POST',
+      headers: { Origin: LIVE, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  it.each([
+    ['a game nobody plays', { game: 'chess', name: 'Ada' }],
+    ['no game', { name: 'Ada' }],
+    ['a name longer than the field allows', { game: 'cricket', name: 'A'.repeat(25) }],
+  ])('refuses %s', async (_label, body) => {
+    expect((await create(body)).status).toBe(400);
+  });
+});
+
+/**
+ * The socket upgrade answers with a different close code depending on whether
+ * the room exists, which makes it an oracle. It cannot answer any other way -
+ * the client needs to know - so the limit is the defence.
+ */
+describe('rate limiting', () => {
+  const refusing = (): Env => env({
+    JOIN_LIMIT: { limit: async () => ({ success: false }) },
+  } as Partial<Env>);
+
+  it.each([
+    ['creating a room', '/rooms', 'POST'],
+    ['looking a code up', '/rooms/AB2D', 'GET'],
+    ['joining', '/rooms/AB2D/join', 'POST'],
+    ['opening a socket', '/rooms/AB2D/socket', 'GET'],
+  ])('limits %s', async (_label, path, method) => {
+    const response = await worker.fetch(
+      new Request(`https://rooms.test${path}`, {
+        method,
+        headers: { Origin: LIVE, Upgrade: 'websocket' },
+        body: method === 'POST' ? JSON.stringify({ game: 'cricket', name: 'Ada' }) : undefined,
+      }),
+      refusing(),
+    );
+    expect(response.status).toBe(429);
+  });
+
+  it('does not limit the health check', async () => {
+    const response = await worker.fetch(new Request('https://rooms.test/health'), refusing());
+    expect(response.status).toBe(200);
+  });
+});

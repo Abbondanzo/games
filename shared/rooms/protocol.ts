@@ -29,8 +29,9 @@ import { z } from 'zod';
  *    that predates it retries a room that has ended forever, and telling that
  *    client to refresh is the only way to stop it.
  * 5: added makeHost, and movePlayer as a game action.
+ * 6: added allowBack, and the list of removed people it acts on.
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** Which side is behind, worked out from the version in the welcome. */
 export type VersionGap = 'app' | 'room';
@@ -74,6 +75,7 @@ export const ErrorCodeSchema = z.enum([
   'rate-limited',
   'room-full',
   'room-locked',
+  'kicked-out',
   'stale-rev',
   'too-large',
   'unknown-action',
@@ -109,10 +111,22 @@ export const PendingRoundSchema = z.object({
 });
 export type PendingRound = z.infer<typeof PendingRoundSchema>;
 
+/**
+ * Somebody the host removed, as the host sees them.
+ *
+ * `ref` is the member id they had at the time: a public handle, so the host can
+ * let them back without the device key it is really keyed on ever leaving the
+ * room.
+ */
+export const RemovedSchema = z.object({ ref: z.string(), name: z.string() });
+export type Removed = z.infer<typeof RemovedSchema>;
+
 export const RoomViewSchema = z.object({
   members: z.array(MemberSchema),
   locked: z.boolean(),
   pending: PendingRoundSchema.nullable(),
+  /** Only ever sent to the host; empty for everybody else. */
+  removed: z.array(RemovedSchema).catch([]),
 });
 export type RoomView = z.infer<typeof RoomViewSchema>;
 
@@ -131,6 +145,7 @@ export const ClientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('lock'), locked: z.boolean() }),
   z.object({ t: z.literal('kick'), memberId: Id }),
   z.object({ t: z.literal('makeHost'), reqId: Id, memberId: Id }),
+  z.object({ t: z.literal('allowBack'), reqId: Id, ref: Id }),
   z.object({ t: z.literal('roundOpen'), reqId: Id, winnerId: Id }),
   z.object({ t: z.literal('rackSubmit'), reqId: Id, seatId: Id, total: z.int().min(0).max(1000) }),
   z.object({ t: z.literal('roundCancel'), reqId: Id }),
@@ -170,6 +185,30 @@ export const ServerMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('closed') }),
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;
+
+/* ─────────────────────────── the join and create bodies ─────────────────────────── */
+
+/**
+ * The two HTTP requests, which are as untrusted as anything off a socket and
+ * were the last thing here not saying so.
+ *
+ * The name cap is the one that matters. A name is kept on the member and
+ * rebroadcast to every device on every presence change, so an unbounded one is
+ * not a silly display name, it is a room nobody can play in.
+ */
+export const CreateRequestSchema = z.object({
+  game: GameSchema,
+  name: Name.default('Host'),
+  device: z.string().max(256).optional(),
+});
+export type CreateRequest = z.infer<typeof CreateRequestSchema>;
+
+export const JoinRequestSchema = z.object({
+  name: Name,
+  device: z.string().max(256).optional(),
+  claim: Id.nullish(),
+});
+export type JoinRequest = z.infer<typeof JoinRequestSchema>;
 
 /* ─────────────────────────── decoding ─────────────────────────── */
 
@@ -221,6 +260,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   'rate-limited': 'Slow down a moment, then try again.',
   'room-full': 'This room is full.',
   'room-locked': 'This room is not taking new players.',
+  'kicked-out': 'The host removed you from this game.',
   'stale-rev': 'The game moved on. Have another look.',
   'too-large': 'This game is too big to share.',
   'unknown-action': 'This app is out of date. Refresh to get the latest.',

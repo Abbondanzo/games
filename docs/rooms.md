@@ -123,6 +123,73 @@ Seats survive a dropped connection, so a sleeping phone keeps its place, and
 they are re-derived from the game after every change: if the host removes your
 player you become a spectator rather than holding a seat that no longer exists.
 
+**Coming back after leaving.** Leaving gives up the seat but leaves the player
+in the game, so the way back is to take that player again. The room recognises
+the device, never the name.
+
+A name cannot do this job. It is public - everyone can see it and anyone can
+type it. It is not stable - people rename themselves mid-game. And it is not
+unique: a table with two Peters has a "Peter" and a "Peter 2", so the name the
+second one types on returning is the first one's. That is exactly how the
+reported bug produced a "Peter 3".
+
+So each device keeps a secret, one per room code, minted the first time it
+joins. It is never shown, never editable, and goes in the body of the join
+request over HTTPS and nowhere else - in particular, never over the socket. The
+room stores only a SHA-256 digest of it, against the player it holds:
+
+```
+join { name, device }  ->  room: devices[sha256(device)] = seatId
+```
+
+Coming back is presenting the same secret. The room treats it as a request
+rather than a fact: the player has to still exist, be free, and not be one the
+host has barred. Everything else is a new player, including a device the room
+has not met and one that says nothing at all.
+
+The digest never leaves the room. `roomView` builds what clients see field by
+field and none of it is in there, and the message schemas are closed, so a field
+added by accident would be stripped by the client's own decode before any code
+saw it. There is nothing for a client to read, and so nothing it can do
+differently on the strength of.
+
+Names are still made distinct - a second Grace becomes "Grace 2", compared
+without regard to case so the board does not carry a "Grace" and a "grace" - but
+that is about telling rows apart, not people.
+
+**Claiming a row the host laid out.** Hosts often set the table up before anyone
+arrives, typing everybody in, and those rows are there to be taken. Looking the
+code up happens as soon as it is complete, so the question comes *before* the
+name field - by the time you have typed a name you have already made a second
+player.
+
+A row is on offer exactly while no device has ever answered for it. Once
+somebody takes it, it is theirs: it stays theirs while they are away, and
+another device asking for it by id gets a new player instead. The host's own row
+is never on offer, because their device answered for it when they made the room.
+
+There is nothing to verify in a claim and nothing to verify it with - the host
+wrote "Grace" so that Grace could take it, and the room code is what stands
+between that and a stranger. That is the same trust the code already carries,
+and the host can remove anybody who abuses it.
+
+**Locking stops new players, not people coming back.** A host locks the room
+once everyone is at the table, which is exactly when somebody's phone goes to
+sleep. A join that takes an existing player is let through - coming back, or
+claiming a row - and one that would make a new player is refused.
+
+**Being removed is about a device, and lasts the game.** It used to work by
+locking the room, which tangled throwing one person out up with a decision about
+everybody else, and unlocking quietly undid it. Now the device is written down
+and turned away however the door is set, until the host says otherwise: they are
+shown who they have removed and can let them back, by a public handle rather
+than by the key the list is really kept on. Their player stays on the board with
+its score, and stays spoken for, so nobody can claim it while they are out.
+
+Clearing storage makes a new device, and there is no defence against that beyond
+removing them again. The alternative - locking the room on every kick - was
+worse, because it punished the whole table for one person.
+
 **Rummikub** is the exception. A round records every rack at once, so it cannot
 be seat-scoped. The host opens a round, each player submits their own rack, and
 the host commits. That collection lives in room state, not in the game, so
@@ -138,8 +205,9 @@ sheet. The defences are proportionate.
   shape is checked there too, because `idFromName` will create an object for any
   string - without that check, enumeration would become an object-creation
   attack.
-- **Kicking locks the room**, or the person kicked would simply rejoin with a
-  fresh identity.
+- **Removing somebody is written against their device** and lasts the game,
+  whether the room is locked or not. It used to work by locking the room,
+  which made throwing one person out a decision about everybody else.
 - **Tokens** are random and per member. No client message carries an identity;
   the room stamps it from the socket, so there is nothing to impersonate.
 - **Origin allowlist on the socket upgrade.** WebSocket upgrades bypass CORS, so

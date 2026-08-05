@@ -14,12 +14,20 @@ const MembershipSchema = z.object({
   game: GameSchema,
 });
 
-const PeekSchema = z.object({ game: GameSchema, open: z.boolean() });
+const PeekSchema = z.object({
+  game: GameSchema,
+  open: z.boolean(),
+  /** Rows the host laid out that nobody has answered for yet. */
+  claimable: z.array(z.object({ id: z.string(), name: z.string() })).catch([]),
+});
+
+export type Peek = z.infer<typeof PeekSchema>;
 
 export type RoomError =
   | 'no-room'
   | 'room-locked'
   | 'room-full'
+  | 'kicked-out'
   | 'rate-limited'
   | 'unreachable';
 
@@ -56,18 +64,33 @@ const asSession = (value: unknown): Result<StoredSession> => {
     : { ok: false, error: 'unreachable' };
 };
 
-export async function createRoom(game: Game, name: string): Promise<Result<StoredSession>> {
-  const result = await post('/rooms', { game, name });
+export async function createRoom(
+  game: Game,
+  name: string,
+  device: string,
+): Promise<Result<StoredSession>> {
+  const result = await post('/rooms', { game, name, device });
   return result.ok ? asSession(result.value) : result;
 }
 
-export async function joinRoom(code: string, name: string): Promise<Result<StoredSession>> {
-  const result = await post(`/rooms/${code}/join`, { name });
+/**
+ * `device` is a secret this browser keeps for this room, and is how the room
+ * knows somebody coming back from somebody new. It is sent here and nowhere
+ * else. The room treats it as a request: a player that has gone, or that
+ * somebody else is now using, means an ordinary new one instead.
+ */
+export async function joinRoom(
+  code: string,
+  name: string,
+  device: string,
+  claim?: string | null,
+): Promise<Result<StoredSession>> {
+  const result = await post(`/rooms/${code}/join`, { name, device, claim: claim ?? null });
   return result.ok ? asSession(result.value) : result;
 }
 
 /** Resolves which game a code belongs to, so a deep link knows where to go. */
-export async function peekRoom(code: string): Promise<Result<{ game: Game; open: boolean }>> {
+export async function peekRoom(code: string): Promise<Result<Peek>> {
   let response: Response;
   try {
     response = await fetch(`${ROOMS_URL}/rooms/${code}`);
@@ -85,6 +108,7 @@ export const ROOM_ERRORS: Record<RoomError, string> = {
   'no-room': 'That code did not match a room.',
   'room-locked': 'This room is not taking new players.',
   'room-full': 'This room is full.',
+  'kicked-out': 'The host removed you from this game.',
   'rate-limited': 'Too many tries. Wait a minute, then try again.',
   unreachable: 'Could not reach the room. Check your connection.',
 };
