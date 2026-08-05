@@ -138,8 +138,10 @@ kbd {
   border-radius: var(--radius);
   padding: 1rem;
 }
-a.game:hover {
-  border-color: var(--accent);
+@media (hover: hover) {
+  a.game:hover {
+    border-color: var(--accent);
+  }
 }
 .game.soon {
   opacity: 0.5;
