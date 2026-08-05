@@ -1,0 +1,28 @@
+# Cloudflare Pages reads this file.
+#
+# The failure it exists to prevent: a browser holding a cached index.html from
+# an earlier deploy asks for a hashed asset that deploy shipped, the new
+# deployment does not have that file, and Pages answers with an HTML page. The
+# browser refuses it - "Expected a JavaScript-or-Wasm module script" - and the
+# app is a white screen.
+#
+# So the entry points must always be revalidated, and the hashed files they
+# point at can be cached forever, because their names change when they do.
+
+/
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+# The service worker decides when everything else updates, so it is the last
+# thing that should be served stale.
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+
+# Content-addressed: a change to the file is a change to the name.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

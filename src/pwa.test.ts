@@ -105,3 +105,90 @@ describe('favicons', () => {
     }
   });
 });
+
+/**
+ * Surviving a deploy.
+ *
+ * The failure these guard against: a browser holding an index.html from an
+ * earlier deploy asks for a hashed file that deploy shipped, the new deployment
+ * does not have it, and the host answers with an HTML page. The browser refuses
+ * to run that as a module - "Expected a JavaScript-or-Wasm module script" - and
+ * the page is blank.
+ */
+describe('cache headers', () => {
+  const headers = read('public/_headers');
+
+  /** The rule that applies to a path, as Pages reads the file top to bottom. */
+  const ruleFor = (path: string): string => {
+    const blocks = headers.split(/\n(?=\S)/);
+    const block = blocks.find((b) => b.split('\n')[0]?.trim() === path);
+    return block ?? '';
+  };
+
+  it.each(['/', '/index.html', '/sw.js', '/manifest.webmanifest'])(
+    'keeps %s from being served stale',
+    (path) => {
+      expect(ruleFor(path)).toMatch(/Cache-Control:\s*no-cache/i);
+    },
+  );
+
+  // Their names change when they do, so holding one forever is safe and is
+  // what keeps a deploy from re-downloading everything.
+  it('lets the hashed files be kept forever', () => {
+    expect(ruleFor('/assets/*')).toMatch(/max-age=31536000/);
+    expect(ruleFor('/assets/*')).toMatch(/immutable/);
+  });
+
+  it('does not let the hashed rule swallow the entry points', () => {
+    expect(ruleFor('/')).not.toMatch(/immutable/);
+    expect(ruleFor('/index.html')).not.toMatch(/immutable/);
+  });
+
+  it('is shipped, not just written', () => {
+    // Pages reads it from the root of what was published.
+    expect(existsSync(resolve(process.cwd(), 'public/_headers'))).toBe(true);
+  });
+});
+
+describe('recovering from a stale page', () => {
+  it('watches for the page failing to load at all', () => {
+    expect(html).toMatch(/addEventListener\('error'/);
+    // Capture phase: a failed script or stylesheet does not bubble.
+    expect(html).toMatch(/\}, true\)/);
+  });
+
+  it('clears what this device is holding before trying again', () => {
+    expect(html).toContain('caches');
+    expect(html).toContain('unregister');
+    expect(html).toContain('reload');
+  });
+
+  // Or a page that fails for any other reason would reload for ever.
+  it('tries once, and remembers that it did', () => {
+    expect(html).toContain('sessionStorage');
+    expect(html).toContain('games.reload.v1');
+  });
+
+  /**
+   * Offline, a failure to load means something else entirely, and throwing the
+   * caches away would take the installed app with it.
+   */
+  it('does nothing without a connection', () => {
+    expect(html).toContain('navigator.onLine');
+  });
+
+  it('is cleared once the app actually boots', () => {
+    expect(read('src/main.tsx')).toContain('games.reload.v1');
+  });
+
+  // It has to run before the module it is watching for.
+  it('is registered above the app script', () => {
+    expect(html.indexOf('games.reload.v1')).toBeLessThan(html.indexOf('type="module"'));
+  });
+
+  // It is inline on purpose: a script that has to be fetched is a script that
+  // can fail the same way as the one it is meant to rescue.
+  it('is inline rather than a file of its own', () => {
+    expect(html).not.toMatch(/<script[^>]*src="[^"]*recover/);
+  });
+});

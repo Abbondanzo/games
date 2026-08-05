@@ -113,6 +113,38 @@ was built from, which Workers Builds sets.
 
 Open to any origin and never cached, so it can be curled from anywhere.
 
+## Surviving a deploy
+
+A build's filenames carry a content hash, so a new deploy replaces every one of
+them. That leaves a window where a browser is holding the previous
+`index.html` - out of its own cache, or out of the service worker's precache -
+and asks for a hashed file the current deployment no longer has. Cloudflare
+answers with an HTML page, the browser refuses to run it as a module
+("Expected a JavaScript-or-Wasm module script but the server responded with a
+MIME type of text/html"), and the page is blank.
+
+Three things address it, and they are worth keeping together:
+
+- **`public/_headers`** tells Pages never to serve `/`, `index.html`, `sw.js` or
+  the manifest from cache, and to let the hashed files be kept forever. The
+  entry points are the only things that must be fresh; everything they point at
+  changes its name when it changes.
+- **`navigateFallbackDenylist`** in `vite.config.ts` stops the service worker
+  answering a request under `/assets/` with the page. Workbox already scopes the
+  fallback to navigations, so this is belt and braces, but it is the exact shape
+  of the failure.
+- **A recovery script in `index.html`**, which is the one that actually rescues
+  somebody. If a script or stylesheet fails to load it clears this device's
+  caches, unregisters the service worker and reloads - once, guarded by
+  `sessionStorage`, and only with a connection, because offline the same failure
+  means something else and throwing the caches away would take the installed app
+  with it. `main.tsx` clears the guard on boot, so a later failure can try again.
+
+**Worth checking in the dashboard:** if the Pages project has single-page-app
+handling turned on, a missing file returns `index.html` with a 200 rather than a
+404. This app routes on the hash, so every real route is `/` and it needs no
+such fallback. Turning it off makes a missing file fail as a missing file.
+
 ## Toolchain
 
 Node 20+ and pnpm; `corepack enable` picks up the version pinned in `package.json`.

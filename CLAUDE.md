@@ -135,6 +135,10 @@ it fail first.
   it loaded until it reloads. `UpdatePrompt` offers that; the service worker waits for the tap
   rather than swapping silently. When something new "does not work", check the client is current
   before debugging it - that has been the answer twice.
+- **A deploy replaces every hashed filename.** A browser holding the previous `index.html` asks
+  for a file that is gone, Pages answers with HTML, and the page is blank with a MIME error.
+  `public/_headers`, `navigateFallbackDenylist` and the recovery script in `index.html` are three
+  halves of the same fix; `pwa.test.ts` guards all three. See `docs/deployment.md`.
 - **Icons are committed.** Regenerate with `pnpm icons` after changing the artwork; nothing
   rasterises at build time.
 - **CI does not gate deployment.** Cloudflare Pages builds from the repo independently, so a red
