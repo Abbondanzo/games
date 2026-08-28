@@ -91,10 +91,14 @@ export const HINTS: Record<Category, string> = {
 /**
  * Every number a box will take, low to high, with 0 first for a scratch.
  *
- * This is the whole of the entry rule. An upper box can only hold a multiple of
- * its own face, a fixed box holds its one number or nothing, and the three that
- * add the dice hold any sum five dice can make. Offering exactly these means a
- * wrong number cannot be typed rather than being caught afterwards.
+ * What a box may hold at all. An upper box can only hold a multiple of its own
+ * face, a fixed box holds its one number or nothing, and the three that add the
+ * dice hold any sum five dice can make.
+ *
+ * The two of-a-kind boxes are narrower than this in practice, but only once the
+ * matched face is known: taken on its own, every total from 5 to 30 is some
+ * four of a kind. So this stays the bound on the wire, and `kindTotals` below
+ * is what the pad offers.
  */
 export function scoreOptions(category: Category): number[] {
   if (isUpper(category)) {
@@ -113,6 +117,45 @@ export function scoreOptions(category: Category): number[] {
 /** Whether a number is one this box could hold. */
 export const isValidScore = (category: Category, value: number): boolean =>
   Number.isInteger(value) && scoreOptions(category).includes(value);
+
+/* ── the two boxes that are asked for as dice, not as a total ── */
+
+/**
+ * The boxes scored on "at least n of a kind", and what n is.
+ *
+ * These two are the only ones where the total is not what anybody at the table
+ * says. You say "four fives", and the sheet works out what that comes to once
+ * you say what the odd die was. Asked that way round, most of the 5 to 30 range
+ * stops being enterable at all: four fives cannot come to 7.
+ */
+export const OF_A_KIND: Partial<Record<Category, number>> = {
+  threeOfAKind: 3,
+  fourOfAKind: 4,
+};
+
+/** How many of a kind this box wants, or null if it is not one of those. */
+export const kindOf = (category: Category): number | null => OF_A_KIND[category] ?? null;
+
+/** The dice left over: one for four of a kind, two for three. */
+export const spareDice = (kind: number): number => DICE - kind;
+
+/**
+ * What the leftover dice can add up to, low to high.
+ *
+ * They are free, and may land on the matched face as well - five of a kind is
+ * four of a kind too, and may be written in that box.
+ */
+export function spareTotals(kind: number): number[] {
+  const spare = spareDice(kind);
+  return Array.from({ length: spare * (FACES - 1) + 1 }, (_, i) => spare + i);
+}
+
+/** Every total a roll of `kind` dice showing `face` can come to, low to high. */
+export const kindTotals = (kind: number, face: number): number[] =>
+  spareTotals(kind).map((spare) => kind * face + spare);
+
+/** What the leftover dice came to, given the face and what was written down. */
+export const spareFor = (kind: number, face: number, total: number): number => total - kind * face;
 
 /** One player's sheet, every figure on it derived from the turns they took. */
 export interface Sheet {

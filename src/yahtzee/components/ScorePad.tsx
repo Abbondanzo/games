@@ -1,6 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { HINTS, LABELS, scoreOptions, YAHTZEE_BONUS } from '@shared/games/yahtzee/rules';
+import {
+  FACES,
+  HINTS,
+  kindOf,
+  kindTotals,
+  LABELS,
+  scoreOptions,
+  spareDice,
+  spareTotals,
+  YAHTZEE_BONUS,
+} from '@shared/games/yahtzee/rules';
 import type { Sheet } from '@shared/games/yahtzee/rules';
 import type { Player } from '@shared/games/yahtzee/types';
 import { WhoseTurn } from '../../rooms/WhoseTurn';
@@ -22,15 +32,25 @@ interface Props {
   currentName: string | null;
 }
 
+const DIE_FACES = Array.from({ length: FACES }, (_, i) => i + 1);
+
+const COUNT_WORD: Record<number, string> = { 3: 'three', 4: 'four' };
+
 /**
  * What a box will take, as buttons.
  *
- * Every number a box can hold is on screen, so filling one in is a tap rather
- * than a keyboard and a check afterwards: an upper box only holds multiples of
- * its own face, the fixed combinations hold their one number, and the three
- * that add the whole hand hold any sum five dice can make. A turn that scored
- * nothing is the same two taps as one that scored, which is the point - it is
- * the commonest entry of the game and the easiest one to leave out.
+ * Most boxes are one tap: an upper box holds multiples of its own face, a fixed
+ * combination holds its one number, chance holds any sum five dice can make. A
+ * turn that scored nothing is the same two taps as one that scored, which is
+ * the point - it is the commonest entry of the game and the easiest one to
+ * leave out.
+ *
+ * The two of-a-kind boxes are asked for the way they are said at the table:
+ * which number you got four of, and then what the odd die was. That is not
+ * politeness, it is what makes the entry safe. Four fives cannot come to 7, but
+ * "any total from 5 to 30" cannot say so, because taken on its own every one of
+ * those totals is some four of a kind. Only the matched face rules the rest of
+ * them out.
  */
 export function ScorePad({
   selection,
@@ -47,6 +67,26 @@ export function ScorePad({
 }: Props) {
   const tone = yourTurn === null ? '' : yourTurn ? ' yours' : ' theirs';
 
+  /** The face picked in the first step, for the boxes that have two. */
+  const [face, setFace] = useState<number | null>(null);
+
+  /**
+   * Stepping between the two halves replaces every key, which leaves a
+   * keyboard on the body with nothing selected. Only a step moves focus; the
+   * pad opening does not, or tapping a box would take the caret off the sheet.
+   */
+  const pad = useRef<HTMLDivElement>(null);
+  const stepped = useRef(false);
+  const step = (to: number | null) => {
+    stepped.current = true;
+    setFace(to);
+  };
+  useEffect(() => {
+    if (!stepped.current) return;
+    stepped.current = false;
+    pad.current?.querySelector('button')?.focus();
+  }, [face]);
+
   /**
    * A full sheet is taller than a phone, so a box tapped near the top opens a
    * pad below the fold. Bringing it into view is the difference between two
@@ -54,6 +94,7 @@ export function ScorePad({
    */
   const card = useRef<HTMLElement>(null);
   useEffect(() => {
+    setFace(null);
     card.current?.scrollIntoView?.({ block: 'nearest' });
   }, [selection.playerId, selection.category]);
 
@@ -105,8 +146,87 @@ export function ScorePad({
 
   const category = selection.category;
   // Every box offers a scratch, and it is always the first option.
-  const [scratch = 0, ...values] = scoreOptions(category);
+  const [scratch = 0, ...totals] = scoreOptions(category);
   const current = sheet.scores[category];
+  const kind = kindOf(category);
+  const spare = kind === null ? 0 : spareDice(kind);
+
+  const keyFor = (value: number, main: number, sub: string, label: string) => (
+    <button
+      key={value}
+      type="button"
+      className={`key tall${current === value ? ' on' : ''}`}
+      aria-label={label}
+      aria-pressed={current === value}
+      disabled={disabled}
+      onClick={() => onScore(value)}
+    >
+      <span className="k-main">{main}</span>
+      <span className="k-sub">{sub}</span>
+    </button>
+  );
+
+  /* ── the three shapes the keys take ── */
+
+  let hint: string;
+  let groupLabel: string;
+  let keys: JSX.Element[];
+
+  if (kind === null) {
+    hint = `${HINTS[category]}.`;
+    groupLabel = `Score for ${LABELS[category]}`;
+    keys = totals.map((value) => (
+      <button
+        key={value}
+        type="button"
+        className={`key${current === value ? ' on' : ''}`}
+        aria-label={`Score ${value}`}
+        aria-pressed={current === value}
+        disabled={disabled}
+        onClick={() => onScore(value)}
+      >
+        {value}
+      </button>
+    ));
+  } else if (face === null) {
+    hint = `Which number did you get ${COUNT_WORD[kind]} of?`;
+    groupLabel = `The number for ${LABELS[category]}`;
+    keys = DIE_FACES.map((value) => {
+      const range = kindTotals(kind, value);
+      return (
+        <button
+          key={value}
+          type="button"
+          className="key tall"
+          aria-label={`${LABELS[category]} on ${value}`}
+          disabled={disabled}
+          onClick={() => step(value)}
+        >
+          <span className="k-main">{value}</span>
+          <span className="k-sub">
+            {range[0]} to {range[range.length - 1]}
+          </span>
+        </button>
+      );
+    });
+  } else {
+    hint =
+      spare === 1
+        ? `${COUNT_WORD[kind]} ${face}s. What was the other die?`
+        : `${COUNT_WORD[kind]} ${face}s. What did the other two dice add up to?`;
+    hint = hint.charAt(0).toUpperCase() + hint.slice(1);
+    groupLabel = spare === 1 ? 'The other die' : 'The other two dice';
+    keys = spareTotals(kind).map((rest) =>
+      keyFor(
+        kind * face + rest,
+        rest,
+        String(kind * face + rest),
+        spare === 1
+          ? `Other die ${rest}, total ${kind * face + rest}`
+          : `Other dice ${rest}, total ${kind * face + rest}`,
+      ),
+    );
+  }
 
   return (
     <section className={`card entry${tone}`} ref={card}>
@@ -125,22 +245,10 @@ export function ScorePad({
         />
       )}
 
-      <p className="hint">{HINTS[category]}.</p>
+      <p className="hint">{hint}</p>
 
-      <div className="pad" role="group" aria-label={`Score for ${LABELS[category]}`}>
-        {values.map((value) => (
-          <button
-            key={value}
-            type="button"
-            className={`key${current === value ? ' on' : ''}`}
-            aria-label={`Score ${value}`}
-            aria-pressed={current === value}
-            disabled={disabled}
-            onClick={() => onScore(value)}
-          >
-            {value}
-          </button>
-        ))}
+      <div className="pad" role="group" aria-label={groupLabel} ref={pad}>
+        {keys}
       </div>
 
       <div className="pad-actions">
@@ -154,6 +262,11 @@ export function ScorePad({
         >
           Scratch for 0
         </button>
+        {face !== null && (
+          <button type="button" className="link" onClick={() => step(null)}>
+            Change the number
+          </button>
+        )}
         {current !== undefined && (
           <button type="button" className="link" disabled={disabled} onClick={onClear}>
             Empty this box
