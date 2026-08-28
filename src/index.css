@@ -1712,6 +1712,25 @@ button.link {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, var(--card-2));
 }
+
+/* A key that carries two figures: what you tapped, and what it comes to. */
+.pad .key.tall {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  line-height: 1.2;
+  padding: 0.5rem 0.3rem;
+}
+.pad .k-sub {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.pad .key.on .k-sub {
+  color: var(--text);
+}
 .pad-actions {
   display: flex;
   align-items: center;

@@ -139,6 +139,147 @@ describe('filling a box in', () => {
   });
 });
 
+/**
+ * Four fives cannot come to 7, but a pad of totals cannot say so: taken on its
+ * own, every total from 5 to 30 is some four of a kind. So these two boxes ask
+ * which number was hit first, which is also how it is said at the table.
+ */
+describe('the boxes that ask for dice', () => {
+  /** The keys of one pad, by accessible name, in the order they are offered. */
+  const padKeys = (name: string) =>
+    within(screen.getByRole('group', { name }))
+      .getAllByRole('button')
+      .map((b) => b.getAttribute('aria-label'));
+
+  it('asks which number was hit rather than what it adds up to', async () => {
+    const { user } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Four of a kind for Ada' }));
+
+    expect(screen.getByText('Which number did you get four of?')).toBeInTheDocument();
+    expect(padKeys('The number for Four of a kind')).toEqual([
+      'Four of a kind on 1',
+      'Four of a kind on 2',
+      'Four of a kind on 3',
+      'Four of a kind on 4',
+      'Four of a kind on 5',
+      'Four of a kind on 6',
+    ]);
+    // Each carries what it could come to, so the choice is not made blind.
+    expect(screen.getByRole('button', { name: 'Four of a kind on 5' })).toHaveTextContent(
+      '21 to 26',
+    );
+  });
+
+  it('offers only the totals that number can make, and shows each one', async () => {
+    const { user } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Four of a kind for Ada' }));
+    await user.click(screen.getByRole('button', { name: 'Four of a kind on 5' }));
+
+    expect(screen.getByText('Four 5s. What was the other die?')).toBeInTheDocument();
+    // The odd die is what is tapped; the total it makes is shown beside it.
+    expect(padKeys('The other die')).toEqual([
+      'Other die 1, total 21',
+      'Other die 2, total 22',
+      'Other die 3, total 23',
+      'Other die 4, total 24',
+      'Other die 5, total 25',
+      'Other die 6, total 26',
+    ]);
+    expect(screen.getByRole('button', { name: 'Other die 3, total 23' })).toHaveTextContent('23');
+  });
+
+  it('will not take a total that number could never make', async () => {
+    const { user } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Four of a kind for Ada' }));
+    await user.click(screen.getByRole('button', { name: 'Four of a kind on 5' }));
+
+    // 7 is a perfectly good four of a kind, on ones. It is not one on fives.
+    expect(screen.queryByRole('button', { name: /total 7$/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Other die 2, total 22' })).toBeInTheDocument();
+  });
+
+  it('writes the total the two answers come to', async () => {
+    const { user, container } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Four of a kind for Ada' }));
+    await user.click(screen.getByRole('button', { name: 'Four of a kind on 5' }));
+    await user.click(screen.getByRole('button', { name: 'Other die 3, total 23' }));
+
+    expect(filledBoxFor('Ada', 'fourOfAKind', 23)).toBeInTheDocument();
+    expect(totals(container)).toEqual(['Ada:23']);
+  });
+
+  it('asks three of a kind for the other two dice together', async () => {
+    const { user, container } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Three of a kind for Ada' }));
+    await user.click(screen.getByRole('button', { name: 'Three of a kind on 4' }));
+
+    expect(
+      screen.getByText('Three 4s. What did the other two dice add up to?'),
+    ).toBeInTheDocument();
+    expect(padKeys('The other two dice')).toHaveLength(11);
+
+    await user.click(screen.getByRole('button', { name: 'Other dice 7, total 19' }));
+    expect(totals(container)).toEqual(['Ada:19']);
+  });
+
+  // Stepping replaces every key, which would otherwise drop a keyboard on the
+  // body with nothing selected.
+  it('puts the caret on the new keys when the step changes', async () => {
+    const { user } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Four of a kind for Ada' }));
+    await user.click(screen.getByRole('button', { name: 'Four of a kind on 5' }));
+    expect(screen.getByRole('button', { name: 'Other die 1, total 21' })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Change the number' }));
+    expect(screen.getByRole('button', { name: 'Four of a kind on 1' })).toHaveFocus();
+  });
+
+  it('goes back to the number without scoring anything', async () => {
+    const { user } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Four of a kind for Ada' }));
+    await user.click(screen.getByRole('button', { name: 'Four of a kind on 6' }));
+    await user.click(screen.getByRole('button', { name: 'Change the number' }));
+
+    expect(screen.getByText('Which number did you get four of?')).toBeInTheDocument();
+    expect(boxFor('Ada', 'fourOfAKind')).toBeInTheDocument();
+  });
+
+  it('still scratches in two taps, without picking a number first', async () => {
+    const { user, container } = setup();
+    await addPlayers(user, 'Ada');
+    await fill(user, 'Ada', 'fourOfAKind', 0);
+
+    expect(filledBoxFor('Ada', 'fourOfAKind', 0)).toBeInTheDocument();
+    expect(totals(container)).toEqual(['Ada:0']);
+  });
+
+  it('starts again at the number when a filled box is reopened', async () => {
+    const { user } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Four of a kind for Ada' }));
+    await user.click(screen.getByRole('button', { name: 'Four of a kind on 5' }));
+    await user.click(screen.getByRole('button', { name: 'Other die 3, total 23' }));
+
+    await user.click(screen.getByRole('button', { name: 'Change Four of a kind for Ada, now 23' }));
+    expect(screen.getByText('Which number did you get four of?')).toBeInTheDocument();
+  });
+
+  it('leaves chance asking for the total, because there is nothing to match', async () => {
+    const { user } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Chance for Ada' }));
+    expect(screen.getByRole('group', { name: 'Score for Chance' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Score 7' })).toBeInTheDocument();
+  });
+});
+
 describe('the host tapping whoever calls out a score', () => {
   it('fills in any player, not just the one whose turn it is', async () => {
     const { user, container } = setup();

@@ -5,10 +5,16 @@ import {
   faceOf,
   isOver,
   isValidScore,
+  kindOf,
+  kindTotals,
   LOWER,
+  OF_A_KIND,
   roundNumber,
   scoreOptions,
   sheetFor,
+  spareDice,
+  spareFor,
+  spareTotals,
   sheets,
   standings,
   UPPER,
@@ -90,6 +96,72 @@ describe('what a box will take', () => {
     ['ones', -1, false],
   ] as [Category, number, boolean][])('says %s can hold %d: %s', (category, value, ok) => {
     expect(isValidScore(category, value)).toBe(ok);
+  });
+});
+
+describe('the boxes asked for as dice', () => {
+  it('knows which two they are', () => {
+    expect(kindOf('fourOfAKind')).toBe(4);
+    expect(kindOf('threeOfAKind')).toBe(3);
+    expect(kindOf('chance')).toBeNull();
+    expect(kindOf('fives')).toBeNull();
+  });
+
+  it('leaves one die spare for four of a kind and two for three', () => {
+    expect(spareDice(4)).toBe(1);
+    expect(spareDice(3)).toBe(2);
+    expect(spareTotals(4)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(spareTotals(3)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it('totals four of a kind as the four plus whatever the odd die was', () => {
+    expect(kindTotals(4, 5)).toEqual([21, 22, 23, 24, 25, 26]);
+    expect(kindTotals(4, 1)).toEqual([5, 6, 7, 8, 9, 10]);
+    expect(kindTotals(4, 6)).toEqual([25, 26, 27, 28, 29, 30]);
+  });
+
+  it('totals three of a kind as the three plus the other two', () => {
+    expect(kindTotals(3, 5)[0]).toBe(17);
+    expect(kindTotals(3, 5).at(-1)).toBe(27);
+    expect(kindTotals(3, 1)).toEqual([5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+  });
+
+  /**
+   * The spare dice are free and may land on the matched face too: five of a
+   * kind is four of a kind as well, and may be written in that box.
+   */
+  it('lets the spare dice match the face, which is five of a kind', () => {
+    expect(kindTotals(4, 6)).toContain(30);
+    expect(kindTotals(3, 6)).toContain(30);
+  });
+
+  it('says the total back from the face and what was written down', () => {
+    expect(spareFor(4, 5, 23)).toBe(3);
+    expect(spareFor(3, 5, 23)).toBe(8);
+  });
+
+  it('never offers a total the box itself could not hold', () => {
+    for (const [category, kind] of Object.entries(OF_A_KIND) as [Category, number][]) {
+      for (const face of [1, 2, 3, 4, 5, 6]) {
+        for (const total of kindTotals(kind, face)) {
+          expect(isValidScore(category, total), `${category} ${face} ${total}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  /**
+   * Why the face has to be asked for at all: taken on its own every total from
+   * 5 to 30 is some four of a kind, so a pad of totals can rule nothing out.
+   * Four fives is what makes 7 impossible, and 7 is only impossible once the
+   * five is known.
+   */
+  it('rules nothing out until the face is known, and plenty once it is', () => {
+    const anyFace = new Set([1, 2, 3, 4, 5, 6].flatMap((f) => kindTotals(4, f)));
+    for (let total = 5; total <= 30; total += 1) expect(anyFace.has(total)).toBe(true);
+
+    expect(kindTotals(4, 5)).not.toContain(7);
+    expect(kindTotals(4, 5)).toHaveLength(6);
   });
 });
 

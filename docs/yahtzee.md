@@ -14,9 +14,33 @@ the game and the easiest to leave out, so it sits on the pad beside the numbers 
 somewhere else.
 
 The pad only offers what the box can hold. An upper box takes a multiple of its own face and
-nothing else, so Fives offers 5, 10, 15, 20, 25. A fixed combination offers its one number. The
-three that add the whole hand offer every sum five dice can make, 5 to 30. A wrong number cannot
-be typed, so there is nothing to catch afterwards.
+nothing else, so Fives offers 5, 10, 15, 20, 25. A fixed combination offers its one number.
+Chance offers every sum five dice can make, 5 to 30. A wrong number cannot be typed, so there is
+nothing to catch afterwards.
+
+## Three and four of a kind
+
+These two are asked for the way they are said at the table: which number you got four of, and
+then what the odd die was. Three of a kind asks the same thing and then what the other two dice
+came to. Each key carries the total it makes, so nothing is chosen blind.
+
+```
+which number   1     2     3     4     5     6
+               5-10  9-14  13-18 17-22 21-26 25-30
+
+four 5s, and the other die
+               1     2     3     4     5     6
+               21    22    23    24    25    26
+```
+
+Asking for the dice rather than the sum is what makes the entry safe. Four fives cannot come to
+7, and a pad of totals has no way of saying so: taken on its own, every total from 5 to 30 is
+some four of a kind, so nothing can be ruled out until the matched face is known. That is also
+why the wire still accepts 5 to 30 for these boxes - the bound is honest only with the face, and
+the face is not stored.
+
+The spare dice are free and may land on the matched number too, so five of a kind is offered in
+both boxes: it is four of a kind as well, and may be written there.
 
 ## What the sheet works out
 
