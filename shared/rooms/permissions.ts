@@ -67,6 +67,7 @@ export const seatView: Record<Game, (state: Snapshot) => SeatView> = {
   scrabble: withTurnPointer,
   cricket: withTurnPointer,
   rummikub: roundBased,
+  yahtzee: withTurnPointer,
 };
 
 /**
@@ -102,6 +103,7 @@ const HOST_ONLY: Record<Game, readonly string[]> = {
     'resetAll',
     'undo',
   ],
+  yahtzee: ['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'newGame', 'resetAll'],
 };
 
 /** Actions a seated player may take, but only when it is their turn. */
@@ -109,6 +111,7 @@ const ON_YOUR_TURN: Record<Game, readonly string[]> = {
   scrabble: ['recordPlay', 'pass'],
   cricket: ['recordTurn'],
   rummikub: [],
+  yahtzee: ['score', 'clearBox', 'addBonus', 'removeBonus'],
 };
 
 /**
@@ -116,7 +119,24 @@ const ON_YOUR_TURN: Record<Game, readonly string[]> = {
  * while nobody has played since. It fixes the commonest real complaint - "I
  * typed 24 instead of 42" - without letting anyone rewrite history.
  */
-const SELF_UNDO: Record<Game, boolean> = { scrabble: true, cricket: true, rummikub: false };
+const SELF_UNDO: Record<Game, boolean> = {
+  scrabble: true,
+  cricket: true,
+  rummikub: false,
+  yahtzee: true,
+};
+
+/**
+ * Which box of the payload names the player being scored for.
+ *
+ * Scrabble and cricket score whoever is up and say nothing about it, so being
+ * up is the whole check. Yahtzee names a player, because the host fills in
+ * whoever calls out a number - which means for anybody else the name has to be
+ * checked as well, or being up would be a licence to write on someone else's
+ * sheet.
+ */
+const namesAPlayer = (action: GameAction): string | null =>
+  typeof action.playerId === 'string' ? action.playerId : null;
 
 export function permit(game: Game, view: SeatView, actor: Actor, action: GameAction): Permission {
   const type = action.type;
@@ -142,6 +162,8 @@ export function permit(game: Game, view: SeatView, actor: Actor, action: GameAct
 
   if (ON_YOUR_TURN[game].includes(type)) {
     if (!actor.seatId) return deny('not-your-seat');
+    const named = namesAPlayer(action);
+    if (named !== null && named !== actor.seatId) return deny('not-your-seat');
     return actor.seatId === view.currentPlayerId ? ALLOW : deny('not-your-turn');
   }
 

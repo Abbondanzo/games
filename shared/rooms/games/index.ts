@@ -11,6 +11,7 @@ import type { IdSource } from '../../ids';
 import { cricketApply, cricketInitialState } from './cricket';
 import { scrabbleApply, scrabbleInitialState } from './scrabble';
 import { rummikubApply, rummikubInitialState } from './rummikub';
+import { yahtzeeApply, yahtzeeInitialState } from './yahtzee';
 
 export interface GameSetup {
   initial: () => Snapshot;
@@ -21,4 +22,5 @@ export const GAME_SETUP: Record<Game, GameSetup> = {
   cricket: { initial: cricketInitialState, apply: cricketApply },
   scrabble: { initial: scrabbleInitialState, apply: scrabbleApply },
   rummikub: { initial: rummikubInitialState, apply: rummikubApply },
+  yahtzee: { initial: yahtzeeInitialState, apply: yahtzeeApply },
 };

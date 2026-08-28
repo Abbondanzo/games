@@ -11,6 +11,7 @@ uses a small room server.
 | [Scrabble](docs/scrabble.md)       | Words, bonus squares, blanks and bingos, with a dictionary lookup |
 | [Cricket (darts)](docs/cricket.md) | Marks, closing out and points - standard, cut-throat or no points |
 | [Rummikub](docs/rummikub.md)       | Round-by-round scoring from the tiles left on each rack           |
+| [Yahtzee](docs/yahtzee.md)         | The paper score sheet, every box a tap, totals and bonuses added  |
 
 Any game can be [shared with a four-character code](docs/rooms.md), so everyone at the table
 sees the score and enters their own turns.
@@ -51,7 +52,7 @@ is the React app and `worker/` is the room server.
 Scores are derived by replaying the raw events - words played, darts thrown, rounds won - rather
 than being stored, which is what lets cricket switch scoring modes mid-game without restarting.
 
-Around 480 tests cover the rule engines, the reducers, the room protocol and every tracker end
+Around 1,100 tests cover the rule engines, the reducers, the room protocol and every tracker end
 to end.
 
 [CLAUDE.md](CLAUDE.md) has the detail: architecture, conventions, testing approach and the
@@ -59,8 +60,8 @@ gotchas worth knowing before changing anything.
 
 ## Docs
 
-- [Scrabble](docs/scrabble.md), [Cricket](docs/cricket.md), [Rummikub](docs/rummikub.md) - rules
-  and behaviour for each tracker
+- [Scrabble](docs/scrabble.md), [Cricket](docs/cricket.md), [Rummikub](docs/rummikub.md),
+  [Yahtzee](docs/yahtzee.md) - rules and behaviour for each tracker
 - [Rooms](docs/rooms.md) - sharing a game, and how the room server works
 - [Install and offline use](docs/pwa.md) - PWA setup, icon pipeline, iOS specifics
 - [CI and deployment](docs/deployment.md) - what runs where, and what does not

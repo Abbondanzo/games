@@ -16,6 +16,7 @@ import type { ApplyAction } from '../roomCore';
 import { cricketApply } from './cricket';
 import { scrabbleApply } from './scrabble';
 import { rummikubApply } from './rummikub';
+import { yahtzeeApply } from './yahtzee';
 import {
   createReducer as cricketReducer,
   initialState as cricketStart,
@@ -28,6 +29,10 @@ import {
   createReducer as rummikubReducer,
   initialState as rummikubStart,
 } from '../../games/rummikub/reducer';
+import {
+  createReducer as yahtzeeReducer,
+  initialState as yahtzeeStart,
+} from '../../games/yahtzee/reducer';
 
 /**
  * Ids are minted from a counter rather than the clock, so the two runs can be
@@ -40,8 +45,8 @@ const countingIds = (): IdSource => {
 
 /**
  * The room holds a snapshot rather than a typed state, which is the whole point
- * of the parse. `never` for the action is what lets one helper drive all three
- * reducers; each script below is typed as the wire union it really is.
+ * of the parse. `never` for the action is what lets one helper drive every
+ * reducer; each script below is typed as the wire union it really is.
  */
 type Reducer<S> = (state: S, action: never) => S;
 
@@ -269,6 +274,101 @@ describe('rummikub', () => {
   });
 });
 
+describe('yahtzee', () => {
+  const run = (script: GameAction[]) =>
+    bothWays(yahtzeeStart, yahtzeeReducer, yahtzeeApply, script);
+
+  const box = (playerId: string, category: string, value: number) => ({
+    type: 'score',
+    playerId,
+    category,
+    value,
+  });
+
+  it('fills a sheet in the same way', () => {
+    const runs = run([
+      { type: 'addPlayers', names: 'Ada, Grace, Alan' },
+      box('id0', 'sixes', 24),
+      box('id1', 'chance', 21),
+      box('id2', 'fullHouse', 0),
+      box('id0', 'largeStraight', 40),
+      box('id1', 'ones', 3),
+    ]);
+    agree(runs);
+    expect(runs.solo.turns).toHaveLength(5);
+  });
+
+  /**
+   * The schema strips what it does not declare and coerces nothing, so a box
+   * that cannot hold a number has to be declined identically down both roads -
+   * once by the reducer and once before it ever gets there.
+   */
+  it('declines an impossible score the same way', () => {
+    const runs = run([
+      { type: 'addPlayers', names: 'Ada' },
+      box('id0', 'twos', 7),
+      box('id0', 'chance', 4),
+      box('id0', 'ones', 5),
+    ]);
+    agree(runs);
+    expect(runs.solo.turns).toHaveLength(1);
+  });
+
+  it('corrects a box without spending a second turn the same way', () => {
+    agree(
+      run([
+        { type: 'addPlayers', names: 'Ada, Grace' },
+        box('id0', 'fours', 12),
+        box('id1', 'fours', 8),
+        box('id0', 'fours', 16),
+        { type: 'clearBox', playerId: 'id1', category: 'fours' },
+      ]),
+    );
+  });
+
+  it('counts extra Yahtzees the same way', () => {
+    const runs = run([
+      { type: 'addPlayers', names: 'Ada, Grace' },
+      box('id0', 'yahtzee', 50),
+      { type: 'addBonus', playerId: 'id0' },
+      { type: 'addBonus', playerId: 'id0' },
+      { type: 'removeBonus', playerId: 'id0' },
+      // Refused down both roads: Grace has not rolled one at all.
+      { type: 'addBonus', playerId: 'id1' },
+    ]);
+    agree(runs);
+    expect(runs.solo.bonuses).toHaveLength(1);
+  });
+
+  it('undoes, removes and renames the same way', () => {
+    agree(
+      run([
+        { type: 'addPlayers', names: 'Ada, Grace, Alan' },
+        box('id0', 'ones', 3),
+        box('id1', 'ones', 2),
+        { type: 'undo' },
+        { type: 'setCurrent', id: 'id2' },
+        box('id2', 'sixes', 18),
+        { type: 'removePlayer', id: 'id0' },
+        { type: 'renamePlayer', id: 'id1', name: 'Grace H' },
+        { type: 'newGame' },
+      ]),
+    );
+  });
+
+  it('rearranges the order the same way', () => {
+    agree(
+      run([
+        { type: 'addPlayers', names: 'Ada, Grace, Alan' },
+        { type: 'movePlayer', id: 'id2', to: 0 },
+        box('id2', 'chance', 19),
+        // Declined by both, now that a box has been filled in.
+        { type: 'movePlayer', id: 'id0', to: 0 },
+      ]),
+    );
+  });
+});
+
 /**
  * A room can outlive the code that made it, so a snapshot is parsed on the way
  * in as well as on the way out. That parse must not quietly reshape a good
@@ -302,6 +402,15 @@ describe('round-tripping a snapshot', () => {
       [
         { type: 'addPlayers', names: 'Ada, Grace' },
         { type: 'recordRound', winnerId: 'id0', penalties: { id1: 24 } },
+      ],
+    ],
+    [
+      'yahtzee',
+      yahtzeeStart,
+      yahtzeeApply,
+      [
+        { type: 'addPlayers', names: 'Ada, Grace' },
+        { type: 'score', playerId: 'id0', category: 'fives', value: 15 },
       ],
     ],
   ];

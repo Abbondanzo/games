@@ -30,8 +30,11 @@ import { z } from 'zod';
  *    client to refresh is the only way to stop it.
  * 5: added makeHost, and movePlayer as a game action.
  * 6: added allowBack, and the list of removed people it acts on.
+ * 7: added Yahtzee. Nothing in a frame changed, but a room that predates it
+ *    refuses to be created for a game it has never heard of, and the button
+ *    would otherwise just look broken.
  */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 /** Which side is behind, worked out from the version in the welcome. */
 export type VersionGap = 'app' | 'room';
@@ -48,7 +51,7 @@ export const VERSION_MESSAGES: Record<VersionGap, string> = {
   app: 'This app is out of date. Refresh to get the latest.',
 };
 
-export const GameSchema = z.enum(['scrabble', 'cricket', 'rummikub']);
+export const GameSchema = z.enum(['scrabble', 'cricket', 'rummikub', 'yahtzee']);
 export type Game = z.infer<typeof GameSchema>;
 export const GAMES = GameSchema.options;
 

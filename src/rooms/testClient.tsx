@@ -110,18 +110,39 @@ export const playerNames = (client?: HTMLElement): string[] =>
 export const myRow = (client?: HTMLElement): HTMLElement | undefined =>
   rows(client).find((li) => li.querySelector('.you'));
 
-/** Cricket puts its players across the top instead of down the side. */
+/**
+ * The headings of a board laid out in columns, which is where cricket and
+ * Yahtzee put their players. Scoped to the head of the table on purpose: a
+ * heading spanning a section further down is a column header too, and would
+ * otherwise arrive here as a player with no name.
+ */
+const headings = (client: HTMLElement): HTMLElement[] => {
+  const head = within(client).getByRole('table').querySelector('thead');
+  return head ? within(head as HTMLElement).getAllByRole('columnheader') : [];
+};
+
 export const boardColumns = (client: HTMLElement): string[] =>
-  within(within(client).getByRole('table'))
-    .getAllByRole('columnheader')
+  headings(client)
     .slice(1)
     .map((h) => h.querySelector('.name')?.textContent ?? '');
 
+/**
+ * The bottom row of a board laid out in columns, as "Ada:65": cricket points,
+ * Yahtzee totals. Same exception as the rows above, for the same reason - a
+ * total sits in a cell with no accessible structure tying it to its column.
+ */
+export const boardTotals = (client: HTMLElement): string[] => {
+  const table = within(client).getByRole('table');
+  const names = boardColumns(client);
+  const totals = [...(table.querySelector('tfoot')?.querySelectorAll('.pts') ?? [])].map(
+    (cell) => cell.textContent ?? '',
+  );
+  return names.map((name, i) => `${name}:${totals[i] ?? ''}`);
+};
+
 /** The cricket column marked as this device's own. */
 export const myColumn = (client: HTMLElement): HTMLElement | undefined =>
-  within(within(client).getByRole('table'))
-    .getAllByRole('columnheader')
-    .find((h) => h.querySelector('.you'));
+  headings(client).find((h) => h.querySelector('.you'));
 
 /* ─────────────────────────── watching for sockets ─────────────────────────── */
 

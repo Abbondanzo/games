@@ -90,6 +90,19 @@ describe('the host', () => {
       'resetAll',
       'undo',
     ],
+    yahtzee: [
+      'addPlayers',
+      'removePlayer',
+      'movePlayer',
+      'setCurrent',
+      'newGame',
+      'resetAll',
+      'score',
+      'clearBox',
+      'addBonus',
+      'removeBonus',
+      'undo',
+    ],
   };
 
   for (const [game, types] of Object.entries(everything) as [Game, string[]][]) {
@@ -178,6 +191,69 @@ describe('undoing your own turn', () => {
   it('is host-only in Rummikub', () => {
     const state: Snapshot = { players: [{ id: ada }], rounds: [] };
     expect(check('rummikub', state, seatedAda, 'undo')).toEqual({ ok: false, code: 'host-only' });
+  });
+});
+
+describe('an action that names the player it is for', () => {
+  const scoring = (playerId: string) => ({ type: 'score', playerId, category: 'ones', value: 1 });
+
+  /**
+   * Regression: being up used to be the whole check, which was fine while every
+   * action scored whoever was up implicitly. Yahtzee names the player, because
+   * the host fills in for whoever calls out a number - so without this, a guest
+   * on their own turn could write on somebody else's sheet.
+   */
+  it('is refused when a seated player names somebody else', () => {
+    expect(permit('yahtzee', view('yahtzee', turnGame(0)), seatedAda, scoring(grace))).toEqual({
+      ok: false,
+      code: 'not-your-seat',
+    });
+  });
+
+  it('is allowed when they name their own seat on their own turn', () => {
+    expect(permit('yahtzee', view('yahtzee', turnGame(0)), seatedAda, scoring(ada)).ok).toBe(true);
+  });
+
+  it('is still refused on somebody else’s turn', () => {
+    expect(permit('yahtzee', view('yahtzee', turnGame(1)), seatedAda, scoring(ada))).toEqual({
+      ok: false,
+      code: 'not-your-turn',
+    });
+  });
+
+  it('lets the host name anybody', () => {
+    expect(permit('yahtzee', view('yahtzee', turnGame(0)), host, scoring(grace)).ok).toBe(true);
+  });
+
+  // The UI asks whether an action is possible at all, with no payload to check.
+  it('still answers the question the UI asks, with nothing named', () => {
+    expect(can('yahtzee', view('yahtzee', turnGame(0)), seatedAda, 'score')).toBe(true);
+    expect(can('yahtzee', view('yahtzee', turnGame(1)), seatedAda, 'score')).toBe(false);
+  });
+});
+
+describe('Yahtzee guests', () => {
+  it.each(['score', 'clearBox', 'addBonus', 'removeBonus'])('may %s on their own turn', (type) => {
+    expect(check('yahtzee', turnGame(0), seatedAda, type).ok).toBe(true);
+  });
+
+  it.each(['addPlayers', 'removePlayer', 'movePlayer', 'setCurrent', 'newGame', 'resetAll'])(
+    'may not %s',
+    (type) => {
+      expect(check('yahtzee', turnGame(), seatedAda, type)).toEqual({
+        ok: false,
+        code: 'host-only',
+      });
+    },
+  );
+
+  // Grace filled the last box, so only Grace may take it back.
+  it('may take back the box they just filled, and nobody else may', () => {
+    expect(check('yahtzee', turnGame(), seatedGrace, 'undo').ok).toBe(true);
+    expect(check('yahtzee', turnGame(), seatedAda, 'undo')).toEqual({
+      ok: false,
+      code: 'not-your-turn',
+    });
   });
 });
 
