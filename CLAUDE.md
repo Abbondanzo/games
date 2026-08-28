@@ -1,6 +1,6 @@
 # Working in this repo
 
-Score trackers for Scrabble, cricket darts and Rummikub. React 18 + TypeScript + Vite,
+Score trackers for Scrabble, cricket darts, Rummikub and Yahtzee. React 18 + TypeScript + Vite,
 deployed to Cloudflare Pages. Solo play is entirely offline in the browser; shared rooms are
 served by a Cloudflare Worker.
 
@@ -103,7 +103,7 @@ throw inside the room.
 
 ## Testing
 
-`pnpm test` runs everything under jsdom. Around 600 tests across three layers:
+`pnpm test` runs everything under jsdom. Around 1,100 tests across three layers:
 
 1. **Rules** (`<game>.test.ts`) - pure functions, table-driven where it helps.
 2. **Reducers** (`use<Game>.test.ts`) - actions in, state out, no rendering.
@@ -192,12 +192,16 @@ it fail first.
 - **Play order is fixed by the first turn.** `movePlayer` is refused once a game has any
   turns, because the roster order is the turn order and moving somebody would hand the turn
   to a different player. The UI hides the buttons then, but the reducer is what enforces it.
+- **An action that names a player is checked against the seat, not just the turn.** Scrabble and
+  cricket score whoever is up implicitly, so being up was the whole check. Yahtzee names the
+  player, because the host fills in for whoever calls a score out - and without the extra check
+  in `permit`, a guest on their own turn could write on somebody else's sheet.
 - **Storage keys are `games.<game>.v1`.** Changing one discards saved games, so version them
   rather than renaming.
 
 ## Docs
 
 Per-game rules and behaviour live in `docs/`: [scrabble](docs/scrabble.md),
-[cricket](docs/cricket.md), [rummikub](docs/rummikub.md). Also
+[cricket](docs/cricket.md), [rummikub](docs/rummikub.md), [yahtzee](docs/yahtzee.md). Also
 [docs/rooms.md](docs/rooms.md), [docs/pwa.md](docs/pwa.md) and
 [docs/deployment.md](docs/deployment.md).

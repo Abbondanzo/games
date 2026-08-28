@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Games",
   "short_name": "Games",
-  "description": "Score trackers for Scrabble, cricket darts and Rummikub. Works offline.",
+  "description": "Score trackers for Scrabble, cricket darts, Rummikub and Yahtzee. Works offline.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

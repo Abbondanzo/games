@@ -50,6 +50,14 @@ describe('routing', () => {
     expect(screen.getByLabelText('Player name')).toBeInTheDocument();
   });
 
+  it('opens the yahtzee tracker from the home page', async () => {
+    const user = userEvent.setup();
+    renderAt('/');
+    await user.click(screen.getByRole('link', { name: /Yahtzee/ }));
+    expect(screen.getByRole('heading', { name: 'Yahtzee' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Player name')).toBeInTheDocument();
+  });
+
   it('sends an unknown route home', () => {
     renderAt('/not-a-game');
     expect(screen.getByRole('heading', { name: 'Games' })).toBeInTheDocument();
@@ -59,7 +67,7 @@ describe('routing', () => {
    * Installed as an app there is no browser chrome, so a page without a way
    * back is a page you cannot leave. The join page shipped without one.
    */
-  it.each(['/scrabble', '/cricket', '/rummikub', '/join', '/join/AB23'])(
+  it.each(['/scrabble', '/cricket', '/rummikub', '/yahtzee', '/join', '/join/AB23'])(
     'gives %s a way back to the game list',
     (path) => {
       renderAt(path);
@@ -72,6 +80,7 @@ describe('routing', () => {
       ['/scrabble', 'Scrabble'],
       ['/cricket', 'Cricket'],
       ['/rummikub', 'Rummikub'],
+      ['/yahtzee', 'Yahtzee'],
       ['/join', 'Join a game'],
     ] as const) {
       const { unmount } = renderAt(path);

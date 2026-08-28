@@ -1555,3 +1555,184 @@ button.link {
   margin-top: 0.6rem;
   width: 100%;
 }
+
+/* ─────────────────────────── yahtzee ─────────────────────────── */
+
+/* Laid out like the paper sheet: the boxes down the side, a column each. */
+.score-sheet {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.score-sheet th,
+.score-sheet td {
+  padding: 0.2rem 0.35rem;
+  text-align: center;
+  border-bottom: 1px solid var(--line);
+}
+.score-sheet thead th {
+  font-size: 0.82rem;
+  font-weight: 600;
+  vertical-align: bottom;
+  padding-bottom: 0.4rem;
+}
+.score-sheet .corner {
+  text-align: left;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.score-sheet tbody th,
+.score-sheet tfoot th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  min-width: 8.5rem;
+}
+/* The "how to score" column of a paper sheet, kept small and out of the way. */
+.score-sheet .how {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+.score-sheet tr.section th {
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 0.7rem;
+}
+.score-sheet tr.sub th {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.score-sheet tr.sub {
+  background: color-mix(in srgb, var(--muted) 7%, transparent);
+}
+.score-sheet td.active,
+.score-sheet th.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.score-sheet th.mine .name {
+  color: var(--accent);
+}
+.score-sheet .you {
+  display: block;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* A box is the whole tap target, so it fills its cell rather than sitting in it. */
+.score-sheet .box {
+  display: block;
+  width: 100%;
+  min-width: 2.9rem;
+  min-height: 2.1rem;
+  padding: 0.25rem;
+  font: inherit;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.score-sheet button.box.empty {
+  border-style: dashed;
+  color: var(--muted);
+}
+.score-sheet button.box:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.score-sheet button.box[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--card-2));
+}
+.score-sheet button.box:disabled {
+  opacity: 0.5;
+}
+.score-sheet .box.static {
+  background: none;
+  border-color: transparent;
+}
+.score-sheet .box.derived {
+  color: var(--muted);
+  font-weight: 700;
+}
+.score-sheet .note {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+.score-sheet tfoot th {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.score-sheet tfoot td {
+  padding-top: 0.5rem;
+}
+.score-sheet tfoot .pts {
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+/* Every number the tapped box could hold, as keys. */
+.pad {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.pad .key {
+  padding: 0.65rem 0.3rem;
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--card-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.pad .key:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.pad .key.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--card-2));
+}
+.pad-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+}
+.pad-actions .danger.on {
+  border-color: var(--bad);
+}
+
+@media (max-width: 480px) {
+  .score-sheet th,
+  .score-sheet td {
+    padding: 0.2rem 0.2rem;
+  }
+  .score-sheet tbody th,
+  .score-sheet tfoot th {
+    min-width: 7rem;
+    font-size: 0.8rem;
+  }
+  .pad {
+    grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  }
+}

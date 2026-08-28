@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Blocks, DoorOpen, SpellCheck, Target, type LucideIcon } from 'lucide-react';
+import { Blocks, DoorOpen, Dices, SpellCheck, Target, type LucideIcon } from 'lucide-react';
 
 interface Game {
   path?: string;
@@ -26,6 +26,12 @@ const GAMES: Game[] = [
     Icon: Blocks,
     title: 'Rummikub',
     desc: 'Round-by-round scoring from the tiles left on each rack.',
+  },
+  {
+    path: '/yahtzee',
+    Icon: Dices,
+    title: 'Yahtzee',
+    desc: 'The paper score sheet, with every box a tap and the totals added up for you.',
   },
 ];
 
