@@ -16,8 +16,10 @@ somewhere else.
 **No box asks for a total**, because the total is the one thing nobody at the table says out
 loud. You say "three fives", or "four of a kind on 5, and a 3". The upper boxes ask how many;
 the three boxes that add the dice up ask for the dice; only a fixed combination is a single
-number, and it is the same number every time. Every key carries what it would write, so nothing
-is chosen blind and a wrong number cannot be produced at all.
+number, and it is the same number every time. A key carries the one number it is an answer with
+
+- how many, or which die - and never what that comes to as well: the second figure is one more
+  to read past on the way to the first.
 
 ## The upper section
 
@@ -25,7 +27,6 @@ Fives asks how many fives you got, not what they came to.
 
 ```
 how many fives 1     2     3     4     5
-               5     10    15    20    25
 ```
 
 Two taps still, and the pad can only produce a multiple of the face, so there is nothing to
@@ -38,13 +39,14 @@ There is nothing to match in this box, so there is no shorter way to say what wa
 adding a hand up in your head before typing it is the step that gets it wrong.
 
 ```
+6  _  _  _  _                                       one die in, four to go
 the second die 1     2     3     4     5     6
-               7     8     9     10    11    12     with a 6 already in
 ```
 
-Each key carries what the hand comes to with that die in it, so the running total is on screen
-throughout and the fifth key names the number it writes. The dice already in sit above the pad
-and each one can be taken back where it sits - a misread die does not cost the other four.
+The dice already in sit above the pad, with a place for each one still to come, and any of them
+can be taken back where it sits - a misread die does not cost the other four. Where the hand
+stands is said once, above the keys - "Three more dice. 10 so far." - rather than on all six of
+them.
 
 **Scratch for 0** is still two taps: a hand worth nothing has no dice worth counting out.
 
@@ -52,16 +54,15 @@ and each one can be taken back where it sits - a misread die does not cost the o
 
 These two are asked for the way they are said at the table: which number you got four of, and
 then what the odd die was. Three of a kind asks the same thing and then its two spare dice, one
-at a time, the same way Chance takes all five. Each key carries the total it makes, so nothing
-is chosen blind.
+at a time, the same way Chance takes all five. The first question is the one choice that is not
+plain from the dice in front of you, so it is the one place a key says what it could come to.
 
 ```
 which number   1     2     3     4     5     6
                5-10  9-14  13-18 17-22 21-26 25-30
 
-four 5s, and the other die
+5  5  5  5  _                        four 5s, and the other die
                1     2     3     4     5     6
-               21    22    23    24    25    26
 ```
 
 Asking for the dice rather than the sum is what makes the entry safe. Four fives cannot come to

@@ -74,9 +74,11 @@ const MORE: Record<number, string> = {
  * ruled out at all: there the safety is that a hand of 6 4 4 3 2 goes in as it
  * lies, and adding it up in your head first is the step that gets it wrong.
  *
- * Wherever dice are tapped in, each key carries what the hand comes to with
- * that die in it, so the tap that writes the box writes a number that was on
- * screen before it was taken.
+ * A key carries one number, which is the one being answered with: how many, or
+ * which die. What the answer comes to is the pad's business, and a column of
+ * running totals beside the dice is a second set of numbers to read past on the
+ * way to the first. Where it is worth saying at all it is said once, in the
+ * hint above the keys.
  */
 export function ScorePad({
   selection,
@@ -193,18 +195,18 @@ export function ScorePad({
   const kind = kindOf(category);
   const spare = kind === null ? 0 : spareDice(kind);
 
-  const keyFor = (value: number, main: number, sub: string, label: string) => (
+  /** A key that writes the box. What was tapped is all it shows. */
+  const scoreKey = (value: number, shows: number, label: string) => (
     <button
       key={value}
       type="button"
-      className={`key tall${current === value ? ' on' : ''}`}
+      className={`key${current === value ? ' on' : ''}`}
       aria-label={label}
       aria-pressed={current === value}
       disabled={disabled}
       onClick={() => onScore(value)}
     >
-      <span className="k-main">{main}</span>
-      <span className="k-sub">{sub}</span>
+      {shows}
     </button>
   );
 
@@ -213,33 +215,28 @@ export function ScorePad({
    *
    * `base` is what the box has accounted for already - nothing for chance, the
    * matched dice for an of-a-kind box - and `want` is how many are left to tap.
-   * Only the last key writes anything, so only it names the total; the others
-   * carry what the hand stands at with that die in it.
+   *
+   * A key shows the die and nothing else. Six running totals down the pad are
+   * six numbers to read past on the way to the one you are looking for, and the
+   * one that matters is said once, in the hint. Only the last key writes
+   * anything, so only it names a total, and only to a reader who cannot see the
+   * sheet it is about to appear on.
    */
   const diceKeys = (base: number, want: number) => {
     const last = dice.length === want - 1;
     return DIE_FACES.map((value) => {
       const total = base + running + value;
-      // The first die of a chance hand has no total behind it yet to show.
-      const bare = base + running === 0;
 
       return (
         <button
           key={value}
           type="button"
-          className={`key${bare ? '' : ' tall'}`}
+          className="key"
           aria-label={last ? `Die showing ${value}, scores ${total}` : `Die showing ${value}`}
           disabled={disabled}
           onClick={() => (last ? onScore(total) : setDice([...dice, value]))}
         >
-          {bare ? (
-            value
-          ) : (
-            <>
-              <span className="k-main">{value}</span>
-              <span className="k-sub">{total}</span>
-            </>
-          )}
+          {value}
         </button>
       );
     });
@@ -267,29 +264,16 @@ export function ScorePad({
     hint = `How many ${many} did you get?`;
     groupLabel = `How many ${many}`;
     keys = COUNTS.map((count) =>
-      keyFor(
+      scoreKey(
         count * each,
         count,
-        String(count * each),
         `${count} ${count === 1 ? NUMBER_WORD[each - 1] : many}, total ${count * each}`,
       ),
     );
   } else if (kind === null) {
     hint = `${HINTS[category]}.`;
     groupLabel = `Score for ${LABELS[category]}`;
-    keys = totals.map((value) => (
-      <button
-        key={value}
-        type="button"
-        className={`key${current === value ? ' on' : ''}`}
-        aria-label={`Score ${value}`}
-        aria-pressed={current === value}
-        disabled={disabled}
-        onClick={() => onScore(value)}
-      >
-        {value}
-      </button>
-    ));
+    keys = totals.map((value) => scoreKey(value, value, `Score ${value}`));
   } else if (face === null) {
     hint = `Which number did you get ${COUNT_WORD[kind]} of?`;
     groupLabel = `The number for ${LABELS[category]}`;

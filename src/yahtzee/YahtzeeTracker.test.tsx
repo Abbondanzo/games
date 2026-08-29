@@ -75,6 +75,12 @@ const padKeys = (name: string) =>
     .getAllByRole('button')
     .map((b) => b.getAttribute('aria-label'));
 
+/** What those keys read on screen, which is only ever the answer they give. */
+const padText = (name: string) =>
+  within(screen.getByRole('group', { name }))
+    .getAllByRole('button')
+    .map((b) => b.textContent);
+
 const totals = (container: HTMLElement) => boardTotals(container);
 
 const boxFor = (name: string, category: Category) =>
@@ -124,6 +130,9 @@ describe('filling a box in', () => {
       '4 fives, total 20',
       '5 fives, total 25',
     ]);
+    // A key reads as the count alone. What it comes to is not a second number
+    // to read past on the way to the first.
+    expect(padText('How many fives')).toEqual(['1', '2', '3', '4', '5']);
   });
 
   it('writes what the count comes to, not the count', async () => {
@@ -229,9 +238,8 @@ describe('the boxes that ask for dice', () => {
       'Die showing 5, scores 25',
       'Die showing 6, scores 26',
     ]);
-    expect(screen.getByRole('button', { name: 'Die showing 3, scores 23' })).toHaveTextContent(
-      '23',
-    );
+    // The die is what is tapped, so the die is all the key shows.
+    expect(padText('The other die')).toEqual(['1', '2', '3', '4', '5', '6']);
   });
 
   it('will not take a total that number could never make', async () => {
@@ -264,7 +272,9 @@ describe('the boxes that ask for dice', () => {
 
     expect(screen.getByText('Three 4s. What were the other two dice?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Die showing 6' }));
+    // Where the hand stands is said once, in the hint, not on every key.
     expect(screen.getByText('One more die. 18 so far.')).toBeInTheDocument();
+    expect(padText('The last of the other two dice')).toEqual(['1', '2', '3', '4', '5', '6']);
 
     // The matched dice hold the first three places, so this is the fourth.
     expect(
@@ -326,6 +336,7 @@ describe('the boxes that ask for dice', () => {
 
     expect(screen.getByRole('group', { name: 'The first die' })).toBeInTheDocument();
     expect(screen.getByText('Tap each of your five dice.')).toBeInTheDocument();
+    expect(padText('The first die')).toEqual(['1', '2', '3', '4', '5', '6']);
 
     for (const die of [6, 4, 4, 3]) {
       await user.click(screen.getByRole('button', { name: `Die showing ${die}` }));
