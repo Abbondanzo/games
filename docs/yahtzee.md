@@ -5,42 +5,79 @@ for each player, and every figure below the line added up as the boxes are fille
 
 ## Filling a box in
 
-Tap the box where the two meet - the player's column, the category's row - and the pad shows
-every number that box could hold. Tap one and it is written in. Two taps, and the host can do it
-for whoever calls a score out rather than only for whoever is up.
+Tap the box where the two meet - the player's column, the category's row - and the pad asks what
+you rolled. Tap the answer and the score is written in. Two taps for most boxes, and the host
+can do it for whoever calls a score out rather than only for whoever is up.
 
 A turn that scored nothing is the same two taps: **Scratch for 0**. It is the commonest entry in
 the game and the easiest to leave out, so it sits on the pad beside the numbers rather than
 somewhere else.
 
-The pad only offers what the box can hold. An upper box takes a multiple of its own face and
-nothing else, so Fives offers 5, 10, 15, 20, 25. A fixed combination offers its one number.
-Chance offers every sum five dice can make, 5 to 30. A wrong number cannot be typed, so there is
-nothing to catch afterwards.
+**No box asks for a total**, because the total is the one thing nobody at the table says out
+loud. You say "three fives", or "four of a kind on 5, and a 3". The upper boxes ask how many;
+the three boxes that add the dice up ask for the dice; only a fixed combination is a single
+number, and it is the same number every time. A key carries the one number it is an answer with
+
+- how many, or which die - and never what that comes to as well: the second figure is one more
+  to read past on the way to the first.
+
+## The upper section
+
+Fives asks how many fives you got, not what they came to.
+
+```
+how many fives 1     2     3     4     5
+```
+
+Two taps still, and the pad can only produce a multiple of the face, so there is nothing to
+catch afterwards.
+
+## Chance
+
+Chance is tapped in a die at a time, five taps, in whatever order they are read off the table.
+There is nothing to match in this box, so there is no shorter way to say what was rolled, and
+adding a hand up in your head before typing it is the step that gets it wrong.
+
+```
+6  _  _  _  _                                       one die in, four to go
+the second die 1     2     3     4     5     6
+```
+
+The dice already in sit above the pad, with a place for each one still to come, and any of them
+can be taken back where it sits - a misread die does not cost the other four. Where the hand
+stands is said once, above the keys - "Three more dice. 10 so far." - rather than on all six of
+them.
+
+**Scratch for 0** is still two taps: a hand worth nothing has no dice worth counting out.
 
 ## Three and four of a kind
 
 These two are asked for the way they are said at the table: which number you got four of, and
-then what the odd die was. Three of a kind asks the same thing and then what the other two dice
-came to. Each key carries the total it makes, so nothing is chosen blind.
+then what the odd die was. Three of a kind asks the same thing and then its two spare dice, one
+at a time, the same way Chance takes all five. The first question is the one choice that is not
+plain from the dice in front of you, so it is the one place a key says what it could come to.
 
 ```
 which number   1     2     3     4     5     6
                5-10  9-14  13-18 17-22 21-26 25-30
 
-four 5s, and the other die
+5  5  5  5  _                        four 5s, and the other die
                1     2     3     4     5     6
-               21    22    23    24    25    26
 ```
 
 Asking for the dice rather than the sum is what makes the entry safe. Four fives cannot come to
 7, and a pad of totals has no way of saying so: taken on its own, every total from 5 to 30 is
 some four of a kind, so nothing can be ruled out until the matched face is known. That is also
 why the wire still accepts 5 to 30 for these boxes - the bound is honest only with the face, and
-the face is not stored.
+the face is not stored. Chance is the same on the wire for the same reason: five dice can make
+any total from 5 to 30, and the dice themselves are not stored either, only what they came to.
 
 The spare dice are free and may land on the matched number too, so five of a kind is offered in
 both boxes: it is four of a kind as well, and may be written there.
+
+The matched dice sit above the pad, with a place for each die still to come, so the whole hand
+is on screen while it is entered. The dice tapped in can be taken back where they sit; the
+matched ones are changed with **Change the number**, which asks the first question again.
 
 ## What the sheet works out
 
