@@ -44,7 +44,8 @@ export const BOXES = CATEGORIES.length;
 /** The face a box counts, so "fives" knows it is worth five a die. */
 export const faceOf = (category: UpperCategory): number => UPPER.indexOf(category) + 1;
 
-const isUpper = (category: Category): category is UpperCategory =>
+/** Whether a box is one of the six above the line, which count one face. */
+export const isUpper = (category: Category): category is UpperCategory =>
   (UPPER as readonly string[]).includes(category);
 
 /** The fixed payers: no dice arithmetic, you either made it or you did not. */

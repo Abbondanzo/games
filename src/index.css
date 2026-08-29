@@ -1731,8 +1731,10 @@ button.link {
 .pad .key.on .k-sub {
   color: var(--text);
 }
-/* The five dice of a chance hand, as they are tapped in. Each is a button
-   because a misread die is taken back where it sits, not by starting over. */
+/* The five dice of the hand, as they are tapped in. Each one tapped is a button
+   because a misread die is taken back where it sits, not by starting over. The
+   dice a box has already matched sit in front of them, and are not takeable:
+   the number they show is changed on the step that asked for it. */
 .dice-run {
   display: flex;
   gap: 0.35rem;
@@ -1760,6 +1762,9 @@ button.link {
 .dice-run .die.empty {
   background: none;
   border-style: dashed;
+}
+.dice-run .die.set {
+  color: var(--muted);
 }
 .pad-actions {
   display: flex;

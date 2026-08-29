@@ -27,7 +27,7 @@ async function addPlayers(user: User, client: HTMLElement, names: string) {
   await user.click(within(client).getByRole('button', { name: 'Add' }));
 }
 
-/** Tap the box, then the number, on one particular device. */
+/** Tap the box, then the answer, on one particular device. */
 async function fill(
   user: User,
   client: HTMLElement,
@@ -36,9 +36,11 @@ async function fill(
   value: number | 'scratch',
 ) {
   await user.click(within(client).getByRole('button', { name: `Score ${box} for ${name}` }));
+  // Every box here is an upper one, where the key is how many dice showed the
+  // face and carries the total it comes to.
   await user.click(
     within(client).getByRole('button', {
-      name: value === 'scratch' ? 'Scratch this box' : `Score ${value}`,
+      name: value === 'scratch' ? 'Scratch this box' : new RegExp(`total ${value}$`),
     }),
   );
 }

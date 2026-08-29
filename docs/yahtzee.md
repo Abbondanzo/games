@@ -5,26 +5,37 @@ for each player, and every figure below the line added up as the boxes are fille
 
 ## Filling a box in
 
-Tap the box where the two meet - the player's column, the category's row - and the pad shows
-every number that box could hold. Tap one and it is written in. Two taps, and the host can do it
-for whoever calls a score out rather than only for whoever is up.
+Tap the box where the two meet - the player's column, the category's row - and the pad asks what
+you rolled. Tap the answer and the score is written in. Two taps for most boxes, and the host
+can do it for whoever calls a score out rather than only for whoever is up.
 
 A turn that scored nothing is the same two taps: **Scratch for 0**. It is the commonest entry in
 the game and the easiest to leave out, so it sits on the pad beside the numbers rather than
 somewhere else.
 
-The pad only offers what the box can hold. An upper box takes a multiple of its own face and
-nothing else, so Fives offers 5, 10, 15, 20, 25. A fixed combination offers its one number. A
-wrong number cannot be typed, so there is nothing to catch afterwards.
+**No box asks for a total**, because the total is the one thing nobody at the table says out
+loud. You say "three fives", or "four of a kind on 5, and a 3". The upper boxes ask how many;
+the three boxes that add the dice up ask for the dice; only a fixed combination is a single
+number, and it is the same number every time. Every key carries what it would write, so nothing
+is chosen blind and a wrong number cannot be produced at all.
 
-Three of a kind, four of a kind and Chance are the three that add the dice up, and all three ask
-for the dice rather than the total.
+## The upper section
+
+Fives asks how many fives you got, not what they came to.
+
+```
+how many fives 1     2     3     4     5
+               5     10    15    20    25
+```
+
+Two taps still, and the pad can only produce a multiple of the face, so there is nothing to
+catch afterwards.
 
 ## Chance
 
 Chance is tapped in a die at a time, five taps, in whatever order they are read off the table.
-There is nothing to match in this box, so there is nothing to add up on your behalf either, and
-adding a hand in your head before typing it is the step that gets it wrong.
+There is nothing to match in this box, so there is no shorter way to say what was rolled, and
+adding a hand up in your head before typing it is the step that gets it wrong.
 
 ```
 the second die 1     2     3     4     5     6
@@ -40,8 +51,9 @@ and each one can be taken back where it sits - a misread die does not cost the o
 ## Three and four of a kind
 
 These two are asked for the way they are said at the table: which number you got four of, and
-then what the odd die was. Three of a kind asks the same thing and then what the other two dice
-came to. Each key carries the total it makes, so nothing is chosen blind.
+then what the odd die was. Three of a kind asks the same thing and then its two spare dice, one
+at a time, the same way Chance takes all five. Each key carries the total it makes, so nothing
+is chosen blind.
 
 ```
 which number   1     2     3     4     5     6
@@ -61,6 +73,10 @@ any total from 5 to 30, and the dice themselves are not stored either, only what
 
 The spare dice are free and may land on the matched number too, so five of a kind is offered in
 both boxes: it is four of a kind as well, and may be written there.
+
+The matched dice sit above the pad, with a place for each die still to come, so the whole hand
+is on screen while it is entered. The dice tapped in can be taken back where they sit; the
+matched ones are changed with **Change the number**, which asks the first question again.
 
 ## What the sheet works out
 
