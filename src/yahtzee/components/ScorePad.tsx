@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import {
+  DICE,
   FACES,
   HINTS,
   kindOf,
@@ -36,14 +37,24 @@ const DIE_FACES = Array.from({ length: FACES }, (_, i) => i + 1);
 
 const COUNT_WORD: Record<number, string> = { 3: 'three', 4: 'four' };
 
+/** Which die is being asked for, said the way it is said at the table. */
+const ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth'];
+
+/** How many dice are still to come, once at least one is in. */
+const MORE: Record<number, string> = {
+  1: 'One more die.',
+  2: 'Two more dice.',
+  3: 'Three more dice.',
+  4: 'Four more dice.',
+};
+
 /**
  * What a box will take, as buttons.
  *
  * Most boxes are one tap: an upper box holds multiples of its own face, a fixed
- * combination holds its one number, chance holds any sum five dice can make. A
- * turn that scored nothing is the same two taps as one that scored, which is
- * the point - it is the commonest entry of the game and the easiest one to
- * leave out.
+ * combination holds its one number. A turn that scored nothing is the same two
+ * taps as one that scored, which is the point - it is the commonest entry of
+ * the game and the easiest one to leave out.
  *
  * The two of-a-kind boxes are asked for the way they are said at the table:
  * which number you got four of, and then what the odd die was. That is not
@@ -51,6 +62,13 @@ const COUNT_WORD: Record<number, string> = { 3: 'three', 4: 'four' };
  * "any total from 5 to 30" cannot say so, because taken on its own every one of
  * those totals is some four of a kind. Only the matched face rules the rest of
  * them out.
+ *
+ * Chance is asked for as the dice too, one at a time, because there is nothing
+ * to match and so nothing to add up on your behalf: a hand of 6 4 4 3 2 is read
+ * off the table as it lies, and adding it in your head before typing it is the
+ * step that gets it wrong. Each key carries what the hand comes to with that
+ * die in it, so the fifth tap writes a total that was on screen before it was
+ * taken.
  */
 export function ScorePad({
   selection,
@@ -69,6 +87,10 @@ export function ScorePad({
 
   /** The face picked in the first step, for the boxes that have two. */
   const [face, setFace] = useState<number | null>(null);
+
+  /** The dice tapped in so far, for the box that is entered die by die. */
+  const [dice, setDice] = useState<number[]>([]);
+  const running = dice.reduce((a, b) => a + b, 0);
 
   /**
    * Stepping between the two halves replaces every key, which leaves a
@@ -95,6 +117,7 @@ export function ScorePad({
   const card = useRef<HTMLElement>(null);
   useEffect(() => {
     setFace(null);
+    setDice([]);
     card.current?.scrollIntoView?.({ block: 'nearest' });
   }, [selection.playerId, selection.category]);
 
@@ -166,13 +189,43 @@ export function ScorePad({
     </button>
   );
 
-  /* ── the three shapes the keys take ── */
+  /* ── the four shapes the keys take ── */
 
   let hint: string;
   let groupLabel: string;
   let keys: JSX.Element[];
 
-  if (kind === null) {
+  if (category === 'chance') {
+    const first = dice.length === 0;
+    const last = dice.length === DICE - 1;
+    hint = first ? 'Tap each of your five dice.' : `${MORE[DICE - dice.length]} ${running} so far.`;
+    groupLabel = `The ${ORDINALS[dice.length]} die`;
+    keys = DIE_FACES.map((value) => {
+      const total = running + value;
+      // Only the fifth key writes anything, so only it names the total.
+      const label = last ? `Die showing ${value}, scores ${total}` : `Die showing ${value}`;
+
+      return (
+        <button
+          key={value}
+          type="button"
+          className={`key${first ? '' : ' tall'}`}
+          aria-label={label}
+          disabled={disabled}
+          onClick={() => (last ? onScore(total) : setDice([...dice, value]))}
+        >
+          {first ? (
+            value
+          ) : (
+            <>
+              <span className="k-main">{value}</span>
+              <span className="k-sub">{total}</span>
+            </>
+          )}
+        </button>
+      );
+    });
+  } else if (kind === null) {
     hint = `${HINTS[category]}.`;
     groupLabel = `Score for ${LABELS[category]}`;
     keys = totals.map((value) => (
@@ -246,6 +299,26 @@ export function ScorePad({
       )}
 
       <p className="hint">{hint}</p>
+
+      {category === 'chance' && (
+        <div className="dice-run">
+          {dice.map((value, at) => (
+            <button
+              key={at}
+              type="button"
+              className="die"
+              aria-label={`Take back the ${ORDINALS[at]} die, showing ${value}`}
+              disabled={disabled}
+              onClick={() => setDice(dice.filter((_, i) => i !== at))}
+            >
+              {value}
+            </button>
+          ))}
+          {Array.from({ length: DICE - dice.length }, (_, at) => (
+            <span key={`empty-${at}`} className="die empty" aria-hidden="true" />
+          ))}
+        </div>
+      )}
 
       <div className="pad" role="group" aria-label={groupLabel} ref={pad}>
         {keys}

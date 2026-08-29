@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { YahtzeeTracker } from './YahtzeeTracker';
 import { boardColumns, boardTotals } from '../rooms/testClient';
-import { CATEGORIES, LABELS } from '@shared/games/yahtzee/rules';
+import { CATEGORIES, DICE, FACES, LABELS } from '@shared/games/yahtzee/rules';
 import type { Category } from '@shared/games/yahtzee/types';
 
 const Router = ({ children }: { children: ReactNode }) => (
@@ -31,9 +31,36 @@ async function addPlayers(user: User, names: string) {
   await user.click(screen.getByRole('button', { name: 'Add' }));
 }
 
+/** Five dice adding to a total, for the box that is entered die by die. */
+function diceFor(total: number): number[] {
+  let left = total - DICE;
+  return Array.from({ length: DICE }, () => {
+    const add = Math.min(left, FACES - 1);
+    left -= add;
+    return 1 + add;
+  });
+}
+
+/** Tap five dice in on an open pad. The fifth is what writes the total. */
+async function tapDice(user: User, total: number) {
+  let running = 0;
+  for (const [at, die] of diceFor(total).entries()) {
+    running += die;
+    await user.click(
+      screen.getByRole('button', {
+        name: at === DICE - 1 ? `Die showing ${die}, scores ${running}` : `Die showing ${die}`,
+      }),
+    );
+  }
+}
+
 /** Tap the box on the sheet, then the number on the pad. Two taps, as played. */
 async function fill(user: User, name: string, category: Category, value: number) {
   await user.click(screen.getByRole('button', { name: `Score ${LABELS[category]} for ${name}` }));
+  if (value !== 0 && category === 'chance') {
+    await tapDice(user, value);
+    return;
+  }
   await user.click(
     screen.getByRole('button', { name: value === 0 ? 'Scratch this box' : `Score ${value}` }),
   );
@@ -271,12 +298,56 @@ describe('the boxes that ask for dice', () => {
     expect(screen.getByText('Which number did you get four of?')).toBeInTheDocument();
   });
 
-  it('leaves chance asking for the total, because there is nothing to match', async () => {
+  it('asks chance for the five dice, and adds them up itself', async () => {
+    const { user, container } = setup();
+    await addPlayers(user, 'Ada');
+    await user.click(screen.getByRole('button', { name: 'Score Chance for Ada' }));
+
+    expect(screen.getByRole('group', { name: 'The first die' })).toBeInTheDocument();
+    expect(screen.getByText('Tap each of your five dice.')).toBeInTheDocument();
+
+    for (const die of [6, 4, 4, 3]) {
+      await user.click(screen.getByRole('button', { name: `Die showing ${die}` }));
+    }
+    expect(screen.getByRole('group', { name: 'The fifth die' })).toBeInTheDocument();
+    expect(screen.getByText('One more die. 17 so far.')).toBeInTheDocument();
+
+    // The last key says what it writes, so the total is on screen before it is taken.
+    await user.click(screen.getByRole('button', { name: 'Die showing 2, scores 19' }));
+    expect(filledBoxFor('Ada', 'chance', 19)).toBeInTheDocument();
+    expect(totals(container)).toEqual(['Ada:19']);
+  });
+
+  it('takes a misread die back where it sits, rather than starting the hand over', async () => {
     const { user } = setup();
     await addPlayers(user, 'Ada');
     await user.click(screen.getByRole('button', { name: 'Score Chance for Ada' }));
-    expect(screen.getByRole('group', { name: 'Score for Chance' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Score 7' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Die showing 6' }));
+    await user.click(screen.getByRole('button', { name: 'Die showing 2' }));
+    expect(screen.getByText('Three more dice. 8 so far.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Take back the first die, showing 6' }));
+    expect(screen.getByText('Four more dice. 2 so far.')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'The second die' })).toBeInTheDocument();
+  });
+
+  it('still scratches chance in two taps, without counting any dice out', async () => {
+    const { user, container } = setup();
+    await addPlayers(user, 'Ada');
+    await fill(user, 'Ada', 'chance', 0);
+
+    expect(filledBoxFor('Ada', 'chance', 0)).toBeInTheDocument();
+    expect(totals(container)).toEqual(['Ada:0']);
+  });
+
+  it('starts the chance hand again when a filled box is reopened', async () => {
+    const { user } = setup();
+    await addPlayers(user, 'Ada');
+    await fill(user, 'Ada', 'chance', 19);
+
+    await user.click(screen.getByRole('button', { name: 'Change Chance for Ada, now 19' }));
+    expect(screen.getByText('Tap each of your five dice.')).toBeInTheDocument();
   });
 });
 
@@ -400,7 +471,7 @@ describe('putting a mistake right', () => {
     await fill(user, 'Ada', 'chance', 24);
 
     await user.click(screen.getByRole('button', { name: 'Change Chance for Ada, now 24' }));
-    await user.click(screen.getByRole('button', { name: 'Score 12' }));
+    await tapDice(user, 12);
     expect(totals(container)).toEqual(['Ada:12']);
   });
 

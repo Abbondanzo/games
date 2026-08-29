@@ -14,9 +14,28 @@ the game and the easiest to leave out, so it sits on the pad beside the numbers 
 somewhere else.
 
 The pad only offers what the box can hold. An upper box takes a multiple of its own face and
-nothing else, so Fives offers 5, 10, 15, 20, 25. A fixed combination offers its one number.
-Chance offers every sum five dice can make, 5 to 30. A wrong number cannot be typed, so there is
-nothing to catch afterwards.
+nothing else, so Fives offers 5, 10, 15, 20, 25. A fixed combination offers its one number. A
+wrong number cannot be typed, so there is nothing to catch afterwards.
+
+Three of a kind, four of a kind and Chance are the three that add the dice up, and all three ask
+for the dice rather than the total.
+
+## Chance
+
+Chance is tapped in a die at a time, five taps, in whatever order they are read off the table.
+There is nothing to match in this box, so there is nothing to add up on your behalf either, and
+adding a hand in your head before typing it is the step that gets it wrong.
+
+```
+the second die 1     2     3     4     5     6
+               7     8     9     10    11    12     with a 6 already in
+```
+
+Each key carries what the hand comes to with that die in it, so the running total is on screen
+throughout and the fifth key names the number it writes. The dice already in sit above the pad
+and each one can be taken back where it sits - a misread die does not cost the other four.
+
+**Scratch for 0** is still two taps: a hand worth nothing has no dice worth counting out.
 
 ## Three and four of a kind
 
@@ -37,7 +56,8 @@ Asking for the dice rather than the sum is what makes the entry safe. Four fives
 7, and a pad of totals has no way of saying so: taken on its own, every total from 5 to 30 is
 some four of a kind, so nothing can be ruled out until the matched face is known. That is also
 why the wire still accepts 5 to 30 for these boxes - the bound is honest only with the face, and
-the face is not stored.
+the face is not stored. Chance is the same on the wire for the same reason: five dice can make
+any total from 5 to 30, and the dice themselves are not stored either, only what they came to.
 
 The spare dice are free and may land on the matched number too, so five of a kind is offered in
 both boxes: it is four of a kind as well, and may be written there.
