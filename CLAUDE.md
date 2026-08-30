@@ -149,10 +149,16 @@ it fail first.
   And a lookup outlives the word it was about, so `src/scrabble/lib/useLookup.ts` is the only way
   to start one - it cancels the request in flight whenever the word moves on, which is what stops
   a stale definition landing on a later turn.
-- **The word list is generated and committed.** `pnpm words` rebuilds it from the `word-list`
-  package; nothing fetches or processes it at build time. It is front-coded to halve what every
-  visitor precaches, and its header is verified on read - a deploy that has moved the files
-  answers with `index.html`, and HTML decoding quietly would mean every word reading as invalid.
+- **The word list is generated and committed.** `pnpm words` rebuilds it from ENABLE; nothing
+  fetches or processes it at build time. It is front-coded to halve what every visitor precaches,
+  and its header is verified on read - a deploy that has moved the files answers with
+  `index.html`, and HTML decoding quietly would mean every word reading as invalid. The generator
+  reaches the network, so it validates what it gets and refuses to write a list that fails.
+- **The word list may not be filtered, and may not carry names.** A source that strips "bad words"
+  cost it `balls` while keeping `ball`, and `damn` while keeping `damned`; a general English one
+  marked `mary` and `spain` valid. ENABLE is neither. Do not fix a name problem by subtracting a
+  list of names - `japan`, `china`, `john`, `wales` and `texas` are ordinary words, and that is
+  why the answer was a better list rather than a filter.
 - **`base` is `/`, not relative.** The service worker and manifest are scoped to the origin
   root, so subpath hosting will not work.
 - **pnpm 11 blocks dependency build scripts.** `pnpm-workspace.yaml` has `allowBuilds: esbuild`.
