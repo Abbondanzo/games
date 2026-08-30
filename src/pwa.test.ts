@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 const html = read('index.html');
@@ -183,40 +183,147 @@ describe('the chosen colour scheme', () => {
   });
 });
 
+const MARK = 'games.reload.v1';
+
+/**
+ * The recovery script out of index.html itself, so these tests hold the code
+ * that ships rather than a copy of it. It reaches for window, navigator and
+ * sessionStorage as globals, which is what lets them be substituted here;
+ * document is jsdom's own, so #root is a real element.
+ */
+const recoveryScript = (() => {
+  const blocks = html.match(/<script>[\s\S]*?<\/script>/g) ?? [];
+  const block = blocks.find((b) => b.includes(MARK));
+  if (!block) throw new Error('index.html has no recovery script');
+  return block.replace('<script>', '').replace('</script>', '');
+})();
+
+type AssetFailure = { target: { tagName: string } };
+
+function runRecovery({ online = true, mark }: { online?: boolean; mark?: string } = {}) {
+  const handlers: ((event: AssetFailure) => void)[] = [];
+  const stored = new Map<string, string>();
+  if (mark !== undefined) stored.set(MARK, mark);
+  const counts = { reloads: 0, cachesDeleted: 0, unregistered: 0 };
+
+  const win = {
+    addEventListener: (type: string, handler: (event: AssetFailure) => void, capture: boolean) => {
+      // Capture phase only: a failed script or stylesheet does not bubble, so a
+      // handler registered any other way would never hear about one.
+      if (type === 'error' && capture) handlers.push(handler);
+    },
+    location: {
+      reload: () => {
+        counts.reloads += 1;
+      },
+    },
+    caches: {
+      keys: () => Promise.resolve(['workbox-precache-v2']),
+      delete: () => {
+        counts.cachesDeleted += 1;
+        return Promise.resolve(true);
+      },
+    },
+  };
+  const nav = {
+    onLine: online,
+    serviceWorker: {
+      getRegistrations: () =>
+        Promise.resolve([
+          {
+            unregister: () => {
+              counts.unregistered += 1;
+              return Promise.resolve(true);
+            },
+          },
+        ]),
+    },
+  };
+  const storage = {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      stored.set(key, value);
+    },
+  };
+
+  new Function('window', 'navigator', 'sessionStorage', recoveryScript)(win, nav, storage);
+
+  return {
+    counts,
+    mark: () => stored.get(MARK) ?? null,
+    async fail(tagName = 'SCRIPT') {
+      for (const handler of handlers) handler({ target: { tagName } });
+      // The clearing is a promise chain; a turn of the loop settles it.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+  };
+}
+
 describe('recovering from a stale page', () => {
-  it('watches for the page failing to load at all', () => {
-    expect(html).toMatch(/addEventListener\(\s*'error'/);
-    // Capture phase: a failed script or stylesheet does not bubble.
-    expect(html).toMatch(/\},\s*true,?\s*\)/);
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="root"></div>';
   });
 
-  it('clears what this device is holding before trying again', () => {
-    expect(html).toContain('caches');
-    expect(html).toContain('unregister');
-    expect(html).toContain('reload');
+  it('clears what this device is holding before trying again', async () => {
+    const page = runRecovery();
+    await page.fail();
+    expect(page.counts).toMatchObject({ cachesDeleted: 1, unregistered: 1, reloads: 1 });
+    expect(page.mark()).not.toBeNull();
   });
 
-  // Or a page that fails for any other reason would reload for ever.
-  it('tries once, and remembers that it did', () => {
-    expect(html).toContain('sessionStorage');
-    expect(html).toContain('games.reload.v1');
+  /**
+   * The loop this guard exists for. A deploy left a chunk missing, the page
+   * reloaded, booted, asked for the chunk again and reloaded again, for ever.
+   * main.tsx used to clear the mark as soon as the bundle ran, so the guard was
+   * always clear by the time the failure came round and no refresh, hard or
+   * otherwise, could break out of it.
+   */
+  it('holds still when the same failure comes back on the next load', async () => {
+    const page = runRecovery({ mark: String(Date.now()) });
+    await page.fail();
+    expect(page.counts.reloads).toBe(0);
+  });
+
+  // Which is the other half of that loop: the chunks fetched after the app has
+  // started - the word list, and the service worker's own library - fail long
+  // after there is anything blank to rescue.
+  it('leaves an app that is already on screen alone', async () => {
+    document.body.innerHTML = '<div id="root"><main>Scrabble</main></div>';
+    const page = runRecovery();
+    await page.fail('LINK');
+    expect(page.counts.reloads).toBe(0);
+  });
+
+  it('tries again once the last attempt is old news', async () => {
+    const page = runRecovery({ mark: '0' });
+    await page.fail();
+    expect(page.counts.reloads).toBe(1);
   });
 
   /**
    * Offline, a failure to load means something else entirely, and throwing the
    * caches away would take the installed app with it.
    */
-  it('does nothing without a connection', () => {
-    expect(html).toContain('navigator.onLine');
+  it('does nothing without a connection', async () => {
+    const page = runRecovery({ online: false });
+    await page.fail();
+    expect(page.counts).toMatchObject({ cachesDeleted: 0, reloads: 0 });
   });
 
-  it('is cleared once the app actually boots', () => {
-    expect(read('src/main.tsx')).toContain('games.reload.v1');
+  it('ignores anything that is not a script or a stylesheet', async () => {
+    const page = runRecovery();
+    await page.fail('IMG');
+    expect(page.counts.reloads).toBe(0);
+  });
+
+  // It is what defeated the guard, so the app must keep its hands off it.
+  it('is not cleared by the app booting', () => {
+    expect(read('src/main.tsx')).not.toContain(MARK);
   });
 
   // It has to run before the module it is watching for.
   it('is registered above the app script', () => {
-    expect(html.indexOf('games.reload.v1')).toBeLessThan(html.indexOf('type="module"'));
+    expect(html.indexOf(MARK)).toBeLessThan(html.indexOf('type="module"'));
   });
 
   // It is inline on purpose: a script that has to be fetched is a script that
