@@ -36,6 +36,12 @@ export default defineConfig({
   // Absolute base: the service worker and manifest are scoped to the site root,
   // which rules out serving the app from a subpath.
   base: '/',
+  build: {
+    // The word list is a megabyte on purpose and is loaded on its own, so the
+    // default 500 kB warning only ever fires for it. Raised rather than
+    // silenced, so a main bundle that grows into it still says so.
+    chunkSizeWarningLimit: 1200,
+  },
   server: {
     port: 5173,
     open: true,

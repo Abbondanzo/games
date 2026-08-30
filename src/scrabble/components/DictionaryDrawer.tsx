@@ -79,9 +79,10 @@ export function DictionaryDrawer({ initialWord, onClose }: Props) {
         </div>
 
         <p className="hint">
-          Definitions come from a free online dictionary, so this needs an internet connection. It
-          is a general English dictionary rather than the official Scrabble word list, so a missing
-          word means “probably not allowed”, not a ruling.
+          Whether a word counts is decided on your device, so it works with no connection.
+          Definitions come from Merriam-Webster and do need one. The word list is general English
+          rather than the official Scrabble one, so a word it does not have is “probably not
+          allowed”, rather than a ruling.
         </p>
       </div>
     </div>
@@ -92,7 +93,7 @@ function Entry({ entries }: { entries: DictEntry[] }) {
   const entry = entries[0];
   if (!entry) return null;
 
-  const phonetic = entry.phonetic ?? entry.phonetics?.find((p) => p.text)?.text;
+  const phonetic = entry.phonetic;
 
   return (
     <div>
@@ -100,7 +101,7 @@ function Entry({ entries }: { entries: DictEntry[] }) {
         <span className="word">{entry.word}</span>
         {phonetic && <span className="phon">{phonetic}</span>}
       </div>
-      {(entry.meanings ?? []).map((meaning, i) => (
+      {entry.meanings.map((meaning, i) => (
         <div key={`${meaning.partOfSpeech}-${i}`}>
           <div className="pos">{meaning.partOfSpeech}</div>
           <ol>

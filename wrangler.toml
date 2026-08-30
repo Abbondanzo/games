@@ -31,3 +31,18 @@ name = "JOIN_LIMIT"
 type = "ratelimit"
 namespace_id = "1001"
 simple = { limit = 20, period = 60 }
+
+# Definitions are cheap to ask for and metered upstream - the free tier is 1000
+# lookups a day for the whole account - so this one guards the budget rather
+# than the room. Its own namespace, so a busy Scrabble game cannot use up what
+# joining needs.
+[[unsafe.bindings]]
+name = "DEFINE_LIMIT"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 30, period = 60 }
+
+# DICTIONARY_KEY is a secret, not a var: set it with
+#   wrangler secret put DICTIONARY_KEY
+# and locally with a .dev.vars file, which is gitignored. GET /health reports
+# whether it is bound.

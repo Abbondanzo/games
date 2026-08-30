@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { runLookup, type LookupView } from './lookupView';
+import { runDefinition, runVerdict, type LookupView } from './lookupView';
+import { loadWordList } from './words';
 
 const IDLE: LookupView = { kind: 'idle' };
 
@@ -36,6 +37,13 @@ export function useLookup() {
     [cancel],
   );
 
+  /**
+   * The verdict first, from the list, then the definition once the dictionary
+   * answers. In that order because the verdict is the part that must not wait
+   * on a network - it lands immediately and the definition fills in beneath it,
+   * or does not, which is only ever a missing sentence rather than a missing
+   * ruling.
+   */
   const check = useCallback(
     async (rawWord: string) => {
       cancel();
@@ -43,8 +51,13 @@ export function useLookup() {
       inFlight.current = controller;
       setView({ kind: 'loading', word: rawWord.trim().toUpperCase() });
       try {
-        const result = await runLookup(rawWord, controller.signal);
-        if (!controller.signal.aborted) setView(result);
+        const verdict = await runVerdict(rawWord);
+        if (controller.signal.aborted) return;
+        setView(verdict);
+        if (verdict.kind !== 'valid') return;
+
+        const definition = await runDefinition(rawWord, controller.signal);
+        if (definition && !controller.signal.aborted) setView({ ...verdict, ...definition });
       } catch {
         // Only an abort reaches here, and it is never this lookup's to report.
       } finally {
@@ -54,8 +67,14 @@ export function useLookup() {
     [cancel],
   );
 
-  // A lookup outliving its component would set state on an unmounted one.
-  useEffect(() => cancel, [cancel]);
+  useEffect(() => {
+    // Warm the list while somebody is still typing. It is a megabyte to decode,
+    // and paying that on mount rather than on the first Check is the difference
+    // between a verdict that feels instant and one that does not.
+    void loadWordList();
+    // A lookup outliving its component would set state on an unmounted one.
+    return cancel;
+  }, [cancel]);
 
   return { view, check, clear, show };
 }

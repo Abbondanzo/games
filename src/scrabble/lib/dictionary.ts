@@ -1,19 +1,11 @@
-export interface Definition {
-  definition: string;
-  example?: string;
-}
+import { DefinitionResponseSchema, type DefinitionEntry } from '@shared/dictionary';
+import { ROOMS_URL } from '../../rooms/transport';
 
-export interface Meaning {
-  partOfSpeech: string;
-  definitions: Definition[];
-}
-
-export interface DictEntry {
-  word: string;
-  phonetic?: string;
-  phonetics?: { text?: string }[];
-  meanings?: Meaning[];
-}
+/**
+ * The room server normalises the dictionary's shape, so this is the shape both
+ * sides agree on rather than anything Merriam-Webster returns.
+ */
+export type DictEntry = DefinitionEntry;
 
 export type LookupResult =
   { status: 'found'; word: string; entries: DictEntry[] } | { status: 'missing'; word: string };
@@ -95,20 +87,13 @@ function deadline(signal: AbortSignal | undefined, ms: number) {
   return attempt;
 }
 
-const API = 'https://api.dictionaryapi.dev/api/v2/entries/en';
-
-/** A CORS reverse proxy, tried only if the direct call fails. */
-const CORS_PROXY = 'https://cors.abbondanzo.workers.dev';
-
 /**
- * The API sends `Access-Control-Allow-Origin: *`, so the browser can call it
- * directly from any http(s) origin - which is why this has to be served rather
- * than opened as a file. The proxy covers the case where that call is blocked.
+ * The dictionary is asked through the room server, which holds the API key.
+ * That also ends the CORS problem the old direct call had: this is our own
+ * origin answering, so there is no third party to be blocked by and no reverse
+ * proxy to fall back to.
  */
-function endpoints(word: string): string[] {
-  const direct = `${API}/${encodeURIComponent(word)}`;
-  return [direct, `${CORS_PROXY}/${direct}`];
-}
+const endpoint = (word: string): string => `${ROOMS_URL}/define/${encodeURIComponent(word)}`;
 
 const cache = new Map<string, LookupResult>();
 
@@ -136,61 +121,61 @@ export async function lookup(rawWord: string, signal?: AbortSignal): Promise<Loo
 
   throwIfCancelled(signal);
 
-  const urls = endpoints(word);
+  const url = endpoint(word);
   const startedAt = Date.now();
   const spent = () => Date.now() - startedAt >= retryConfig.budgetMs;
   let attempted = false;
   let lastError: unknown;
 
-  rounds: for (let round = 0; round < retryConfig.rounds; round++) {
+  for (let round = 0; round < retryConfig.rounds; round++) {
     if (round > 0) await delay(retryConfig.delayMs * 2 ** (round - 1), signal);
+    throwIfCancelled(signal);
 
-    for (const url of urls) {
-      throwIfCancelled(signal);
-      // The budget only applies once something has actually been tried, so a
-      // clock skewed forward can never turn a lookup into a no-op.
-      if (attempted && spent()) break rounds;
+    // The budget only applies once something has actually been tried, so a
+    // clock skewed forward can never turn a lookup into a no-op.
+    if (attempted && spent()) break;
+    attempted = true;
 
-      attempted = true;
-      const attempt = deadline(signal, retryConfig.timeoutMs);
-      try {
-        const res = await fetch(url, { signal: attempt.signal });
+    const attempt = deadline(signal, retryConfig.timeoutMs);
+    try {
+      const res = await fetch(url, { signal: attempt.signal });
 
-        // 404 is the only signal that a word genuinely isn't there. Trust it
-        // immediately - no retry, and cache it.
-        if (res.status === 404) {
-          const miss: LookupResult = { status: 'missing', word };
-          cache.set(word, miss);
-          return miss;
-        }
-
-        if (!res.ok) {
-          // The status is kept for debugging but deliberately not shown.
-          lastError = new DictionaryError(
-            'The dictionary didn’t answer - it may still be a perfectly valid word. Try again in a moment.',
-            res.status,
-          );
-          continue;
-        }
-
-        // Inside the deadline as well: headers can arrive and the body still hang.
-        const entries = (await res.json()) as DictEntry[];
-        const hit: LookupResult = { status: 'found', word, entries };
-        cache.set(word, hit);
-        return hit;
-      } catch (err) {
-        // Our deadline, not the caller's cancellation: a hung request says
-        // nothing about the word, so it is retried like any other failure.
-        if (attempt.expired) {
-          lastError = new DictionaryError(SLOW);
-          continue;
-        }
-        if (isAbort(err)) throw err;
-        lastError = err; // Try the next endpoint (the CORS proxy) before giving up.
+      if (!res.ok) {
+        // The status is kept for debugging but deliberately not shown. A 404
+        // here means the room server has never heard of this route - one
+        // deployed before definitions existed - not that the word is absent.
+        lastError = new DictionaryError(
+          'The dictionary didn’t answer - it may still be a perfectly valid word. Try again in a moment.',
+          res.status,
+        );
         continue;
-      } finally {
-        attempt.release();
       }
+
+      // Inside the deadline as well: headers can arrive and the body still hang.
+      const body = DefinitionResponseSchema.safeParse(await res.json());
+      if (!body.success) {
+        lastError = new DictionaryError('The dictionary’s answer could not be read.');
+        continue;
+      }
+
+      // No entries is an answer: the dictionary has nothing for this word.
+      // Cached like any other answer, because it will not change.
+      const result: LookupResult = body.data.entries.length
+        ? { status: 'found', word, entries: body.data.entries }
+        : { status: 'missing', word };
+      cache.set(word, result);
+      return result;
+    } catch (err) {
+      // Our deadline, not the caller's cancellation: a hung request says
+      // nothing about the word, so it is retried like any other failure.
+      if (attempt.expired) {
+        lastError = new DictionaryError(SLOW);
+        continue;
+      }
+      if (isAbort(err)) throw err;
+      lastError = err;
+    } finally {
+      attempt.release();
     }
   }
 

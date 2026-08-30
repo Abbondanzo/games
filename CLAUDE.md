@@ -11,6 +11,7 @@ pnpm test         # vitest, run once
 pnpm typecheck    # tsc -b --noEmit
 pnpm build        # tsc -b && vite build
 pnpm icons        # regenerate public/ icons from the trophy artwork
+pnpm words        # regenerate the offline Scrabble word list
 ```
 
 ## Architecture
@@ -127,14 +128,27 @@ it fail first.
 
 ## Gotchas
 
-- **Dictionary 5xx is not a verdict.** The upstream returns sporadic `502`s unrelated to the
-  word. Only `200` and `404` mean anything; everything else retries and, if it never resolves,
-  shows an amber "could not check" rather than "not a word". Never collapse those two states.
-- **A dictionary request needs a deadline, and every lookup needs an owner.** The upstream also
-  accepts a connection and then never answers, which no amount of retrying escapes: `retryConfig`
-  bounds one attempt and the lookup as a whole. And a lookup outlives the word it was about, so
-  `src/scrabble/lib/useLookup.ts` is the only way to start one - it cancels the request in flight
-  whenever the word moves on, which is what stops a stale verdict landing on a later turn.
+- **Validity is offline; only the definition is a network call.** `src/scrabble/lib/words.txt` is
+  the authority on whether a word counts, so a verdict never waits on anything and no upstream
+  can withhold one. The dictionary is asked afterwards, for the sentence underneath. Every way of
+  not getting that sentence - no entries, a 502, an unreadable body, a request that never answers
+  - is the same absence, and none may reach the bar as a verdict. Do not route validity back
+    through the network.
+- **The dictionary key never leaves the Worker.** Merriam-Webster's free tier is 1000 lookups a
+  day for the account, so the browser asks `GET /define/:word` on the room server rather than the
+  dictionary. `DICTIONARY_KEY` is a `wrangler secret`, never a var; `/health` reports whether it
+  is bound. `worker/dictionary.ts` is the only file that knows the upstream's shape, and it parses
+  leniently - a word it does not have comes back as plain suggestion strings, not entries.
+- **A dictionary request needs a deadline, and every lookup needs an owner.** The upstream returns
+  sporadic `502`s unrelated to the word, and also accepts a connection and then never answers,
+  which no amount of retrying escapes: `retryConfig` bounds one attempt and the lookup as a whole.
+  And a lookup outlives the word it was about, so `src/scrabble/lib/useLookup.ts` is the only way
+  to start one - it cancels the request in flight whenever the word moves on, which is what stops
+  a stale definition landing on a later turn.
+- **The word list is generated and committed.** `pnpm words` rebuilds it from the `word-list`
+  package; nothing fetches or processes it at build time. It is front-coded to halve what every
+  visitor precaches, and its header is verified on read - a deploy that has moved the files
+  answers with `index.html`, and HTML decoding quietly would mean every word reading as invalid.
 - **`base` is `/`, not relative.** The service worker and manifest are scoped to the origin
   root, so subpath hosting will not work.
 - **pnpm 11 blocks dependency build scripts.** `pnpm-workspace.yaml` has `allowBuilds: esbuild`.

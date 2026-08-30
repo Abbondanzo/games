@@ -7,6 +7,10 @@ import {
   retryConfig,
 } from './dictionary';
 
+/**
+ * The room server's shape, not Merriam-Webster's. The Worker owns the
+ * translation, so nothing on this side has ever seen the upstream's fields.
+ */
 const entry = (word: string) => [
   {
     word,
@@ -14,13 +18,17 @@ const entry = (word: string) => [
   },
 ];
 
-const okResponse = (word: string) => ({ ok: true, status: 200, json: async () => entry(word) });
-const bad = (status: number) => ({ ok: false, status });
+const okResponse = (word: string) => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ entries: entry(word) }),
+});
 
-/**
- * The upstream's worst failure: the connection is accepted and no response ever
- * comes. Like a real fetch, this settles only when its signal is aborted.
- */
+/** The dictionary answered and has nothing. A fine answer, and a cacheable one. */
+const noEntries = { ok: true, status: 200, json: async () => ({ entries: [] }) };
+const bad = (status: number) => ({ ok: false, status, json: async () => ({}) });
+
+/** A room server that accepts the connection and never answers. */
 const hangs = (_url: string, init?: { signal?: AbortSignal }) =>
   new Promise<never>((_resolve, reject) => {
     const signal = init?.signal;
@@ -42,7 +50,7 @@ afterEach(() => {
 });
 
 describe('lookup', () => {
-  it('returns entries for a known word', async () => {
+  it('returns entries for a word the dictionary has', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => okResponse('quiz')),
@@ -51,10 +59,10 @@ describe('lookup', () => {
     expect(result).toMatchObject({ status: 'found', word: 'quiz' });
   });
 
-  it('treats a 404 as a miss rather than an error', async () => {
+  it('treats an empty answer as a miss rather than an error', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({ ok: false, status: 404 })),
+      vi.fn(async () => noEntries),
     );
     await expect(lookup('zzzz')).resolves.toMatchObject({ status: 'missing' });
   });
@@ -65,6 +73,19 @@ describe('lookup', () => {
     await lookup('cat');
     await lookup('CAT');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // The API key lives on the room server, so this is the only address the
+  // browser may ask - never the dictionary itself, and no reverse proxy.
+  it('asks the room server, and nothing else', async () => {
+    const fetchMock = vi.fn(async (_url: string) => okResponse('cat'));
+    vi.stubGlobal('fetch', fetchMock);
+    await lookup('cat');
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const url = String(fetchMock.mock.calls[0]?.[0]);
+    expect(url).toMatch(/\/define\/cat$/);
+    expect(url).not.toContain('dictionaryapi');
   });
 
   it('raises a DictionaryError with guidance when the network fails', async () => {
@@ -88,39 +109,27 @@ describe('lookup', () => {
     await expect(lookup('cat')).rejects.toBeInstanceOf(DOMException);
   });
 
-  it('calls the API directly first', async () => {
-    const fetchMock = vi.fn(async () => okResponse('cat'));
+  // A room server deployed before definitions existed 404s this route. That is
+  // a server too old to ask, not a word that does not exist, so it must never
+  // be cached as a miss.
+  it('retries a 404 rather than reading it as a word that is not there', async () => {
+    const fetchMock = vi.fn(async () => bad(404));
     vi.stubGlobal('fetch', fetchMock);
-    await lookup('cat');
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.dictionaryapi.dev/api/v2/entries/en/cat',
-      expect.anything(),
+
+    await expect(lookup('quiz')).rejects.toBeInstanceOf(DictionaryError);
+    expect(fetchMock).toHaveBeenCalledTimes(retryConfig.rounds);
+  });
+
+  it('refuses an answer it cannot read rather than inventing entries', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ entries: 'nope' }) })),
     );
+    await expect(lookup('quiz')).rejects.toBeInstanceOf(DictionaryError);
   });
 
-  it('retries through the CORS proxy when the direct call is blocked', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValueOnce(okResponse('cat'));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(lookup('cat')).resolves.toMatchObject({ status: 'found' });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('cors.abbondanzo.workers.dev');
-  });
-
-  it('does not retry a 404 through the proxy - the word is simply not there', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: false, status: 404 }));
-    vi.stubGlobal('fetch', fetchMock);
-    await expect(lookup('zzzz')).resolves.toMatchObject({ status: 'missing' });
-    expect(fetchMock).toHaveBeenCalledOnce();
-  });
-
-  // Regression: nothing bounded a single attempt, so an upstream that accepted
-  // the connection and never answered left the bar spinning until the tab was
-  // closed. A request that does not answer is retryable, never a verdict.
+  // Regression: nothing bounded a single attempt, so a server that accepted the
+  // connection and never answered left the lookup running until the tab closed.
   it('gives up on a request that is accepted and then never answered', async () => {
     retryConfig.timeoutMs = 5;
     const fetchMock = vi.fn(hangs);
@@ -129,7 +138,7 @@ describe('lookup', () => {
     const error = await lookup('ax').catch((e: unknown) => e);
     expect(error).toBeInstanceOf(DictionaryError);
     expect((error as Error).message).toMatch(/taking too long/);
-    expect(fetchMock).toHaveBeenCalledTimes(6); // 3 rounds x 2 endpoints
+    expect(fetchMock).toHaveBeenCalledTimes(retryConfig.rounds);
   });
 
   it('stops retrying once the whole lookup has run out of time', async () => {
@@ -173,15 +182,14 @@ describe('lookup', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     await expect(lookup('cat')).rejects.toThrow(/Check your internet connection/);
-    // 3 rounds × 2 endpoints.
-    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(fetchMock).toHaveBeenCalledTimes(retryConfig.rounds);
   });
 });
 
-// The upstream throws sporadic 502s unrelated to the word: "ax" and "za" both
-// 502'd once and then resolved on retry. A 5xx must never read as "not a word".
-describe('flaky upstream (502)', () => {
-  it('retries a 502 and returns the word as valid when it recovers', async () => {
+// A definition that does not arrive is a missing sentence, never a verdict, so
+// none of these may be cached and none may sound like a ruling on the word.
+describe('a dictionary that will not answer', () => {
+  it('retries a 502 and returns the entries when it recovers', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(bad(502))
@@ -190,13 +198,6 @@ describe('flaky upstream (502)', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(lookup('ax')).resolves.toMatchObject({ status: 'found' });
-  });
-
-  it('retries a 502 and reports a genuine miss when the retry 404s', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(bad(502)).mockResolvedValueOnce(bad(404));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(lookup('flooble')).resolves.toMatchObject({ status: 'missing' });
   });
 
   it('reports a persistent 502 as a service problem, never as an invalid word', async () => {
@@ -213,8 +214,10 @@ describe('flaky upstream (502)', () => {
   });
 
   it('does not cache a failure, so a later attempt can still succeed', async () => {
-    const fetchMock = vi.fn(async () => bad(502));
-    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => bad(502)),
+    );
     await expect(lookup('quiz')).rejects.toThrow();
 
     vi.stubGlobal(
@@ -260,6 +263,6 @@ describe('firstDefinition', () => {
   });
 
   it('falls back when an entry carries no definitions', () => {
-    expect(firstDefinition([{ word: 'x' }])).toBe('Found in the dictionary.');
+    expect(firstDefinition([{ word: 'x', meanings: [] }])).toBe('Found in the dictionary.');
   });
 });
