@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import type { DictEntry } from '../lib/dictionary';
-import { runLookup, type LookupView } from '../lib/lookupView';
+import { useLookup } from '../lib/useLookup';
 import { ValidityBar } from './ValidityBar';
 
 interface Props {
@@ -11,19 +11,14 @@ interface Props {
 
 export function DictionaryDrawer({ initialWord, onClose }: Props) {
   const [term, setTerm] = useState(initialWord);
-  const [view, setView] = useState<LookupView>({ kind: 'idle' });
+  const { view, check } = useLookup();
   const inputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<(word: string) => void>(() => {});
 
-  async function search(raw: string) {
+  function search(raw: string) {
     const word = raw.trim().replace(/[^A-Za-z'-]/g, '');
     if (!word) return;
-    setView({ kind: 'loading', word: word.toUpperCase() });
-    try {
-      setView(await runLookup(word));
-    } catch {
-      // Only an abort reaches here; the view is about to be replaced anyway.
-    }
+    void check(word);
   }
   searchRef.current = search;
 
@@ -45,7 +40,7 @@ export function DictionaryDrawer({ initialWord, onClose }: Props) {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    void search(term);
+    search(term);
   }
 
   return (

@@ -48,6 +48,23 @@ const dictResponse = (word: string) => ({
   ],
 });
 
+/** A lookup that never answers, and settles only when the app cancels it. */
+function stubHangingFetch() {
+  const signals: AbortSignal[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: { signal?: AbortSignal }) => {
+      if (init?.signal) signals.push(init.signal);
+      return new Promise<never>((_resolve, reject) => {
+        const fail = () => reject(new DOMException('aborted', 'AbortError'));
+        if (init?.signal?.aborted) fail();
+        else init?.signal?.addEventListener('abort', fail, { once: true });
+      });
+    }),
+  );
+  return signals;
+}
+
 /**
  * The word check, specifically. The turn header is also a status region, so
  * that whoever is playing is told when it becomes their turn.
@@ -440,6 +457,66 @@ describe('dictionary', () => {
       expect(verdict()).toHaveTextContent(/perfectly valid word/);
       expect(verdict()).not.toHaveClass('invalid');
       expect(verdict()).not.toHaveTextContent('not in the dictionary');
+    });
+  });
+
+  // Regression: nothing cancelled a check in flight, so the request went on
+  // running after the word had been played and its verdict landed on the next
+  // turn's bar - for a word no longer on screen.
+  describe('cancelling a check', () => {
+    const startCheck = async (user: ReturnType<typeof userEvent.setup>) => {
+      await addPlayers(user, 'Ada');
+      await user.type(wordBox(), 'quiz');
+      await user.click(screen.getByRole('button', { name: 'Check' }));
+      await screen.findByText(/Looking up QUIZ/);
+    };
+
+    it('cancels the lookup when the word is entered for the turn', async () => {
+      const signals = stubHangingFetch();
+      const user = setup();
+      await startCheck(user);
+
+      await user.click(screen.getByRole('button', { name: 'Score turn' }));
+
+      await waitFor(() => expect(signals[0]?.aborted).toBe(true));
+      expect(screen.queryByText(/Looking up/)).not.toBeInTheDocument();
+      expect(board()).toEqual(['Ada:22']);
+    });
+
+    it('cancels the lookup when the word is typed on', async () => {
+      const signals = stubHangingFetch();
+      const user = setup();
+      await startCheck(user);
+
+      await user.type(wordBox(), 'z');
+
+      await waitFor(() => expect(signals[0]?.aborted).toBe(true));
+      expect(screen.queryByText(/Looking up/)).not.toBeInTheDocument();
+    });
+
+    it('cancels the lookup when the turn is passed', async () => {
+      const signals = stubHangingFetch();
+      const user = setup();
+      await startCheck(user);
+
+      await user.click(screen.getByRole('button', { name: 'Pass' }));
+
+      await waitFor(() => expect(signals[0]?.aborted).toBe(true));
+      expect(screen.queryByText(/Looking up/)).not.toBeInTheDocument();
+    });
+
+    it('cancels the drawer lookup when the drawer is closed', async () => {
+      const signals = stubHangingFetch();
+      const user = setup();
+      await addPlayers(user, 'Ada');
+      await user.type(wordBox(), 'quiz');
+      await user.click(screen.getAllByRole('button', { name: 'Dictionary' })[0]!);
+
+      const dialog = await screen.findByRole('dialog', { name: 'Dictionary' });
+      await within(dialog).findByText(/Looking up QUIZ/);
+      await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+
+      await waitFor(() => expect(signals[0]?.aborted).toBe(true));
     });
   });
 

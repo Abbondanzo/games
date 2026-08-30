@@ -51,6 +51,30 @@ describe('runLookup', () => {
     await expect(runLookup('London')).resolves.toMatchObject({ kind: 'invalid', word: 'LONDON' });
   });
 
+  // Regression: a signal was never threaded through, so a cancelled lookup
+  // still resolved to a view and the caller wrote a stale verdict on screen.
+  it('rejects rather than resolving to a view when the caller cancels', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: { signal?: AbortSignal }) =>
+          new Promise<never>((_resolve, reject) => {
+            const fail = () => reject(new DOMException('aborted', 'AbortError'));
+            if (init?.signal?.aborted) fail();
+            else init?.signal?.addEventListener('abort', fail, { once: true });
+          }),
+      ),
+    );
+
+    const pending = runLookup('quiz', controller.signal);
+    controller.abort();
+
+    const error = await pending.catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(DOMException);
+    expect((error as DOMException).name).toBe('AbortError');
+  });
+
   it('separates a service failure from an invalid word', async () => {
     vi.stubGlobal(
       'fetch',
