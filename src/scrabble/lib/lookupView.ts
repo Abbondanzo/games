@@ -12,10 +12,15 @@ export type LookupView =
   | { kind: 'invalid'; word: string }
   | { kind: 'error'; word: string; message: string };
 
-export async function runLookup(rawWord: string): Promise<LookupView> {
+/**
+ * Rejects with an `AbortError` when `signal` fires, rather than resolving to a
+ * view: a cancelled lookup has no verdict to show, and whatever cancelled it
+ * owns the bar now.
+ */
+export async function runLookup(rawWord: string, signal?: AbortSignal): Promise<LookupView> {
   const word = rawWord.trim().toUpperCase();
   try {
-    const result = await lookup(rawWord);
+    const result = await lookup(rawWord, signal);
     return result.status === 'missing'
       ? { kind: 'invalid', word }
       : { kind: 'valid', word, detail: firstDefinition(result.entries), entries: result.entries };

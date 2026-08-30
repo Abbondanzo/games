@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { BookOpen, Plus, X } from 'lucide-react';
 import type { Draft, Player, Tile, WordMult } from '@shared/games/scrabble/types';
 import {
@@ -11,7 +11,7 @@ import {
   turnTotal,
 } from '@shared/games/scrabble/scoring';
 import { WhoseTurn, turnTone } from '../../rooms/WhoseTurn';
-import { runLookup, type LookupView } from '../lib/lookupView';
+import { useLookup } from '../lib/useLookup';
 import { TileRow } from './TileRow';
 import { ValidityBar } from './ValidityBar';
 
@@ -34,8 +34,6 @@ interface Props {
   yourTurn?: boolean | null;
 }
 
-const IDLE: LookupView = { kind: 'idle' };
-
 export function TurnEntry({
   draft,
   setDraft,
@@ -47,7 +45,7 @@ export function TurnEntry({
   disabled = false,
   yourTurn = null,
 }: Props) {
-  const [check, setCheck] = useState<LookupView>(IDLE);
+  const { view: check, check: runCheck, clear: clearCheck, show: showCheck } = useLookup();
   const word = draftWord(draft);
 
   const tone = turnTone(currentPlayer?.name ?? null, yourTurn);
@@ -55,7 +53,7 @@ export function TurnEntry({
   const patch = (changes: Partial<Draft>) => setDraft((d) => ({ ...d, ...changes }));
 
   function handleType(raw: string) {
-    setCheck(IDLE);
+    clearCheck();
     setDraft((d) => ({ ...d, tiles: tilesFromWord(raw, d.tiles) }));
   }
 
@@ -68,7 +66,7 @@ export function TurnEntry({
 
   /** Move the word in the box into this turn's list, for plays forming several words. */
   function bankWord() {
-    setCheck(IDLE);
+    clearCheck();
     setDraft((d) => {
       if (!d.tiles.length) return d;
       return {
@@ -80,23 +78,19 @@ export function TurnEntry({
     });
   }
 
-  async function runCheck() {
+  function checkWord() {
     if (word.length < 2) {
-      setCheck({ kind: 'error', word, message: 'Type a word of two or more letters first.' });
+      showCheck({ kind: 'error', word, message: 'Type a word of two or more letters first.' });
       return;
     }
-    setCheck({ kind: 'loading', word });
-    try {
-      setCheck(await runLookup(word));
-    } catch {
-      // Aborted lookups are superseded by whatever triggered the abort.
-    }
+    void runCheck(word);
   }
 
   function submit(event: FormEvent) {
     event.preventDefault();
     onScore();
-    setCheck(IDLE);
+    // The word is played: nothing in flight can still be a verdict worth showing.
+    clearCheck();
   }
 
   return (
@@ -127,7 +121,7 @@ export function TurnEntry({
             spellCheck={false}
             maxLength={15}
           />
-          <button type="button" className="ghost" onClick={() => void runCheck()}>
+          <button type="button" className="ghost" onClick={checkWord}>
             Check
           </button>
         </div>
@@ -203,7 +197,7 @@ export function TurnEntry({
               disabled={disabled}
               onClick={() => {
                 onPass();
-                setCheck(IDLE);
+                clearCheck();
               }}
             >
               Pass

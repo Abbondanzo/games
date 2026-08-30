@@ -63,6 +63,18 @@ nothing to do with the word: `ax`, `za`, `jo` and `xu` are all valid and have ea
 failing once then resolving on a retry. Only `200` and `404` carry meaning, so a lookup retries
 up to 3 rounds across both endpoints with a short backoff, and failures are never cached.
 
+**Deadlines.** The upstream's other failure mode is worse than a 5xx: it accepts the connection
+and never answers. Nothing rejects, so a lookup with no deadline never finishes and the bar spins
+until the tab is closed. Each attempt therefore gets `timeoutMs` and the lookup as a whole gets
+`budgetMs` (both in `retryConfig`), and a request that runs out of time is retried like any other
+failure - it says nothing about the word, so it ends amber, never red.
+
+**Cancellation.** A lookup is cancelled by anything that moves on from the word it is about:
+typing on, banking another word, passing, scoring the turn, closing the drawer, searching for
+something else, or unmounting. `useLookup` owns that: it holds the `AbortController` for the
+request in flight and aborts it before starting or clearing anything. Without it a verdict for a
+word already played landed on the next turn's bar.
+
 Two-letter words are hit hardest, and they are exactly the contested ones in Scrabble. `ax` was
 measured succeeding roughly 1 attempt in 5; retrying raises that to around 3 in 4, but it is not
 a guarantee.

@@ -17,7 +17,19 @@ const entry = (word: string) => [
 const okResponse = (word: string) => ({ ok: true, status: 200, json: async () => entry(word) });
 const bad = (status: number) => ({ ok: false, status });
 
-const originalDelay = retryConfig.delayMs;
+/**
+ * The upstream's worst failure: the connection is accepted and no response ever
+ * comes. Like a real fetch, this settles only when its signal is aborted.
+ */
+const hangs = (_url: string, init?: { signal?: AbortSignal }) =>
+  new Promise<never>((_resolve, reject) => {
+    const signal = init?.signal;
+    const fail = () => reject(new DOMException('aborted', 'AbortError'));
+    if (signal?.aborted) fail();
+    else signal?.addEventListener('abort', fail, { once: true });
+  });
+
+const original = { ...retryConfig };
 
 beforeEach(() => {
   clearDictionaryCache();
@@ -26,7 +38,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  retryConfig.delayMs = originalDelay;
+  Object.assign(retryConfig, original);
 });
 
 describe('lookup', () => {
@@ -106,6 +118,55 @@ describe('lookup', () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
+  // Regression: nothing bounded a single attempt, so an upstream that accepted
+  // the connection and never answered left the bar spinning until the tab was
+  // closed. A request that does not answer is retryable, never a verdict.
+  it('gives up on a request that is accepted and then never answered', async () => {
+    retryConfig.timeoutMs = 5;
+    const fetchMock = vi.fn(hangs);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await lookup('ax').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(DictionaryError);
+    expect((error as Error).message).toMatch(/taking too long/);
+    expect(fetchMock).toHaveBeenCalledTimes(6); // 3 rounds x 2 endpoints
+  });
+
+  it('stops retrying once the whole lookup has run out of time', async () => {
+    retryConfig.timeoutMs = 10;
+    retryConfig.budgetMs = 1;
+    const fetchMock = vi.fn(hangs);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(lookup('ax')).rejects.toBeInstanceOf(DictionaryError);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  // A cancellation has to reach the socket, not just stop the retry loop: the
+  // request left open is the one that goes on holding the connection.
+  it('cancels the request in flight when the caller aborts', async () => {
+    retryConfig.timeoutMs = 1_000;
+    const controller = new AbortController();
+    const fetchMock = vi.fn((url: string, init?: { signal?: AbortSignal }) => {
+      controller.abort(); // cancelled while this attempt is still open
+      return hangs(url, init);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await lookup('ax', controller.signal).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(DOMException);
+    expect((error as DOMException).name).toBe('AbortError');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not start at all when the caller has already cancelled', async () => {
+    const fetchMock = vi.fn(async () => okResponse('cat'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(lookup('cat', AbortSignal.abort())).rejects.toBeInstanceOf(DOMException);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('gives up with guidance when every attempt fails', async () => {
     const fetchMock = vi.fn(async () => {
       throw new TypeError('Failed to fetch');
@@ -182,7 +243,11 @@ describe('flaky upstream (502)', () => {
     );
     const networkFailure = await lookup('beta').catch((e: unknown) => (e as Error).message);
 
-    for (const message of [serviceFailure, networkFailure]) {
+    retryConfig.timeoutMs = 5;
+    vi.stubGlobal('fetch', vi.fn(hangs));
+    const timeout = await lookup('gamma').catch((e: unknown) => (e as Error).message);
+
+    for (const message of [serviceFailure, networkFailure, timeout]) {
       expect(message).not.toMatch(JARGON);
       expect(message).not.toMatch(/not a word|invalid|not in the dictionary/i);
     }

@@ -130,6 +130,11 @@ it fail first.
 - **Dictionary 5xx is not a verdict.** The upstream returns sporadic `502`s unrelated to the
   word. Only `200` and `404` mean anything; everything else retries and, if it never resolves,
   shows an amber "could not check" rather than "not a word". Never collapse those two states.
+- **A dictionary request needs a deadline, and every lookup needs an owner.** The upstream also
+  accepts a connection and then never answers, which no amount of retrying escapes: `retryConfig`
+  bounds one attempt and the lookup as a whole. And a lookup outlives the word it was about, so
+  `src/scrabble/lib/useLookup.ts` is the only way to start one - it cancels the request in flight
+  whenever the word moves on, which is what stops a stale verdict landing on a later turn.
 - **`base` is `/`, not relative.** The service worker and manifest are scoped to the origin
   root, so subpath hosting will not work.
 - **pnpm 11 blocks dependency build scripts.** `pnpm-workspace.yaml` has `allowBuilds: esbuild`.
