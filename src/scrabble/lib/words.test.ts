@@ -13,7 +13,7 @@ const encoded = (words: string[]) => {
     lines.push(String.fromCharCode(65 + shared) + word.slice(shared));
     previous = word;
   }
-  return `word-list 4.1.0 ${words.length}\n${lines.join('\n')}\n`;
+  return `wordlist source@1.0.0 ${words.length}\n${lines.join('\n')}\n`;
 };
 
 describe('decodeWordList', () => {
@@ -35,7 +35,7 @@ describe('decodeWordList', () => {
   });
 
   it('refuses a line sharing more characters than the word before it has', () => {
-    expect(() => decodeWordList('word-list 1 1\nAab\nZc')).toThrow(WordListError);
+    expect(() => decodeWordList('wordlist source@1 1\nAab\nZc')).toThrow(WordListError);
   });
 });
 
@@ -47,16 +47,83 @@ describe('loadWordList', () => {
     }
   });
 
-  it('has no proper nouns, no single letters and nothing over the board width', async () => {
+  // Regression: ENABLE was compiled in 1997 and six tournament two-letter words
+  // were added to the Scrabble dictionaries after it - `qi` and `za` among
+  // them, which are precisely the ones players argue about. The generator adds
+  // the canonical set back, and this is what holds it there.
+  it('has the two-letter words its source predates', async () => {
     const words = await loadWordList();
-    expect(words.has('london')).toBe(false);
+    for (const word of ['da', 'fe', 'ki', 'oi', 'qi', 'za']) {
+      expect(words.has(word)).toBe(true);
+    }
+  });
+
+  // Regression: the list was a general English one and marked names valid.
+  it('does not treat names and places as words', async () => {
+    const words = await loadWordList();
+    for (const name of [
+      'mary',
+      'michael',
+      'james',
+      'william',
+      'sarah',
+      'spain',
+      'canada',
+      'london',
+      'france',
+      'vienna',
+      'virginia',
+      'greece',
+    ]) {
+      expect(words.has(name)).toBe(false);
+    }
+  });
+
+  // The other half of that, and the reason a list of names could not just be
+  // subtracted: these look like names and are ordinary words.
+  it('keeps the ordinary words that happen to look like names', async () => {
+    const words = await loadWordList();
+    for (const word of ['japan', 'china', 'john', 'wales', 'lima', 'rose', 'grace', 'will']) {
+      expect(words.has(word)).toBe(true);
+    }
+  });
+
+  it('has no single letters and nothing over the board width', async () => {
+    const words = await loadWordList();
     expect(words.has('a')).toBe(false);
     expect([...words].every((word) => word.length >= 2 && word.length <= 15)).toBe(true);
+  });
+
+  // Regression: the list was built from a source that filters out "bad words",
+  // which for a Scrabble scorer is not tidiness but wrong answers - `balls` was
+  // absent while `ball` was present, and the board read it as "not a word". The
+  // filtering was not even consistent: `damned` stayed while `damn` went.
+  it('has the words its predecessor censored, which are legal plays', async () => {
+    const words = await loadWordList();
+    for (const word of ['balls', 'damn', 'hell', 'crap', 'bum', 'turd', 'ass', 'arse']) {
+      expect(words.has(word)).toBe(true);
+    }
+  });
+
+  // The same word list has to answer for a word and its plural. This is the
+  // shape the bug was reported in, whatever its actual cause turned out to be.
+  it('has plurals wherever it has the singular', async () => {
+    const words = await loadWordList();
+    for (const [singular, plural] of [
+      ['ball', 'balls'],
+      ['cat', 'cats'],
+      ['box', 'boxes'],
+      ['quiz', 'quizzes'],
+      ['tile', 'tiles'],
+    ]) {
+      expect(words.has(singular!)).toBe(true);
+      expect(words.has(plural!)).toBe(true);
+    }
   });
 
   it('decodes once and hands the same set back', async () => {
     const first = await loadWordList();
     expect(await loadWordList()).toBe(first);
-    expect(first.size).toBeGreaterThan(250_000);
+    expect(first.size).toBeGreaterThan(150_000);
   });
 });

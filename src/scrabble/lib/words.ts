@@ -8,12 +8,22 @@
  * available at a table with no signal. The API is now only asked for the
  * definition, which is the part it is actually good at.
  *
- * It is a general English list rather than TWL or SOWPODS, which are Hasbro's
- * and Collins' to license. It has the words Scrabble arguments are about - `ax`,
- * `za`, `jo`, `xu`, `qi` are all in it - and no proper nouns, so a miss still
- * means "probably not allowed" rather than a ruling. See docs/scrabble.md.
+ * It is ENABLE, the public-domain lexicon built for word games, rather than TWL
+ * or SOWPODS, which are Hasbro's and Collins' to license. Two properties are
+ * the reason it is this list and not a general English one:
+ *
+ * - **No proper nouns.** `mary`, `spain` and `london` are absent. The ordinary
+ *   words that merely look like names are not: `japan` is a lacquer, `china` is
+ *   porcelain, `john` is a toilet, `wales` is the plural of `wale`. Removing
+ *   names by subtracting a list of names would have taken those with them.
+ * - **Unexpurgated.** A list this replaced filtered out "bad words", which for
+ *   a Scrabble scorer is not tidiness but wrong answers: it had `ball` and not
+ *   `balls`, `damned` and not `damn`. A word list may leave out a word it has
+ *   never heard of. It may not leave out one it disapproves of.
+ *
+ * A miss still means "probably not allowed" rather than a ruling. See
+ * docs/scrabble.md, and `scripts/generate-words.mjs` for how it is built.
  */
-
 export class WordListError extends Error {}
 
 /**
@@ -29,7 +39,7 @@ export class WordListError extends Error {}
 export function decodeWordList(text: string): Set<string> {
   const split = text.indexOf('\n');
   const [name, , claimed] = text.slice(0, Math.max(split, 0)).split(' ');
-  if (name !== 'word-list') throw new WordListError('That is not the word list.');
+  if (name !== 'wordlist') throw new WordListError('That is not the word list.');
 
   const words = new Set<string>();
   let previous = '';
