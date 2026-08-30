@@ -1,5 +1,13 @@
 import { Link } from 'react-router-dom';
-import { Blocks, DoorOpen, Dices, SpellCheck, Target, type LucideIcon } from 'lucide-react';
+import {
+  Blocks,
+  DoorOpen,
+  Dices,
+  Settings,
+  SpellCheck,
+  Target,
+  type LucideIcon,
+} from 'lucide-react';
 
 interface Game {
   path?: string;
@@ -64,6 +72,14 @@ export function Home() {
           <span className="desc">
             Someone else is keeping score. Enter their code to follow along.
           </span>
+        </span>
+      </Link>
+
+      <Link className="game settings-row" to="/settings">
+        <Settings className="icon" size={26} strokeWidth={1.75} aria-hidden="true" />
+        <span>
+          <span className="title">Settings</span>
+          <span className="desc">Light or dark, and the name you play under.</span>
         </span>
       </Link>
     </main>

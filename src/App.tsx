@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Home } from './shared/Home';
+import { Settings } from './shared/Settings';
 import { ScrabbleTracker } from './scrabble/ScrabbleTracker';
 import { CricketTracker } from './cricket/CricketTracker';
 import { RummikubTracker } from './rummikub/RummikubTracker';
@@ -19,6 +20,7 @@ export function App() {
         <Route path="/yahtzee" element={<YahtzeeTracker />} />
         <Route path="/join" element={<JoinRoom />} />
         <Route path="/join/:code" element={<JoinRoom />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

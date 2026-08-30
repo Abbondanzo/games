@@ -111,3 +111,6 @@ export function writeName(name: string): void {
     // Storage can be unavailable; they will just type it again.
   }
 }
+
+/** Offered nowhere again until they type one. The settings page is the way. */
+export const clearName = (): void => removeKey(NAME_KEY);

@@ -67,7 +67,7 @@ describe('routing', () => {
    * Installed as an app there is no browser chrome, so a page without a way
    * back is a page you cannot leave. The join page shipped without one.
    */
-  it.each(['/scrabble', '/cricket', '/rummikub', '/yahtzee', '/join', '/join/AB23'])(
+  it.each(['/scrabble', '/cricket', '/rummikub', '/yahtzee', '/join', '/join/AB23', '/settings'])(
     'gives %s a way back to the game list',
     (path) => {
       renderAt(path);
@@ -82,6 +82,7 @@ describe('routing', () => {
       ['/rummikub', 'Rummikub'],
       ['/yahtzee', 'Yahtzee'],
       ['/join', 'Join a game'],
+      ['/settings', 'Settings'],
     ] as const) {
       const { unmount } = renderAt(path);
       expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument();

@@ -149,6 +149,40 @@ describe('cache headers', () => {
   });
 });
 
+/**
+ * A chosen colour scheme, which three files have to agree on: the stylesheet
+ * paints it, index.html applies it before the first paint, and theme.ts owns
+ * the key and the status bar tint. Drift between them shows up as a flash of
+ * the wrong colour, which is the one thing the inline copy exists to prevent.
+ */
+describe('the chosen colour scheme', () => {
+  const css = read('src/index.css');
+  const theme = read('src/shared/theme.ts');
+
+  it('is read inline, before the app script that would repaint it', () => {
+    expect(html).toContain('games.theme.v1');
+    expect(html.indexOf('games.theme.v1')).toBeLessThan(html.indexOf('type="module"'));
+    expect(theme).toContain("THEME_KEY = 'games.theme.v1'");
+  });
+
+  it('is what the stylesheet keys the light palette off', () => {
+    expect(css).toMatch(/:root:not\(\[data-theme='dark'\]\)/);
+    expect(css).toMatch(/:root\[data-theme='light'\]/);
+  });
+
+  // The pair above are keyed on the device, so neither answers for a choice.
+  it('tints the status bar in the same colours as the page', () => {
+    for (const [scheme, colour] of [
+      ['light', '#f4f6fa'],
+      ['dark', '#10131a'],
+    ] as const) {
+      expect(css).toContain(`--bg: ${colour}`);
+      expect(html).toContain(`media="(prefers-color-scheme: ${scheme})" content="${colour}"`);
+      expect(theme).toContain(`${scheme}: '${colour}'`);
+    }
+  });
+});
+
 describe('recovering from a stale page', () => {
   it('watches for the page failing to load at all', () => {
     expect(html).toMatch(/addEventListener\(\s*'error'/);
