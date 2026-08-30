@@ -57,10 +57,22 @@
   <body>
     <div id="root"></div>
 
-    <!-- Recovering from a stale page. -->
+    <!-- Recovering from a stale page.
+
+         A deploy replaces every hashed filename, so a browser still holding the
+         previous index.html asks for files that are gone, is answered with the
+         page instead, and shows nothing at all. Throwing this device's caches
+         away and reloading is the way out. The two guards are what keep that
+         from becoming a reload loop, which is worse than the blank page: the
+         only thing a person can do about a page that reloads itself is close
+         it. -->
     <script>
       (function () {
-        var TRIED = 'games.reload.v1';
+        var MARK = 'games.reload.v1';
+        // Long enough that a page failing twice over is failing the same way
+        // and reloading will not help, short enough that a deploy later in the
+        // evening can still be recovered from.
+        var COOL_OFF = 10 * 60 * 1000;
 
         window.addEventListener(
           'error',
@@ -68,9 +80,22 @@
             var el = event.target;
             if (!el || (el.tagName !== 'SCRIPT' && el.tagName !== 'LINK')) return;
             if (!navigator.onLine) return;
+
+            // The app is on screen, so what failed is a chunk asked for after
+            // it started - the word list, or the service worker's own library -
+            // and not the blank page this exists for. Reloading would throw a
+            // game away to no purpose, and the chunk would be just as missing
+            // on the next load, and the one after that.
+            var root = document.getElementById('root');
+            if (root && root.childNodes.length > 0) return;
+
             try {
-              if (sessionStorage.getItem(TRIED)) return;
-              sessionStorage.setItem(TRIED, '1');
+              // Nothing stored reads as 0, which is old enough to try. Anything
+              // unreadable reads as NaN, which fails the comparison and so
+              // holds still, since a guard that cannot be trusted is a loop.
+              var last = Number(sessionStorage.getItem(MARK));
+              if (!(Date.now() - last >= COOL_OFF)) return;
+              sessionStorage.setItem(MARK, String(Date.now()));
             } catch (e) {
               return; // No storage means no way to stop a reload loop.
             }

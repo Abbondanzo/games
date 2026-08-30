@@ -158,12 +158,9 @@ Three things address it, and they are worth keeping together:
   answering a request under `/assets/` with the page. Workbox already scopes the
   fallback to navigations, so this is belt and braces, but it is the exact shape
   of the failure.
-- **A recovery script in `index.html`**, which is the one that actually rescues
-  somebody. If a script or stylesheet fails to load it clears this device's
-  caches, unregisters the service worker and reloads - once, guarded by
-  `sessionStorage`, and only with a connection, because offline the same failure
-  means something else and throwing the caches away would take the installed app
-  with it. `main.tsx` clears the guard on boot, so a later failure can try again.
+- **A recovery script in `index.html`**, which is the one that actually rescues somebody. If a script or stylesheet fails to load it clears this device's caches, unregisters the service worker and reloads, and only with a connection, because offline the same failure means something else and throwing the caches away would take the installed app with it.
+
+  Two things bound it, because a page that reloads itself for ever is worse than the blank one it was trying to fix: the only thing anybody can do about a reload loop is close the tab, and a hard refresh only starts it again. It does nothing once the app is on screen, since everything fetched after that is a chunk asked for later - the word list, or the service worker's own library - and losing a game in progress would not bring it back. And the attempt is timestamped in `sessionStorage`, so a failure that repeats within ten minutes is left alone. Nothing clears that mark early: it used to be a flag that `main.tsx` cleared as soon as the bundle ran, and a guard that is always clear by the time the next failure arrives is not a guard. `src/pwa.test.ts` runs the script itself against both cases.
 
 **Worth checking in the dashboard:** if the Pages project has single-page-app
 handling turned on, a missing file returns `index.html` with a 200 rather than a 404. This app routes on the hash, so every real route is `/` and it needs no

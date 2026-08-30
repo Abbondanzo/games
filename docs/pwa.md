@@ -74,6 +74,8 @@ The registration also re-checks hourly, since a game can sit open all evening.
 `docs/rooms.md` covers the related case where the app and the room server are
 different versions, which the room strip reports in the same spirit.
 
+The other half of a deploy is the page left holding filenames the new one does not have. `index.html` carries a recovery script for that, written up in [docs/deployment.md](deployment.md#surviving-a-deploy), including the two guards that keep it from turning into a reload loop.
+
 ## Not implemented
 
 iOS splash screens (`apple-touch-startup-image`). Without them there is a brief blank screen on
