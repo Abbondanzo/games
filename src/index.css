@@ -1,4 +1,8 @@
+/* Dark is what the app is drawn in; the light palette below replaces the few
+   variables that differ. Either can be chosen outright on the settings page,
+   which puts data-theme on the root element. Without one the device decides. */
 :root {
+  color-scheme: dark;
   --bg: #10131a;
   --card: #191d27;
   --card-2: #212736;
@@ -18,7 +22,8 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
     --bg: #f4f6fa;
     --card: #ffffff;
     --card-2: #eef1f7;
@@ -27,6 +32,21 @@
     --muted: #66718a;
     --accent-ink: #ffffff;
   }
+}
+
+/* Light because they asked for it rather than because the device did. Same
+   weight as the rule above, so it has to come after it to win on a dark
+   device. Choosing dark needs no rule of its own: it is the base palette, and
+   the rule above steps aside for it. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f6fa;
+  --card: #ffffff;
+  --card-2: #eef1f7;
+  --line: #dbe1ec;
+  --text: #131722;
+  --muted: #66718a;
+  --accent-ink: #ffffff;
 }
 
 * {
@@ -1370,6 +1390,25 @@ button.link {
 /* ── join ── */
 .join-row {
   margin-top: 1.25rem;
+}
+.settings-row {
+  margin-top: 0.6rem;
+}
+.settings-card {
+  margin-top: 1rem;
+}
+.settings-card .seg {
+  /* The card is not a flex row, so the group would otherwise stretch across it
+     and leave a bare strip beyond the last choice. */
+  width: fit-content;
+}
+.settings-card .seg button {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.settings-card .ghost {
+  margin-top: 0.75rem;
 }
 .join-form {
   display: flex;

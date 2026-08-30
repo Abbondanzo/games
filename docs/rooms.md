@@ -18,6 +18,8 @@ is no warning and no extra step.
 Enter the code and the name you want on the scoreboard, and you are in the game
 straight away, entering your own scores. Nobody waits on the host.
 
+**Your name** is remembered on the device and filled in at both doors, so it is typed once rather than at every room. **Settings** on the home page is where it is changed or forgotten outright, which is otherwise only possible by typing over it on the way into a room.
+
 **Leave** at any time. It gives up your place in the room but leaves your player
 and their score on the board, so nothing vanishes from everyone else's view.
 Rejoining with the same name takes that player back rather than making a second

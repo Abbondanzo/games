@@ -27,6 +27,27 @@
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fa" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10131a" />
 
+    <!-- The colour scheme they chose, ahead of the first paint, or the page
+         flashes dark before turning light. Read the same way in
+         src/shared/theme.ts, which owns this key. -->
+    <script>
+      (function () {
+        try {
+          var chosen = JSON.parse(localStorage.getItem('games.theme.v1'));
+          if (chosen === 'light' || chosen === 'dark') {
+            document.documentElement.dataset.theme = chosen;
+            var tint = document.createElement('meta');
+            tint.setAttribute('name', 'theme-color');
+            tint.setAttribute('data-chosen', '');
+            tint.setAttribute('content', chosen === 'light' ? '#f4f6fa' : '#10131a');
+            document.head.prepend(tint);
+          }
+        } catch (e) {
+          // Nothing stored, or no storage at all: the device preference stands.
+        }
+      })();
+    </script>
+
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />

@@ -27,7 +27,7 @@ shared/     pure domain, imported by both the app and the Worker. No React, no D
 src/        the React app
   <game>/   <Game>Tracker.tsx, components/, lib/use<Game>.ts (hook + storage)
   rooms/    whoAmI.ts, RoomStrip.tsx, WhoseTurn.tsx, session.ts, transport.ts
-  shared/   Home.tsx, PlayersCard.tsx, localStore.ts
+  shared/   Home.tsx, Settings.tsx, PlayersCard.tsx, theme.ts, localStore.ts
 worker/     the room server: a Cloudflare Worker with a Durable Object per room
 ```
 

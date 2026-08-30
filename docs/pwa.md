@@ -47,6 +47,16 @@ app rather than a web page.
 `src/pwa.test.ts` asserts the manifest fields, the icon sizes installers require, that every
 referenced icon exists on disk, and that the iOS meta tags and safe-area CSS are present.
 
+## Colour scheme
+
+The app is drawn dark, with a light palette that takes over under a light device preference. The settings page, reached from the bottom of the home page, makes that a choice: light, dark, or automatic. A choice puts `data-theme` on the root element, which is what the stylesheet keys the light palette off; automatic takes the attribute away again and hands the decision back to the device.
+
+`src/shared/theme.ts` owns the key it is stored under and the reading of it, but it cannot be the only reader. A module runs after the stylesheet has painted, so someone who chose light would watch the page flash dark first. index.html reads the same key inline, ahead of everything else, and applies the attribute before the first paint.
+
+The status bar needs the same treatment, and for the same reason the pair of `theme-color` tags cannot answer for it: both are keyed on the device preference, so neither knows what was chosen. A chosen scheme gets a third tag with no `media` at all, put ahead of them, since the first tag that matches is the one used. Automatic removes it.
+
+Three files therefore agree on two colours and one storage key, and a test in `src/pwa.test.ts` holds them to it. Drift between them is not a subtle failure: it is the flash of the wrong colour the inline copy exists to prevent.
+
 ## Updates
 
 The app is precached, so a deploy does not reach anyone holding a tab open: the
