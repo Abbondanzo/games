@@ -24,6 +24,8 @@ binding = "VERSION"
 # project only, since *.pages.dev would admit every site on the platform.
 ALLOWED_ORIGINS = "https://games.abbondanzo.com,https://games-ccu.pages.dev,https://*.games-ccu.pages.dev,http://localhost:5173,http://localhost:4173"
 
+DICTIONARY_REFERENCE = "sd3"
+
 # Cloudflare's rate limiter. Joining is the one endpoint worth guarding: it is
 # where a guessed code would be tried.
 [[unsafe.bindings]]
@@ -46,3 +48,9 @@ simple = { limit = 30, period = 60 }
 #   wrangler secret put DICTIONARY_KEY
 # and locally with a .dev.vars file, which is gitignored. GET /health reports
 # whether it is bound.
+#
+# Which dictionary that key is for, though, is not a secret and is not a
+# property of the code either - Merriam-Webster issues a key per reference and
+# every other one refuses it. `sd3` is the Intermediate Dictionary; `sd2`
+# Elementary, `sd4` School, `collegiate` Collegiate, `learners` Learner's.
+# Changing the key to one for another reference means changing this too.

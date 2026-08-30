@@ -218,6 +218,18 @@ definition, and none of them can change a verdict.
   never in `wrangler.toml`. `GET /health` reports `dictionary: true` when it is
   bound, because otherwise a missing secret looks exactly like a dictionary that
   has nothing to say.
+- **Which dictionary the key is for is a var**, `DICTIONARY_REFERENCE`, and is
+  not a detail of the code. Merriam-Webster sells each reference separately and
+  issues a key per one; every other reference refuses it, at HTTP 200, with a
+  plain-text `Invalid API key. Not subscribed for this reference`. `sd3` is the
+  Intermediate Dictionary - `sd2` Elementary, `sd4` School, `collegiate`
+  Collegiate, `learners` Learner's. A new key usually means a new reference, so
+  the two are changed together and `/health` reports both.
+- **A failure says why in the log, and nothing to the caller.** A rejected key
+  and an upstream that is down are the same 502 from outside, so the upstream's
+  own complaint goes to `console.error` and is read with `wrangler tail`. The
+  key never goes with it: the address carries it, so the address is never
+  logged.
 - **Merriam-Webster's shape is normalised here**, in `worker/dictionary.ts`, and
   nowhere else. It is quirky - pronunciations under `hwi`, part of speech in
   `fl`, headwords with asterisks at the syllable breaks - and a word it does not

@@ -57,8 +57,13 @@ fresh deploy target will not have it:
 
 ```
 wrangler secret put DICTIONARY_KEY
-curl -s https://<worker>/health | grep dictionary   # "dictionary":true
+curl -s https://<worker>/health    # "dictionary":true,"reference":"sd3"
 ```
+
+The key is issued for one Merriam-Webster reference and refused by all the
+others, so `DICTIONARY_REFERENCE` in `wrangler.toml` has to match the key.
+A mismatch is a `502` from `/define/:word` and nothing else; `wrangler tail`
+shows the upstream saying so in as many words.
 
 Until it is set the app works and shows no definitions, which is deliberate -
 validity is decided in the browser against a bundled word list and never waits
