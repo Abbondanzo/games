@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearDictionaryCache, retryConfig } from './dictionary';
-import { runLookup } from './lookupView';
+import { runDefinition, runVerdict } from './lookupView';
+import { forgetWordList } from './words';
 
 const entry = (word: string) => [
   {
@@ -9,7 +10,15 @@ const entry = (word: string) => [
   },
 ];
 
-const originalDelay = retryConfig.delayMs;
+const original = { ...retryConfig };
+
+/** A dictionary that accepts the connection and never answers. */
+const hangs = (_url: string, init?: { signal?: AbortSignal }) =>
+  new Promise<never>((_resolve, reject) => {
+    const fail = () => reject(new DOMException('aborted', 'AbortError'));
+    if (init?.signal?.aborted) fail();
+    else init?.signal?.addEventListener('abort', fail, { once: true });
+  });
 
 beforeEach(() => {
   clearDictionaryCache();
@@ -18,70 +27,81 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  retryConfig.delayMs = originalDelay;
+  Object.assign(retryConfig, original);
+  forgetWordList();
 });
 
-describe('runLookup', () => {
-  it('reports a known word as valid, with its first definition', async () => {
+describe('runVerdict', () => {
+  it('calls a word in the list valid, with no definition yet', async () => {
+    await expect(runVerdict('quiz')).resolves.toEqual({
+      kind: 'valid',
+      word: 'QUIZ',
+      detail: null,
+      entries: [],
+    });
+  });
+
+  it('calls a word that is not in the list invalid', async () => {
+    await expect(runVerdict('zzzz')).resolves.toMatchObject({ kind: 'invalid', word: 'ZZZZ' });
+  });
+
+  // Proper nouns are absent from the list, which is right for Scrabble.
+  it('calls a proper noun invalid', async () => {
+    await expect(runVerdict('London')).resolves.toMatchObject({ kind: 'invalid', word: 'LONDON' });
+  });
+
+  // Regression: validity used to be whatever the API said, so an upstream that
+  // never answered meant no verdict at all. It is decided offline now, and the
+  // network is not consulted - a dead dictionary cannot withhold a ruling.
+  it('rules on a word without touching the network at all', async () => {
+    const fetchMock = vi.fn(hangs);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(runVerdict('ax')).resolves.toMatchObject({ kind: 'valid', word: 'AX' });
+    await expect(runVerdict('zzzz')).resolves.toMatchObject({ kind: 'invalid' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('runDefinition', () => {
+  it('returns the first definition when the dictionary answers', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: true, status: 200, json: async () => entry('quiz') })),
     );
-    await expect(runLookup('quiz')).resolves.toMatchObject({
-      kind: 'valid',
-      word: 'QUIZ',
+    await expect(runDefinition('quiz')).resolves.toMatchObject({
       detail: '(noun) meaning of quiz',
     });
   });
 
-  it('reports a 404 as invalid', async () => {
+  // A definition is a sentence, not a ruling: every way of not getting one is
+  // the same absence, and none of them may reach the bar as an alarm.
+  it.each([
+    ['a word the dictionary does not have', { ok: false, status: 404 }],
+    ['a service failure', { ok: false, status: 502 }],
+  ])('returns nothing to show for %s', async (_case, response) => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({ ok: false, status: 404 })),
+      vi.fn(async () => response),
     );
-    await expect(runLookup('zzzz')).resolves.toMatchObject({ kind: 'invalid', word: 'ZZZZ' });
+    await expect(runDefinition('quiz')).resolves.toBeNull();
   });
 
-  // Proper nouns 404 like any other absent word, which is right for Scrabble.
-  it('reports a proper noun as invalid', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({ ok: false, status: 404 })),
-    );
-    await expect(runLookup('London')).resolves.toMatchObject({ kind: 'invalid', word: 'LONDON' });
+  it('returns nothing to show when the dictionary never answers', async () => {
+    retryConfig.timeoutMs = 5;
+    vi.stubGlobal('fetch', vi.fn(hangs));
+    await expect(runDefinition('quiz')).resolves.toBeNull();
   });
 
-  // Regression: a signal was never threaded through, so a cancelled lookup
-  // still resolved to a view and the caller wrote a stale verdict on screen.
-  it('rejects rather than resolving to a view when the caller cancels', async () => {
+  it('rejects rather than returning when the caller cancels', async () => {
     const controller = new AbortController();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        (_url: string, init?: { signal?: AbortSignal }) =>
-          new Promise<never>((_resolve, reject) => {
-            const fail = () => reject(new DOMException('aborted', 'AbortError'));
-            if (init?.signal?.aborted) fail();
-            else init?.signal?.addEventListener('abort', fail, { once: true });
-          }),
-      ),
-    );
+    vi.stubGlobal('fetch', vi.fn(hangs));
 
-    const pending = runLookup('quiz', controller.signal);
+    const pending = runDefinition('quiz', controller.signal);
     controller.abort();
 
     const error = await pending.catch((e: unknown) => e);
     expect(error).toBeInstanceOf(DOMException);
     expect((error as DOMException).name).toBe('AbortError');
-  });
-
-  it('separates a service failure from an invalid word', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({ ok: false, status: 502 })),
-    );
-    const view = await runLookup('ax');
-    expect(view.kind).toBe('error');
-    expect(view.kind === 'error' && view.message).toMatch(/perfectly valid word/);
   });
 });

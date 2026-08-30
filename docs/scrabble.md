@@ -43,53 +43,71 @@ keeps a double-letter set on the A rather than sliding it onto the newly typed H
 
 ## Dictionary
 
-**Check** validates the word currently in the entry box. The **Dictionary** button opens a full
+**Check** rules on the word currently in the entry box. The **Dictionary** button opens a full
 lookup with pronunciation and definitions, prefilled with whatever you have typed.
 
-Definitions come from the [Free Dictionary API](https://dictionaryapi.dev), so an internet
-connection is needed. It is a general English dictionary rather than the official Scrabble word
-list (TWL/SOWPODS), so a miss means "probably not a word", not a ruling.
+Validity and definitions come from two different places, on purpose.
 
-Every lookup ends in one of three verdict bars:
+**Validity is decided offline**, against a word list bundled with the app
+(`src/scrabble/lib/words.txt`, 269,870 words). No network call, no waiting, and the same answer
+every time. This is what makes the contested words usable: `ax`, `za`, `jo`, `xu` and `qi` are
+all in the list, and settled instantly.
 
-| Bar   | Meaning                                                                                                  |
-| ----- | -------------------------------------------------------------------------------------------------------- |
-| Green | The dictionary has the word.                                                                             |
-| Red   | The dictionary answered and does not have the word. Proper nouns land here, which is right for Scrabble. |
-| Amber | No answer at all. This says nothing about the word - retry.                                              |
+It is a general English list rather than TWL or SOWPODS, which belong to Hasbro and Collins and
+are not ours to ship. It has no proper nouns and no single letters, so a miss still means
+"probably not allowed" rather than a ruling. It is generated from the
+[`word-list`](https://www.npmjs.com/package/word-list) package by `pnpm words` and committed,
+like the icons; nothing is fetched or processed at build time.
 
-Keeping amber distinct from red matters. The upstream serves sporadic `5xx` responses that have
-nothing to do with the word: `ax`, `za`, `jo` and `xu` are all valid and have each been observed
-failing once then resolving on a retry. Only `200` and `404` carry meaning, so a lookup retries
-up to 3 rounds across both endpoints with a short backoff, and failures are never cached.
+**Definitions come from the [Free Dictionary API](https://dictionaryapi.dev)**, which needs a
+connection. They arrive after the verdict and fill in beneath it. If the service is slow, down,
+or has never heard of the word, there is simply no definition - the verdict is already on screen
+and does not change. A missing sentence is not a ruling and must never be shown as one.
 
-**Deadlines.** The upstream's other failure mode is worse than a 5xx: it accepts the connection
-and never answers. Nothing rejects, so a lookup with no deadline never finishes and the bar spins
-until the tab is closed. Each attempt therefore gets `timeoutMs` and the lookup as a whole gets
-`budgetMs` (both in `retryConfig`), and a request that runs out of time is retried like any other
-failure - it says nothing about the word, so it ends amber, never red.
+Every check ends in one of three bars:
+
+| Bar   | Meaning                                                                                             |
+| ----- | --------------------------------------------------------------------------------------------------- |
+| Green | The word is in the list. The definition may follow, or may not.                                     |
+| Red   | The word is not in the list. Proper nouns land here, which is right for Scrabble.                   |
+| Amber | The list itself could not be read, which should not happen - it is precached. Never a word verdict. |
+
+### The word list
+
+Front-coded: each line is the number of characters it shares with the line before it, as a
+letter, then the rest of the word. On a sorted list that turns 2.73 MB into 1.13 MB before
+compression, and 377 KB after it. `scripts/generate-words.mjs` writes it, `words.ts` reads it.
+
+It is loaded on its own chunk, on mount rather than on the first Check, so the decode is done by
+the time anyone presses the button. The chunk is precached with everything else, so the first
+check works with no connection.
+
+The header line is verified rather than skipped. A deploy that has moved the files answers a
+request for a missing asset with `index.html`, and HTML that decoded quietly would mean every
+word on the board reading as invalid - the worst possible way to fail. A payload that is not the
+list, or is short of the word count it declares, is refused.
+
+### Asking the dictionary
+
+The upstream is unreliable in two distinct ways, and neither may reach a verdict any more.
+
+It serves sporadic `5xx` responses unrelated to the word, so only `200` and `404` carry meaning
+and everything else retries across both endpoints with a short backoff. Worse, it also accepts
+the connection and then never answers: nothing rejects, so a request with no deadline never
+finishes at all. Each attempt gets `timeoutMs` and the lookup as a whole gets `budgetMs`, both in
+`retryConfig`. Every one of these outcomes now costs the definition and nothing else.
 
 **Cancellation.** A lookup is cancelled by anything that moves on from the word it is about:
 typing on, banking another word, passing, scoring the turn, closing the drawer, searching for
-something else, or unmounting. `useLookup` owns that: it holds the `AbortController` for the
-request in flight and aborts it before starting or clearing anything. Without it a verdict for a
-word already played landed on the next turn's bar.
-
-Two-letter words are hit hardest, and they are exactly the contested ones in Scrabble. `ax` was
-measured succeeding roughly 1 attempt in 5; retrying raises that to around 3 in 4, but it is not
-a guarantee.
+something else, or unmounting. `useLookup` owns that - it holds the `AbortController` for the
+request in flight and aborts it before starting or clearing anything. Without it a definition for
+a word already played landed on the next turn's bar.
 
 **Endpoints.** The API sends `Access-Control-Allow-Origin: *`, so the browser calls it directly.
 If that fails the request is retried through a CORS reverse proxy, set as a constant at the top
-of `src/scrabble/lib/dictionary.ts`. The proxy shares the same upstream, so it does not help
-when the upstream itself is failing.
+of `src/scrabble/lib/dictionary.ts`. The proxy shares the same upstream, so it does not help when
+the upstream itself is failing - which, since validity no longer depends on it, now costs only
+the definition.
 
 **Player-facing copy** never contains status codes or networking terms. `dictionary.test.ts`
 enforces that with a jargon guard.
-
-### Known gap
-
-Because validity depends on a flaky third-party service, some valid short words are occasionally
-unverifiable. Bundling an offline Scrabble word list (TWL/SOWPODS, roughly 1.9 MB) would make
-validity instant, authoritative and offline, leaving the API to supply definitions only. Not
-implemented.

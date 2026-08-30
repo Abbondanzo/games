@@ -4,8 +4,9 @@ import type { LookupView } from '../lib/lookupView';
 const ICON_PROPS = { size: 18, strokeWidth: 2, 'aria-hidden': true as const, className: 'mark' };
 
 /**
- * The verdict bar: green when the dictionary has the word, red when it
- * definitively doesn't, amber when we couldn't get an answer at all.
+ * The verdict bar: green when the word list has the word, red when it doesn't.
+ * Amber is now only for a list that could not be read, which is why it says
+ * "couldn't check" rather than anything about the word.
  */
 export function ValidityBar({ view }: { view: LookupView }) {
   if (view.kind === 'idle') return null;
@@ -41,11 +42,15 @@ export function ValidityBar({ view }: { view: LookupView }) {
     );
   }
 
+  // `detail` arrives after the verdict, or not at all. The sentence has to read
+  // properly either way, so the definition is a separate node rather than
+  // interpolated text that would leave a stray space when there isn't one.
   return (
     <div className="validity valid" role="status">
       <CircleCheck {...ICON_PROPS} />
       <span>
-        <span className="word">{view.word}</span> is a valid word. {view.detail}
+        <span className="word">{view.word}</span> is a valid word.
+        {view.detail && <span className="detail"> {view.detail}</span>}
       </span>
     </div>
   );

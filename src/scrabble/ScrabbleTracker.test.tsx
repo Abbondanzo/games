@@ -70,7 +70,7 @@ function stubHangingFetch() {
  * that whoever is playing is told when it becomes their turn.
  */
 const bar = () => screen.getAllByRole('status').find((el) => el.classList.contains('validity'))!;
-const originalDelay = retryConfig.delayMs;
+const originalRetryConfig = { ...retryConfig };
 
 beforeEach(() => {
   clearDictionaryCache();
@@ -79,7 +79,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  retryConfig.delayMs = originalDelay;
+  Object.assign(retryConfig, originalRetryConfig);
 });
 
 describe('entering a turn', () => {
@@ -324,7 +324,7 @@ describe('a stored game that is malformed', () => {
 });
 
 describe('dictionary', () => {
-  it('confirms a valid word inline', async () => {
+  it('confirms a valid word inline, and fills in the definition after', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => dictResponse('hello')),
@@ -336,13 +336,12 @@ describe('dictionary', () => {
 
     await waitFor(() => expect(bar()).toHaveClass('validity', 'valid'));
     expect(bar()).toHaveTextContent('HELLO is a valid word');
+    await waitFor(() => expect(bar()).toHaveTextContent('a definition of hello'));
   });
 
-  it('reports a word that is not in the dictionary', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({ ok: false, status: 404 })),
-    );
+  it('reports a word that is not in the word list', async () => {
+    const fetchMock = vi.fn(async () => dictResponse('zzzz'));
+    vi.stubGlobal('fetch', fetchMock);
     const user = setup();
     await addPlayers(user, 'Ada');
     await user.type(wordBox(), 'zzzz');
@@ -350,25 +349,26 @@ describe('dictionary', () => {
 
     await waitFor(() => expect(bar()).toHaveClass('validity', 'invalid'));
     expect(bar()).toHaveTextContent('ZZZZ is not in the dictionary');
+    // No definition is fetched for a word that is not a word.
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  // Regression: a failed fetch used to surface the raw "Failed to fetch".
-  it('explains a network failure instead of showing the raw error', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        throw new TypeError('Failed to fetch');
-      }),
-    );
+  // Regression: validity came from the API, so an upstream that accepted the
+  // connection and never answered left the player with no verdict at all. The
+  // ruling is offline now; a dead dictionary costs the definition and nothing
+  // else, and must never show as amber or red.
+  it('still rules on the word when the dictionary never answers', async () => {
+    retryConfig.timeoutMs = 5;
+    stubHangingFetch();
     const user = setup();
     await addPlayers(user, 'Ada');
-    await user.type(wordBox(), 'hello');
+    await user.type(wordBox(), 'ax');
     await user.click(screen.getByRole('button', { name: 'Check' }));
 
-    await waitFor(() => expect(bar()).toHaveClass('validity', 'error'));
-    expect(bar()).toHaveTextContent(/Check your internet connection/);
+    await waitFor(() => expect(bar()).toHaveClass('validity', 'valid'));
+    expect(bar()).toHaveTextContent('AX is a valid word');
+    expect(bar()).not.toHaveClass('error');
     expect(bar()).not.toHaveClass('invalid');
-    expect(screen.queryByText(/^Failed to fetch$/)).not.toBeInTheDocument();
   });
 
   // Regression: the drawer used the `hidden` attribute, which `display: flex`
@@ -388,7 +388,9 @@ describe('dictionary', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Dictionary' });
     expect(within(dialog).getByLabelText('Word to look up')).toHaveValue('QUIZ');
     await waitFor(() => expect(within(dialog).getByRole('status')).toHaveClass('valid'));
-    expect(within(dialog).getByRole('listitem')).toHaveTextContent('a definition of quiz');
+    await waitFor(() =>
+      expect(within(dialog).getByRole('listitem')).toHaveTextContent('a definition of quiz'),
+    );
 
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -415,10 +417,10 @@ describe('dictionary', () => {
       expect(verdict()).toHaveTextContent('QUIZ is a valid word');
     });
 
-    it('shows a red bar for a word the dictionary does not have', async () => {
+    it('shows a red bar for a word the list does not have', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn(async () => ({ ok: false, status: 404 })),
+        vi.fn(async () => dictResponse('zzzz')),
       );
       const user = setup();
       const verdict = await openDrawer(user, 'zzzz');
@@ -427,82 +429,69 @@ describe('dictionary', () => {
       expect(verdict()).toHaveTextContent('ZZZZ is not in the dictionary');
     });
 
-    // Regression: a 502 used to surface as an error where the user read it as
-    // "not a word". It is transient and unrelated to validity.
-    it('recovers from a 502 and still calls a valid word valid', async () => {
+    // Regression: a 502 used to surface as an error the player read as "not a
+    // word". It now costs the definition and leaves the verdict untouched.
+    it('costs a 502 the definition, never the verdict', async () => {
       vi.stubGlobal(
         'fetch',
-        vi
-          .fn()
-          .mockResolvedValueOnce({ ok: false, status: 502 })
-          .mockResolvedValueOnce({ ok: false, status: 502 })
-          .mockResolvedValue(dictResponse('ax')),
+        vi.fn(async () => ({ ok: false, status: 502 })),
       );
       const user = setup();
       const verdict = await openDrawer(user, 'ax');
 
       await waitFor(() => expect(verdict()).toHaveClass('validity', 'valid'));
       expect(verdict()).toHaveTextContent('AX is a valid word');
-    });
-
-    it('distinguishes a persistent 502 from an invalid word', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => ({ ok: false, status: 502 })),
-      );
-      const user = setup();
-      const verdict = await openDrawer(user, 'quiz');
-
-      await waitFor(() => expect(verdict()).toHaveClass('validity', 'error'));
-      expect(verdict()).toHaveTextContent(/perfectly valid word/);
       expect(verdict()).not.toHaveClass('invalid');
       expect(verdict()).not.toHaveTextContent('not in the dictionary');
+      expect(within(screen.getByRole('dialog')).queryByRole('listitem')).not.toBeInTheDocument();
     });
   });
 
-  // Regression: nothing cancelled a check in flight, so the request went on
-  // running after the word had been played and its verdict landed on the next
-  // turn's bar - for a word no longer on screen.
-  describe('cancelling a check', () => {
-    const startCheck = async (user: ReturnType<typeof userEvent.setup>) => {
+  // Regression: nothing cancelled a lookup in flight, so the request went on
+  // running after the word had been played and its definition landed on the
+  // next turn's bar - for a word no longer on screen.
+  describe('cancelling a lookup', () => {
+    /** Check a word, and wait until its definition request is actually open. */
+    const startCheck = async (user: ReturnType<typeof userEvent.setup>, signals: AbortSignal[]) => {
       await addPlayers(user, 'Ada');
       await user.type(wordBox(), 'quiz');
       await user.click(screen.getByRole('button', { name: 'Check' }));
-      await screen.findByText(/Looking up QUIZ/);
+      await waitFor(() => expect(bar()).toHaveClass('validity', 'valid'));
+      await waitFor(() => expect(signals.length).toBeGreaterThan(0));
     };
 
     it('cancels the lookup when the word is entered for the turn', async () => {
       const signals = stubHangingFetch();
       const user = setup();
-      await startCheck(user);
+      await startCheck(user, signals);
 
       await user.click(screen.getByRole('button', { name: 'Score turn' }));
 
       await waitFor(() => expect(signals[0]?.aborted).toBe(true));
-      expect(screen.queryByText(/Looking up/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/is a valid word/)).not.toBeInTheDocument();
       expect(board()).toEqual(['Ada:22']);
     });
 
     it('cancels the lookup when the word is typed on', async () => {
       const signals = stubHangingFetch();
       const user = setup();
-      await startCheck(user);
+      await startCheck(user, signals);
 
       await user.type(wordBox(), 'z');
 
       await waitFor(() => expect(signals[0]?.aborted).toBe(true));
-      expect(screen.queryByText(/Looking up/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/is a valid word/)).not.toBeInTheDocument();
     });
 
     it('cancels the lookup when the turn is passed', async () => {
       const signals = stubHangingFetch();
       const user = setup();
-      await startCheck(user);
+      await startCheck(user, signals);
 
       await user.click(screen.getByRole('button', { name: 'Pass' }));
 
       await waitFor(() => expect(signals[0]?.aborted).toBe(true));
-      expect(screen.queryByText(/Looking up/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/is a valid word/)).not.toBeInTheDocument();
     });
 
     it('cancels the drawer lookup when the drawer is closed', async () => {
@@ -513,7 +502,8 @@ describe('dictionary', () => {
       await user.click(screen.getAllByRole('button', { name: 'Dictionary' })[0]!);
 
       const dialog = await screen.findByRole('dialog', { name: 'Dictionary' });
-      await within(dialog).findByText(/Looking up QUIZ/);
+      await waitFor(() => expect(within(dialog).getByRole('status')).toHaveClass('valid'));
+      await waitFor(() => expect(signals.length).toBeGreaterThan(0));
       await user.click(within(dialog).getByRole('button', { name: 'Close' }));
 
       await waitFor(() => expect(signals[0]?.aborted).toBe(true));
