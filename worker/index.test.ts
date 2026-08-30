@@ -6,7 +6,7 @@
  * exist, and the origin check, which is a real security boundary and had only
  * been exercised as a pure function.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker, { type Env } from './index';
 import { PROTOCOL_VERSION, GAMES } from '../shared/rooms/protocol';
 
@@ -224,5 +224,108 @@ describe('rate limiting', () => {
   it('does not limit the health check', async () => {
     const response = await worker.fetch(new Request('https://rooms.test/health'), refusing());
     expect(response.status).toBe(200);
+  });
+});
+
+describe('the define endpoint', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const mwEntry = [
+    { hwi: { hw: 'quiz', prs: [{ mw: 'ˈkwiz' }] }, fl: 'noun', shortdef: ['a short test'] },
+  ];
+
+  const stubUpstream = (response: unknown, status = 200) => {
+    const fetchMock = vi.fn(async (_url: string) => ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => response,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+
+  it('answers with the normalised definition', async () => {
+    stubUpstream(mwEntry);
+    const response = await call('/define/quiz', undefined, { DICTIONARY_KEY: 'k' });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      entries: [{ word: 'quiz', phonetic: '/ˈkwiz/' }],
+    });
+  });
+
+  // The key is the account's, and a key in a bundle is a key given away. The
+  // whole point of this route is that it never leaves the server.
+  it('never puts the key in what it sends back', async () => {
+    stubUpstream(mwEntry);
+    const response = await call('/define/quiz', undefined, { DICTIONARY_KEY: 'sekrit' });
+    expect(await response.text()).not.toContain('sekrit');
+  });
+
+  it('sends the key upstream rather than to the caller', async () => {
+    const fetchMock = stubUpstream(mwEntry);
+    await call('/define/quiz', undefined, { DICTIONARY_KEY: 'sekrit' });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('key=sekrit');
+  });
+
+  // Definitions are optional by design: the client decides validity offline, so
+  // an unconfigured or failing dictionary costs a sentence and nothing more.
+  it('answers with nothing when no key is configured', async () => {
+    const fetchMock = stubUpstream(mwEntry);
+    const response = await call('/define/quiz');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ entries: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a failing dictionary without saying anything about the word', async () => {
+    stubUpstream('gateway timeout', 502);
+    const response = await call('/define/quiz', undefined, { DICTIONARY_KEY: 'k' });
+    expect(response.status).toBe(502);
+  });
+
+  it('answers a word the dictionary does not have with no entries', async () => {
+    stubUpstream(['quiz', 'quit']);
+    const response = await call('/define/kwiz', undefined, { DICTIONARY_KEY: 'k' });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ entries: [] });
+  });
+
+  // `idFromName` will make a room for any string; nothing else here should be
+  // any more trusting. A word is letters, and the upstream is never asked
+  // anything else.
+  it.each(['/define/' + 'a'.repeat(40), '/define/quiz%20drop', '/define/../rooms'])(
+    'refuses %s rather than passing it upstream',
+    async (path) => {
+      const fetchMock = stubUpstream(mwEntry);
+      const response = await call(path, undefined, { DICTIONARY_KEY: 'k' });
+      expect(response.status).not.toBe(200);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('is not a route an old client can reach by another method', async () => {
+    const response = await call('/define/quiz', { method: 'POST' }, { DICTIONARY_KEY: 'k' });
+    expect(response.status).toBe(404);
+  });
+
+  it('is refused from an origin that is not allowed', async () => {
+    stubUpstream(mwEntry);
+    const response = await call(
+      '/define/quiz',
+      { headers: { Origin: 'https://evil.test' } },
+      {
+        DICTIONARY_KEY: 'k',
+      },
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it('says on /health whether the key is bound', async () => {
+    const withKey = (await (await call('/health', undefined, { DICTIONARY_KEY: 'k' })).json()) as {
+      dictionary: boolean;
+    };
+    const without = (await (await call('/health')).json()) as { dictionary: boolean };
+    expect(withKey.dictionary).toBe(true);
+    expect(without.dictionary).toBe(false);
   });
 });

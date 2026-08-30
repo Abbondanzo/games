@@ -50,6 +50,20 @@ the live room server. Non-production branches should build and stop.
 A branch cannot usefully deploy a room server of its own from here, and two attempts are written
 up in [rooms.md](rooms.md) so they are not tried a third time.
 
+### The dictionary key
+
+`DICTIONARY_KEY` is a Worker secret, so it does not travel with the code and a
+fresh deploy target will not have it:
+
+```
+wrangler secret put DICTIONARY_KEY
+curl -s https://<worker>/health | grep dictionary   # "dictionary":true
+```
+
+Until it is set the app works and shows no definitions, which is deliberate -
+validity is decided in the browser against a bundled word list and never waits
+on this.
+
 ## There is one room server, and previews use it
 
 Cloudflare Pages gives every pull request a preview, but there is no matching preview of the

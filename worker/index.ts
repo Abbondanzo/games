@@ -15,12 +15,22 @@ import {
   PROTOCOL_VERSION,
 } from '../shared/rooms/protocol';
 
+import { define } from './dictionary';
+
 export { Room } from './room';
 
 export interface Env {
   ROOMS: DurableObjectNamespace;
   /** Optional: Cloudflare's rate limiter. Absent in local dev. */
   JOIN_LIMIT?: RateLimit;
+  /** The same, for definitions, on its own budget so neither can starve the other. */
+  DEFINE_LIMIT?: RateLimit;
+  /**
+   * Merriam-Webster's API key, set with `wrangler secret put DICTIONARY_KEY`.
+   * Absent locally unless `.dev.vars` supplies one, in which case the Worker
+   * serves no definitions - which costs a sentence and nothing else.
+   */
+  DICTIONARY_KEY?: string;
   /** Comma-separated origins allowed to talk to this Worker. */
   ALLOWED_ORIGINS?: string;
   /** Which upload is running. Bound by Cloudflare; absent in local dev. */
@@ -88,6 +98,61 @@ async function withinLimit(request: Request, env: Env): Promise<boolean> {
   return success;
 }
 
+async function withinDefineLimit(request: Request, env: Env): Promise<boolean> {
+  if (!env.DEFINE_LIMIT) return true; // not bound in local dev
+  const { success } = await env.DEFINE_LIMIT.limit({ key: rateKey(request) });
+  return success;
+}
+
+/**
+ * A definition never changes, and the free tier is 1000 lookups a day for the
+ * whole account. Cached at the edge so a table arguing over the same word does
+ * not spend the budget on it. Guarded because `caches` does not exist under a
+ * test runner.
+ */
+const edgeCache = (): Cache | null =>
+  typeof caches !== 'undefined' ? (caches as unknown as { default: Cache }).default : null;
+
+/**
+ * GET /define/:word - the definition, and only the definition.
+ *
+ * Validity is the client's own business, decided against a word list it ships
+ * with, so every failure here is answered the same quiet way: no entries. The
+ * bar shows a verdict either way and this only ever adds a sentence to it.
+ */
+async function defineWord(
+  request: Request,
+  env: Env,
+  word: string,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const normalised = word.trim().toLowerCase();
+  if (!/^[a-z'-]{1,32}$/.test(normalised)) return json({ error: 'bad-word' }, 400, cors);
+  if (!(await withinDefineLimit(request, env))) return json({ error: 'rate-limited' }, 429, cors);
+  if (!env.DICTIONARY_KEY) return json({ entries: [] }, 200, cors);
+
+  const cache = edgeCache();
+  const cacheKey = new Request(new URL(`/define/${normalised}`, request.url).toString());
+  const hit = await cache?.match(cacheKey);
+  if (hit) {
+    // The cached copy carries no CORS headers of its own; they vary by origin.
+    const body: unknown = await hit.json();
+    return json(body, 200, cors);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await define(normalised, env.DICTIONARY_KEY);
+  } catch {
+    // Deliberately not an error the client has to understand. It retries, and
+    // if it never gets one it simply shows no definition.
+    return json({ error: 'dictionary-unavailable' }, 502, cors);
+  }
+
+  await cache?.put(cacheKey, json(payload, 200, { 'cache-control': 'public, max-age=604800' }));
+  return json(payload, 200, cors);
+}
+
 const roomStub = (env: Env, code: string) => env.ROOMS.get(env.ROOMS.idFromName(code));
 
 export default {
@@ -112,6 +177,10 @@ export default {
           ok: true,
           protocol: PROTOCOL_VERSION,
           games: GAMES,
+          // Whether the dictionary key actually landed. The secret is set out
+          // of band, so without this the only symptom of a missing one is
+          // definitions quietly never appearing.
+          dictionary: Boolean(env.DICTIONARY_KEY),
           version: env.VERSION?.id ?? null,
           // Workers Builds tags a version with the commit it was built from.
           commit: env.VERSION?.tag ?? null,
@@ -131,6 +200,15 @@ export default {
     }
 
     const parts = url.pathname.split('/').filter(Boolean);
+
+    // GET /define/:word - definitions for the Scrabble drawer.
+    if (parts[0] === 'define') {
+      if (request.method !== 'GET' || parts.length !== 2) {
+        return json({ error: 'not-found' }, 404, cors);
+      }
+      return defineWord(request, env, parts[1]!, cors);
+    }
+
     if (parts[0] !== 'rooms') return json({ error: 'not-found' }, 404, cors);
 
     // POST /rooms - create

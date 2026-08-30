@@ -27,7 +27,8 @@ pnpm dev
 
 Then open the `http://localhost:5173` address it prints. It must be **served**, not opened as a
 file: browsers give `file://` pages a `null` origin and block their network requests, which
-breaks the dictionary.
+breaks the definition lookup. Word validity is decided against a bundled word list and works
+either way.
 
 | Script               | What it does                                    |
 | -------------------- | ----------------------------------------------- |
@@ -38,6 +39,7 @@ breaks the dictionary.
 | `pnpm test:watch`    | Re-run tests on change                          |
 | `pnpm typecheck`     | Types only, no build                            |
 | `pnpm icons`         | Regenerate the icon set from the trophy artwork |
+| `pnpm words`         | Regenerate the offline Scrabble word list       |
 | `pnpm worker:dev`    | Run the room server locally on :8787            |
 | `pnpm worker:deploy` | Deploy the room server                          |
 

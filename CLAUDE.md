@@ -129,10 +129,16 @@ it fail first.
 ## Gotchas
 
 - **Validity is offline; only the definition is a network call.** `src/scrabble/lib/words.txt` is
-  the authority on whether a word counts, so a verdict never waits on anything and the upstream
-  cannot withhold one. The API is asked afterwards, for the sentence underneath. Every way of not
-  getting that sentence - a 404, a 502, a request that never answers - is the same absence, and
-  none of them may reach the bar as a verdict. Do not route validity back through the network.
+  the authority on whether a word counts, so a verdict never waits on anything and no upstream
+  can withhold one. The dictionary is asked afterwards, for the sentence underneath. Every way of
+  not getting that sentence - no entries, a 502, an unreadable body, a request that never answers
+  - is the same absence, and none may reach the bar as a verdict. Do not route validity back
+    through the network.
+- **The dictionary key never leaves the Worker.** Merriam-Webster's free tier is 1000 lookups a
+  day for the account, so the browser asks `GET /define/:word` on the room server rather than the
+  dictionary. `DICTIONARY_KEY` is a `wrangler secret`, never a var; `/health` reports whether it
+  is bound. `worker/dictionary.ts` is the only file that knows the upstream's shape, and it parses
+  leniently - a word it does not have comes back as plain suggestion strings, not entries.
 - **A dictionary request needs a deadline, and every lookup needs an owner.** The upstream returns
   sporadic `502`s unrelated to the word, and also accepts a connection and then never answers,
   which no amount of retrying escapes: `retryConfig` bounds one attempt and the lookup as a whole.

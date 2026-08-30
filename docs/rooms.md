@@ -198,6 +198,38 @@ be seat-scoped. The host opens a round, each player submits their own rack, and
 the host commits. That collection lives in room state, not in the game, so
 `RummikubState` and its storage never changed.
 
+## Definitions
+
+The Worker serves one route that has nothing to do with rooms.
+
+```
+GET /define/:word  ->  { "entries": [ { word, phonetic?, meanings: [...] } ] }
+```
+
+It exists because of the API key. Merriam-Webster's free tier is 1000 lookups a
+day for the account, so a key in the client bundle is a key given away - it has
+to stay on the server, which means the browser asks the server. The Scrabble
+tracker decides validity offline against its own word list and only ever comes
+here for the sentence underneath, so every failure is answered quietly: an
+unconfigured key, a dead upstream and a word with no entry all end as no
+definition, and none of them can change a verdict.
+
+- **The key is a secret**, set with `wrangler secret put DICTIONARY_KEY` and
+  never in `wrangler.toml`. `GET /health` reports `dictionary: true` when it is
+  bound, because otherwise a missing secret looks exactly like a dictionary that
+  has nothing to say.
+- **Merriam-Webster's shape is normalised here**, in `worker/dictionary.ts`, and
+  nowhere else. It is quirky - pronunciations under `hwi`, part of speech in
+  `fl`, headwords with asterisks at the syllable breaks - and a word it does not
+  have comes back as an array of plain suggestion strings rather than entries.
+  Everything is parsed leniently: an entry that will not read is skipped.
+- **Rate limited on its own budget** (`DEFINE_LIMIT`), so a busy Scrabble game
+  cannot spend what joining a room needs.
+- **Cached at the edge for a week.** A definition does not change, and a table
+  arguing about the same word should not cost the daily allowance twice.
+- **Origin checked** like everything else, so the key answers for this site
+  rather than for anyone who finds the address.
+
 ## Security
 
 The honest threat model: with a few hundred live rooms, finding any room by
@@ -229,6 +261,15 @@ sheet. The defences are proportionate.
 pnpm worker:dev          # the room server on :8787
 VITE_ROOMS_URL=http://localhost:8787 pnpm dev
 ```
+
+For definitions locally, put the key in `.dev.vars`, which is gitignored:
+
+```
+DICTIONARY_KEY=your-merriam-webster-key
+```
+
+Without it the room server answers `/define/:word` with no entries, which is a
+working app minus the definitions.
 
 **Without `VITE_ROOMS_URL` the app talks to the live room server**, from a dev
 server as much as from a pull request preview. There is one room server and no

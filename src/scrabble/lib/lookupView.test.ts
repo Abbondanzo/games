@@ -67,7 +67,11 @@ describe('runDefinition', () => {
   it('returns the first definition when the dictionary answers', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({ ok: true, status: 200, json: async () => entry('quiz') })),
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ entries: entry('quiz') }),
+      })),
     );
     await expect(runDefinition('quiz')).resolves.toMatchObject({
       detail: '(noun) meaning of quiz',
@@ -77,8 +81,12 @@ describe('runDefinition', () => {
   // A definition is a sentence, not a ruling: every way of not getting one is
   // the same absence, and none of them may reach the bar as an alarm.
   it.each([
-    ['a word the dictionary does not have', { ok: false, status: 404 }],
-    ['a service failure', { ok: false, status: 502 }],
+    [
+      'a word the dictionary does not have',
+      { ok: true, status: 200, json: async () => ({ entries: [] }) },
+    ],
+    ['a service failure', { ok: false, status: 502, json: async () => ({}) }],
+    ['a room server too old to know the route', { ok: false, status: 404, json: async () => ({}) }],
   ])('returns nothing to show for %s', async (_case, response) => {
     vi.stubGlobal(
       'fetch',

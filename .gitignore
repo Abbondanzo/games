@@ -5,6 +5,8 @@ dist
 # Local environment overrides
 .env
 *.local
+# Worker secrets for `wrangler dev` - DICTIONARY_KEY lives here locally.
+.dev.vars
 
 # Editor / tooling
 .vscode

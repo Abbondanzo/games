@@ -34,18 +34,21 @@ async function addPlayers(user: ReturnType<typeof userEvent.setup>, names: strin
   await user.click(screen.getByRole('button', { name: 'Add' }));
 }
 
+/** What the room server hands back, which is all this side ever sees. */
 const dictResponse = (word: string) => ({
   ok: true,
   status: 200,
-  json: async () => [
-    {
-      word,
-      phonetic: '/test/',
-      meanings: [
-        { partOfSpeech: 'noun', definitions: [{ definition: `a definition of ${word}` }] },
-      ],
-    },
-  ],
+  json: async () => ({
+    entries: [
+      {
+        word,
+        phonetic: '/test/',
+        meanings: [
+          { partOfSpeech: 'noun', definitions: [{ definition: `a definition of ${word}` }] },
+        ],
+      },
+    ],
+  }),
 });
 
 /** A lookup that never answers, and settles only when the app cancels it. */
@@ -434,7 +437,7 @@ describe('dictionary', () => {
     it('costs a 502 the definition, never the verdict', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn(async () => ({ ok: false, status: 502 })),
+        vi.fn(async () => ({ ok: false, status: 502, json: async () => ({}) })),
       );
       const user = setup();
       const verdict = await openDrawer(user, 'ax');
