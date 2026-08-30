@@ -238,7 +238,7 @@ describe('the define endpoint', () => {
     const fetchMock = vi.fn(async (_url: string) => ({
       ok: status >= 200 && status < 300,
       status,
-      json: async () => response,
+      text: async () => (typeof response === 'string' ? response : JSON.stringify(response)),
     }));
     vi.stubGlobal('fetch', fetchMock);
     return fetchMock;
@@ -318,6 +318,40 @@ describe('the define endpoint', () => {
       },
     );
     expect(response.status).toBe(403);
+  });
+
+  // Regression: the reference was hardcoded, and a key for any other
+  // Merriam-Webster dictionary is refused by it.
+  it('asks the reference the key is subscribed to', async () => {
+    const fetchMock = stubUpstream(mwEntry);
+    await call('/define/quiz', undefined, { DICTIONARY_KEY: 'k', DICTIONARY_REFERENCE: 'sd3' });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/references/sd3/json/quiz');
+  });
+
+  // Regression: the reason was swallowed, so a key for the wrong reference and
+  // a dictionary that was merely down were the same 502 from the outside, with
+  // nothing anywhere to tell them apart.
+  it('logs why it failed, while telling the caller nothing', async () => {
+    const logged: unknown[][] = [];
+    vi.stubGlobal('console', { ...console, error: (...args: unknown[]) => logged.push(args) });
+    stubUpstream('Invalid API key. Not subscribed for this reference.');
+
+    const response = await call('/define/quiz', undefined, { DICTIONARY_KEY: 'sekrit' });
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({ error: 'dictionary-unavailable' });
+    const line = logged.flat().join(' ');
+    expect(line).toMatch(/Not subscribed/);
+    // The log is the one place the failure is legible; it is not a place for
+    // the key, which the upstream address would have carried into it.
+    expect(line).not.toContain('sekrit');
+  });
+
+  it('says on /health which dictionary the key is for', async () => {
+    const body = (await (
+      await call('/health', undefined, { DICTIONARY_REFERENCE: 'sd3' })
+    ).json()) as { reference: string | null };
+    expect(body.reference).toBe('sd3');
   });
 
   it('says on /health whether the key is bound', async () => {

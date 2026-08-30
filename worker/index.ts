@@ -31,6 +31,12 @@ export interface Env {
    * serves no definitions - which costs a sentence and nothing else.
    */
   DICTIONARY_KEY?: string;
+  /**
+   * Which Merriam-Webster dictionary the key is subscribed to. A key is issued
+   * per reference and is refused by every other one, so this belongs beside the
+   * key rather than in code.
+   */
+  DICTIONARY_REFERENCE?: string;
   /** Comma-separated origins allowed to talk to this Worker. */
   ALLOWED_ORIGINS?: string;
   /** Which upload is running. Bound by Cloudflare; absent in local dev. */
@@ -142,10 +148,13 @@ async function defineWord(
 
   let payload: unknown;
   try {
-    payload = await define(normalised, env.DICTIONARY_KEY);
-  } catch {
-    // Deliberately not an error the client has to understand. It retries, and
-    // if it never gets one it simply shows no definition.
+    payload = await define(normalised, env.DICTIONARY_KEY, env.DICTIONARY_REFERENCE);
+  } catch (err) {
+    // Opaque to the caller on purpose - a player must never be shown any of
+    // this - but a rejected key and a dictionary that is merely down are the
+    // same 502 from outside, and telling them apart is the difference between
+    // a one-line fix and an afternoon. `wrangler tail` is where it goes.
+    console.error('define failed:', normalised, err instanceof Error ? err.message : err);
     return json({ error: 'dictionary-unavailable' }, 502, cors);
   }
 
@@ -181,6 +190,9 @@ export default {
           // of band, so without this the only symptom of a missing one is
           // definitions quietly never appearing.
           dictionary: Boolean(env.DICTIONARY_KEY),
+          // Which dictionary the key is for. A key refused by every reference
+          // but its own is the failure this makes visible without a log.
+          reference: env.DICTIONARY_REFERENCE ?? null,
           version: env.VERSION?.id ?? null,
           // Workers Builds tags a version with the commit it was built from.
           commit: env.VERSION?.tag ?? null,

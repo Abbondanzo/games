@@ -139,6 +139,10 @@ it fail first.
   dictionary. `DICTIONARY_KEY` is a `wrangler secret`, never a var; `/health` reports whether it
   is bound. `worker/dictionary.ts` is the only file that knows the upstream's shape, and it parses
   leniently - a word it does not have comes back as plain suggestion strings, not entries.
+- **A dictionary key is issued for one reference and refused by every other**, at `200` with a
+  plain-text body, so `DICTIONARY_REFERENCE` is a var that has to match the key and both are on
+  `/health`. The upstream's complaint goes to `console.error` for `wrangler tail`, never to the
+  caller and never with the key, which the address would have carried into it.
 - **A dictionary request needs a deadline, and every lookup needs an owner.** The upstream returns
   sporadic `502`s unrelated to the word, and also accepts a connection and then never answers,
   which no amount of retrying escapes: `retryConfig` bounds one attempt and the lookup as a whole.
